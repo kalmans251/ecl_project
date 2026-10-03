@@ -83,6 +83,8 @@ void system_state_init(void)
     s_state.music_playing =
         false;
 
+    s_state.music_paused_by_led_mode =
+        false;
 
     s_state.projector_enabled =
         false;
@@ -213,6 +215,17 @@ void system_state_set_music_playing(
     unlock_state();
 }
 
+void system_state_set_music_paused_by_led_mode(
+    bool paused
+)
+{
+    lock_state();
+
+    s_state.music_paused_by_led_mode =
+        paused;
+
+    unlock_state();
+}
 
 /* ============================================================
  * PROJECTOR

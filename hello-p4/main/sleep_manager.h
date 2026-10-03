@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "detection_manager.h"
-
+#include "system_state.h"
 
 /* ============================================================
  * ACTIVITY STATE
@@ -94,3 +94,11 @@ void sleep_manager_reset_activity(void);
  * ============================================================ */
 
 activity_state_t sleep_manager_get_state(void);
+
+/* ============================================================
+ * LED MODE CHANGE
+ * ============================================================ */
+
+void sleep_manager_on_led_mode_changed(
+    led_mode_t mode
+);

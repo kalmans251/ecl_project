@@ -83,6 +83,45 @@ static int64_t now_ms(void)
         1000;
 }
 
+/* ============================================================
+ * IDLE TIMEOUT CHECK
+ * ============================================================ */
+
+static bool idle_timeout_expired(void)
+{
+    detection_summary_t detection;
+
+    detection_manager_get_summary(
+        &detection
+    );
+
+
+    int64_t reference_ms =
+        detection.last_detection_ms;
+
+
+    /*
+     * Sleep 기능을 켠 직후에는
+     * enable 시점을 기준으로 한다.
+     */
+    if (
+        s_enabled_since_ms >
+        reference_ms
+    )
+    {
+        reference_ms =
+            s_enabled_since_ms;
+    }
+
+
+    return
+        (
+            now_ms() -
+            reference_ms
+        )
+        >=
+        SLEEP_IDLE_TIMEOUT_MS;
+}
 
 /* ============================================================
  * LOCK
@@ -864,17 +903,20 @@ void sleep_manager_task(
             )
             {
                 /*
-                 * 10초 신규 사람 없음.
-                 */
+                * 현재 MUSIC LED 모드에서 실제 음악이 재생 중일 때만
+                * 곡 종료를 기다린다.
+                *
+                * BASIC / WEATHER에서는 음악이 재생 상태로 남아 있더라도
+                * 기다리지 않고 Sleep한다.
+                */
 
                 if (
+                    system.led_mode ==
+                        LED_MODE_MUSIC
+                    &&
                     system.music_playing
                 )
                 {
-                    /*
-                     * 현재 곡은 끊지 않는다.
-                     */
-
                     lock_manager();
 
                     s_activity =
@@ -890,11 +932,6 @@ void sleep_manager_task(
                 }
                 else
                 {
-                    /*
-                     * 재생 중인 곡 없음.
-                     * 바로 Sleep.
-                     */
-
                     enter_sleeping();
                 }
             }
@@ -915,23 +952,22 @@ void sleep_manager_task(
             ACTIVITY_SLEEP_PENDING
         )
         {
+            /*
+            * 두 경우에는 더 이상 FINISHED를 기다리지 않는다.
+            *
+            * 1. BASIC / WEATHER로 모드가 변경됨
+            * 2. 음악이 PAUSE / STOP / ERROR 등으로 재생 중이 아님
+            */
+
             if (
+                system.led_mode !=
+                    LED_MODE_MUSIC
+                ||
                 !system.music_playing
             )
             {
-                detection_summary_t detection;
-
-
-                detection_manager_get_summary(
-                    &detection
-                );
-
-
                 if (
-                    now_ms() -
-                    detection.last_detection_ms
-                    >=
-                    SLEEP_IDLE_TIMEOUT_MS
+                    idle_timeout_expired()
                 )
                 {
                     enter_sleeping();
@@ -1002,4 +1038,44 @@ void sleep_manager_task(
             pdMS_TO_TICKS(100)
         );
     }
+}
+
+/* ============================================================
+ * IDLE TIMEOUT CHECK
+ * ============================================================ */
+
+static bool idle_timeout_expired(void)
+{
+    detection_summary_t detection;
+
+    detection_manager_get_summary(
+        &detection
+    );
+
+
+    int64_t reference_ms =
+        detection.last_detection_ms;
+
+
+    /*
+     * Sleep 기능을 켠 직후에는
+     * enable 시점을 기준으로 한다.
+     */
+    if (
+        s_enabled_since_ms >
+        reference_ms
+    )
+    {
+        reference_ms =
+            s_enabled_since_ms;
+    }
+
+
+    return
+        (
+            now_ms() -
+            reference_ms
+        )
+        >=
+        SLEEP_IDLE_TIMEOUT_MS;
 }

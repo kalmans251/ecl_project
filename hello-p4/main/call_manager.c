@@ -748,10 +748,29 @@ bool call_manager_end(void)
          * 당시 Sleep 상태가 아니었다면 RESUME.
          */
 
+        p4_system_state_t current_state;
+
+
+        system_state_get(
+            &current_state
+        );
+
+
+        /*
+        * 통화 직전 음악이 재생 중이었더라도
+        * 현재 LED 모드가 BASIC/WEATHER라면
+        * 음악을 다시 틀면 안 된다.
+        */
+
         if (
-            restore.music_enabled &&
-            restore.music_was_playing &&
+            restore.music_enabled
+            &&
+            restore.music_was_playing
+            &&
             !restore.sleep_active
+            &&
+            current_state.led_mode ==
+                LED_MODE_MUSIC
         )
         {
             request_music_resume();
