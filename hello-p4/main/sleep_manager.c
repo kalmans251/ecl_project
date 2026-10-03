@@ -505,15 +505,23 @@ void sleep_manager_on_new_detection(
             unlock_manager();
 
 
-            ESP_LOGI(
-                TAG,
+            if (
                 source ==
-                    DETECTION_SOURCE_RADAR
-                    ?
+                DETECTION_SOURCE_RADAR
+            )
+            {
+                ESP_LOGI(
+                    TAG,
                     "RADAR wake"
-                    :
+                );
+            }
+            else
+            {
+                ESP_LOGI(
+                    TAG,
                     "CCTV wake immediately / AGE mode OFF"
-            );
+                );
+            }
 
 
             enter_active();
