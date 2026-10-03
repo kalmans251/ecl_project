@@ -1,0 +1,406 @@
+Command: /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python /opt/esp/idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace /workspace/hello-p4/build/hello_world.elf /workspace/hello-p4/build/bootloader/bootloader.elf -m '/home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python' '/opt/esp/idf/tools/idf.py' '-p' '/dev/ttyACM0'
+[0;32mI (264) PLC_RX_WINDOW_TEST: PLCMODEM2 RX WINDOW TEST[0m
+[0;32mI (274) PLC_RX_WINDOW_TEST: ================================[0m
+IESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0x30f (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4fc1c31a
+Core1 Saved PC:0x4ff03cbc
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x15e0
+load:0x4ff28ed0,len:0xe54
+load:0x4ff2bbd0,len:0x35dc
+entry 0x4ff28eda
+[0;32mI (27) boot: ESP-IDF v6.0.2 2nd stage bootloader[0m
+[0;32mI (28) boot: compile time Sep 22 2026 07:07:55[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (30) boot: chip revision: v1.0[0m
+[0;32mI (31) boot: efuse block revision: v0.3[0m
+[0;32mI (34) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (38) boot.esp32p4: SPI Mode       : DIO[0m
+[0;32mI (42) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (46) boot: Enabling RNG early entropy source...[0m
+[0;32mI (50) boot: Partition Table:[0m
+[0;32mI (53) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (59) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (66) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (72) boot:  2 factory          factory app      00 00 00010000 00100000[0m
+[0;32mI (79) boot: End of partition table[0m
+[0;32mI (82) esp_image: segment 0: paddr=00010020 vaddr=40020020 size=09030h ( 36912) map[0m
+[0;32mI (95) esp_image: segment 1: paddr=00019058 vaddr=30100000 size=00088h (   136) load[0m
+[0;32mI (97) esp_image: segment 2: paddr=000190e8 vaddr=4ff00000 size=06f30h ( 28464) load[0m
+[0;32mI (109) esp_image: segment 3: paddr=00020020 vaddr=40000020 size=17e98h ( 97944) map[0m
+[0;32mI (126) esp_image: segment 4: paddr=00037ec0 vaddr=4ff06f30 size=063fch ( 25596) load[0m
+[0;32mI (132) esp_image: segment 5: paddr=0003e2c4 vaddr=4ff0d380 size=02414h (  9236) load[0m
+[0;32mI (137) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (138) boot: Disabling RNG early entropy source...[0m
+[0;32mI (152) cpu_start: Multicore app[0m
+[0;32mI (163) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (163) cpu_start: Pro cpu start user code[0m
+[0;32mI (163) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (165) app_init: Application information:[0m
+[0;32mI (169) app_init: Project name:     hello_world[0m
+[0;32mI (173) app_init: App version:      1[0m
+[0;32mI (177) app_init: Compile time:     Sep 22 2026 07:08:03[0m
+[0;32mI (182) app_init: ELF file SHA256:  006bf3788...[0m
+[0;32mI (186) app_init: ESP-IDF:          v6.0.2[0m
+[0;32mI (190) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (194) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (198) efuse_init: Chip rev:         v1.0[0m
+[0;32mI (201) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (208) heap_init: At 4FF10F90 len 0002A030 (168 KiB): RETENT_RAM[0m
+[0;32mI (213) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (219) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (224) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM[0m
+[0;32mI (229) heap_init: At 30100088 len 00001F78 (7 KiB): SPM[0m
+[0;32mI (235) spi_flash: detected chip: generic[0m
+[0;32mI (238) spi_flash: flash io: dio[0m
+[0;32mI (241) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (247) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (254) main_task: Started on CPU0[0m
+[0;32mI (254) main_task: Calling app_main()[0m
+[0;32mI (264) PLC_RX_WINDOW_TEST: ================================[0m
+[0;32mI (264) PLC_RX_WINDOW_TEST: PLCMODEM2 RX WINDOW TEST[0m
+[0;32mI (274) PLC_RX_WINDOW_TEST: ================================[0m
+[0;32mI (274) PLC_RX_WINDOW_TEST: BAUD           : 9600[0m
+[0;32mI (284) PLC_RX_WINDOW_TEST: VOICE PACKET   : 71 bytes[0m
+[0;32mI (284) PLC_RX_WINDOW_TEST: VOICE INTERVAL : 100 ms[0m
+[0;32mI (294) PLC_RX_WINDOW_TEST: BURST COUNT    : 5[0m
+[0;32mI (294) PLC_RX_WINDOW_TEST: CONTROL WINDOW : 70 ms[0m
+[0;32mI (294) PLC_RX_WINDOW_TEST: ================================[0m
+[0;32mI (304) PLC_RX_WINDOW_TEST: Starting after 5 seconds...[0m
+[0;32mI (5374) PLC_RX_WINDOW_TEST: VOICE seq=0 burst=1/5 tx=74.15ms[0m
+[0;32mI (5474) PLC_RX_WINDOW_TEST: VOICE seq=1 burst=2/5 tx=74.00ms[0m
+[0;32mI (5574) PLC_RX_WINDOW_TEST: VOICE seq=2 burst=3/5 tx=73.99ms[0m
+[0;32mI (5674) PLC_RX_WINDOW_TEST: VOICE seq=3 burst=4/5 tx=73.99ms[0m
+[0;32mI (5774) PLC_RX_WINDOW_TEST: VOICE seq=4 burst=5/5 tx=73.99ms[0m
+[0;32mI (5774) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #1 START ----[0m
+[0;32mI (5844) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (5914) PLC_RX_WINDOW_TEST: VOICE seq=5 burst=1/5 tx=73.99ms[0m
+[0;32mI (6014) PLC_RX_WINDOW_TEST: VOICE seq=6 burst=2/5 tx=73.99ms[0m
+I (6114) PLC_RX_WINDOW_TEST: VOICE seq=7 burst=3/5 tx=73.99ms
+[0;32mI (6214) PLC_RX_WINDOW_TEST: VOICE seq=8 burst=4/5 tx=73.99ms[0m
+[0;32mI (6314) PLC_RX_WINDOW_TEST: VOICE seq=9 burst=5/5 tx=73.99ms[0m
+[0;32mI (6314) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #2 START ----[0m
+[0;32mI (6384) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (6454) PLC_RX_WINDOW_TEST: VOICE seq=10 burst=1/5 tx=73.99ms[0m
+[0;32mI (6554) PLC_RX_WINDOW_TEST: VOICE seq=11 burst=2/5 tx=73.99ms[0m
+[0;32mI (6654) PLC_RX_WINDOW_TEST: VOICE seq=12 burst=3/5 tx=73.99ms[0m
+[0;32mI (6754) PLC_RX_WINDOW_TEST: VOICE seq=13 burst=4/5 tx=73.99ms[0m
+[0;32mI (6854) PLC_RX_WINDOW_TEST: VOICE seq=14 burst=5/5 tx=73.99ms[0m
+[0;32mI (6854) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #3 START ----[0m
+[0;32mI (6924) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (6994) PLC_RX_WINDOW_TEST: VOICE seq=15 burst=1/5 tx=73.99ms[0m
+[0;32mI (7094) PLC_RX_WINDOW_TEST: VOICE seq=16 burst=2/5 tx=73.99ms[0m
+[0;32mI (7194) PLC_RX_WINDOW_TEST: VOICE seq=17 burst=3/5 tx=73.99ms[0m
+[0;32mI (7294) PLC_RX_WINDOW_TEST: VOICE seq=18 burst=4/5 tx=73.99ms[0m
+[0;32mI (7394) PLC_RX_WINDOW_TEST: VOICE seq=19 burst=5/5 tx=73.99ms[0m
+[0;32mI (7394) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #4 START ----[0m
+[0;32mI (7464) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (7534) PLC_RX_WINDOW_TEST: VOICE seq=20 burst=1/5 tx=73.99ms[0m
+[0;32mI (7634) PLC_RX_WINDOW_TEST: VOICE seq=21 burst=2/5 tx=73.99ms[0m
+[0;32mI (7734) PLC_RX_WINDOW_TEST: VOICE seq=22 burst=3/5 tx=73.99ms[0m
+[0;32mI (7834) PLC_RX_WINDOW_TEST: VOICE seq=23 burst=4/5 tx=73.99ms[0m
+[0;32mI (7934) PLC_RX_WINDOW_TEST: VOICE seq=24 burst=5/5 tx=73.99ms[0m
+[0;32mI (7934) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #5 START ----[0m
+[0;32mI (8004) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (8074) PLC_RX_WINDOW_TEST: VOICE seq=25 burst=1/5 tx=73.99ms[0m
+[0;32mI (8174) PLC_RX_WINDOW_TEST: VOICE seq=26 burst=2/5 tx=73.99ms[0m
+[0;32mI (8274) PLC_RX_WINDOW_TEST: VOICE seq=27 burst=3/5 tx=73.99ms[0m
+[0;32mI (8374) PLC_RX_WINDOW_TEST: VOICE seq=28 burst=4/5 tx=73.99ms[0m
+[0;32mI (8474) PLC_RX_WINDOW_TEST: VOICE seq=29 burst=5/5 tx=73.99ms[0m
+[0;32mI (8474) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #6 START ----[0m
+[0;32mI (8544) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (8614) PLC_RX_WINDOW_TEST: VOICE seq=30 burst=1/5 tx=73.99ms[0m
+[0;32mI (8714) PLC_RX_WINDOW_TEST: VOICE seq=31 burst=2/5 tx=73.99ms[0m
+[0;32mI (8814) PLC_RX_WINDOW_TEST: VOICE seq=32 burst=3/5 tx=73.99ms[0m
+[0;32mI (8914) PLC_RX_WINDOW_TEST: VOICE seq=33 burst=4/5 tx=73.99ms[0m
+[0;32mI (9014) PLC_RX_WINDOW_TEST: VOICE seq=34 burst=5/5 tx=73.99ms[0m
+[0;32mI (9014) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #7 START ----[0m
+[0;32mI (9084) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (9154) PLC_RX_WINDOW_TEST: VOICE seq=35 burst=1/5 tx=73.99ms[0m
+[0;32mI (9254) PLC_RX_WINDOW_TEST: VOICE seq=36 burst=2/5 tx=73.99ms[0m
+[0;32mI (9354) PLC_RX_WINDOW_TEST: VOICE seq=37 burst=3/5 tx=73.99ms[0m
+[0;32mI (9454) PLC_RX_WINDOW_TEST: VOICE seq=38 burst=4/5 tx=73.99ms[0m
+[0;32mI (9554) PLC_RX_WINDOW_TEST: VOICE seq=39 burst=5/5 tx=73.99ms[0m
+[0;32mI (9554) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #8 START ----[0m
+[0;32mI (9624) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (9694) PLC_RX_WINDOW_TEST: VOICE seq=40 burst=1/5 tx=73.99ms[0m
+[0;32mI (9794) PLC_RX_WINDOW_TEST: VOICE seq=41 burst=2/5 tx=73.99ms[0m
+[0;32mI (9894) PLC_RX_WINDOW_TEST: VOICE seq=42 burst=3/5 tx=73.99ms[0m
+[0;32mI (9994) PLC_RX_WINDOW_TEST: VOICE seq=43 burst=4/5 tx=73.99ms[0m
+[0;32mI (10094) PLC_RX_WINDOW_TEST: VOICE seq=44 burst=5/5 tx=73.99ms[0m
+[0;32mI (10094) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #9 START ----[0m
+[0;32mI (10164) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (10234) PLC_RX_WINDOW_TEST: VOICE seq=45 burst=1/5 tx=73.99ms[0m
+[0;32mI (10334) PLC_RX_WINDOW_TEST: VOICE seq=46 burst=2/5 tx=73.99ms[0m
+[0;32mI (10434) PLC_RX_WINDOW_TEST: VOICE seq=47 burst=3/5 tx=73.99ms[0m
+[0;32mI (10534) PLC_RX_WINDOW_TEST: VOICE seq=48 burst=4/5 tx=73.99ms[0m
+[0;32mI (10634) PLC_RX_WINDOW_TEST: VOICE seq=49 burst=5/5 tx=73.99ms[0m
+[0;32mI (10634) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #10 START ----[0m
+[0;32mI (10704) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (10774) PLC_RX_WINDOW_TEST: VOICE seq=50 burst=1/5 tx=73.99ms[0m
+[0;32mI (10874) PLC_RX_WINDOW_TEST: VOICE seq=51 burst=2/5 tx=73.99ms[0m
+[0;32mI (10974) PLC_RX_WINDOW_TEST: VOICE seq=52 burst=3/5 tx=73.99ms[0m
+[0;32mI (11074) PLC_RX_WINDOW_TEST: VOICE seq=53 burst=4/5 tx=73.99ms[0m
+[0;32mI (11174) PLC_RX_WINDOW_TEST: VOICE seq=54 burst=5/5 tx=73.99ms[0m
+[0;32mI (11174) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #11 START ----[0m
+[0;32mI (11244) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (11314) PLC_RX_WINDOW_TEST: VOICE seq=55 burst=1/5 tx=73.99ms[0m
+[0;32mI (11414) PLC_RX_WINDOW_TEST: VOICE seq=56 burst=2/5 tx=73.99ms[0m
+[0;32mI (11514) PLC_RX_WINDOW_TEST: VOICE seq=57 burst=3/5 tx=73.99ms[0m
+[0;32mI (11614) PLC_RX_WINDOW_TEST: VOICE seq=58 burst=4/5 tx=73.99ms[0m
+[0;32mI (11714) PLC_RX_WINDOW_TEST: VOICE seq=59 burst=5/5 tx=73.99ms[0m
+[0;32mI (11714) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #12 START ----[0m
+[0;32mI (11784) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (11854) PLC_RX_WINDOW_TEST: VOICE seq=60 burst=1/5 tx=73.99ms[0m
+[0;32mI (11954) PLC_RX_WINDOW_TEST: VOICE seq=61 burst=2/5 tx=73.99ms[0m
+[0;32mI (12054) PLC_RX_WINDOW_TEST: VOICE seq=62 burst=3/5 tx=73.99ms[0m
+[0;32mI (12154) PLC_RX_WINDOW_TEST: VOICE seq=63 burst=4/5 tx=73.99ms[0m
+[0;32mI (12254) PLC_RX_WINDOW_TEST: VOICE seq=64 burst=5/5 tx=73.99ms[0m
+[0;32mI (12254) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #13 START ----[0m
+[0;32mI (12324) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (12394) PLC_RX_WINDOW_TEST: VOICE seq=65 burst=1/5 tx=73.99ms[0m
+[0;32mI (12494) PLC_RX_WINDOW_TEST: VOICE seq=66 burst=2/5 tx=73.99ms[0m
+[0;32mI (12594) PLC_RX_WINDOW_TEST: VOICE seq=67 burst=3/5 tx=73.99ms[0m
+[0;32mI (12694) PLC_RX_WINDOW_TEST: VOICE seq=68 burst=4/5 tx=73.99ms[0m
+[0;32mI (12794) PLC_RX_WINDOW_TEST: VOICE seq=69 burst=5/5 tx=73.99ms[0m
+[0;32mI (12794) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #14 START ----[0m
+[0;32mI (12864) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (12934) PLC_RX_WINDOW_TEST: VOICE seq=70 burst=1/5 tx=73.99ms[0m
+[0;32mI (13034) PLC_RX_WINDOW_TEST: VOICE seq=71 burst=2/5 tx=73.99ms[0m
+[0;32mI (13134) PLC_RX_WINDOW_TEST: VOICE seq=72 burst=3/5 tx=73.99ms[0m
+[0;32mI (13234) PLC_RX_WINDOW_TEST: VOICE seq=73 burst=4/5 tx=73.99ms[0m
+[0;32mI (13334) PLC_RX_WINDOW_TEST: VOICE seq=74 burst=5/5 tx=73.99ms[0m
+[0;32mI (13334) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #15 START ----[0m
+[0;32mI (13404) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (13474) PLC_RX_WINDOW_TEST: VOICE seq=75 burst=1/5 tx=73.99ms[0m
+[0;32mI (13574) PLC_RX_WINDOW_TEST: VOICE seq=76 burst=2/5 tx=73.99ms[0m
+[0;32mI (13674) PLC_RX_WINDOW_TEST: VOICE seq=77 burst=3/5 tx=73.99ms[0m
+I (13774) PLC_RX_WINDOW_TEST: VOICE seq=78 burst=4/5 tx=73.99ms
+[0;32mI (13874) PLC_RX_WINDOW_TEST: VOICE seq=79 burst=5/5 tx=73.99ms[0m
+[0;32mI (13874) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #16 START ----[0m
+[0;32mI (13944) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (14014) PLC_RX_WINDOW_TEST: VOICE seq=80 burst=1/5 tx=73.99ms[0m
+[0;32mI (14114) PLC_RX_WINDOW_TEST: VOICE seq=81 burst=2/5 tx=73.99ms[0m
+[0;32mI (14214) PLC_RX_WINDOW_TEST: VOICE seq=82 burst=3/5 tx=73.99ms[0m
+[0;32mI (14314) PLC_RX_WINDOW_TEST: VOICE seq=83 burst=4/5 tx=73.99ms[0m
+[0;32mI (14414) PLC_RX_WINDOW_TEST: VOICE seq=84 burst=5/5 tx=73.99ms[0m
+[0;32mI (14414) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #17 START ----[0m
+[0;32mI (14484) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (14554) PLC_RX_WINDOW_TEST: VOICE seq=85 burst=1/5 tx=73.99ms[0m
+[0;32mI (14654) PLC_RX_WINDOW_TEST: VOICE seq=86 burst=2/5 tx=73.99ms[0m
+[0;32mI (14754) PLC_RX_WINDOW_TEST: VOICE seq=87 burst=3/5 tx=73.99ms[0m
+[0;32mI (14854) PLC_RX_WINDOW_TEST: VOICE seq=88 burst=4/5 tx=73.99ms[0m
+[0;32mI (14954) PLC_RX_WINDOW_TEST: VOICE seq=89 burst=5/5 tx=73.99ms[0m
+[0;32mI (14954) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #18 START ----[0m
+[0;32mI (15024) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (15094) PLC_RX_WINDOW_TEST: VOICE seq=90 burst=1/5 tx=73.99ms[0m
+[0;32mI (15194) PLC_RX_WINDOW_TEST: VOICE seq=91 burst=2/5 tx=73.99ms[0m
+[0;32mI (15294) PLC_RX_WINDOW_TEST: VOICE seq=92 burst=3/5 tx=73.99ms[0m
+[0;32mI (15394) PLC_RX_WINDOW_TEST: VOICE seq=93 burst=4/5 tx=73.99ms[0m
+[0;32mI (15494) PLC_RX_WINDOW_TEST: VOICE seq=94 burst=5/5 tx=73.99ms[0m
+[0;32mI (15494) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #19 START ----[0m
+[0;32mI (15564) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (15634) PLC_RX_WINDOW_TEST: VOICE seq=95 burst=1/5 tx=73.99ms[0m
+[0;32mI (15734) PLC_RX_WINDOW_TEST: VOICE seq=96 burst=2/5 tx=73.99ms[0m
+[0;32mI (15834) PLC_RX_WINDOW_TEST: VOICE seq=97 burst=3/5 tx=73.99ms[0m
+[0;32mI (15934) PLC_RX_WINDOW_TEST: VOICE seq=98 burst=4/5 tx=73.99ms[0m
+[0;32mI (16034) PLC_RX_WINDOW_TEST: VOICE seq=99 burst=5/5 tx=73.99ms[0m
+[0;32mI (16034) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #20 START ----[0m
+[0;32mI (16104) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (16174) PLC_RX_WINDOW_TEST: VOICE seq=100 burst=1/5 tx=73.99ms[0m
+[0;32mI (16274) PLC_RX_WINDOW_TEST: VOICE seq=101 burst=2/5 tx=73.99ms[0m
+[0;32mI (16374) PLC_RX_WINDOW_TEST: VOICE seq=102 burst=3/5 tx=73.99ms[0m
+[0;32mI (16474) PLC_RX_WINDOW_TEST: VOICE seq=103 burst=4/5 tx=73.99ms[0m
+[0;32mI (16574) PLC_RX_WINDOW_TEST: VOICE seq=104 burst=5/5 tx=73.99ms[0m
+[0;32mI (16574) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #21 START ----[0m
+[0;32mI (16644) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (16714) PLC_RX_WINDOW_TEST: VOICE seq=105 burst=1/5 tx=73.99ms[0m
+[0;32mI (16814) PLC_RX_WINDOW_TEST: VOICE seq=106 burst=2/5 tx=73.99ms[0m
+[0;32mI (16914) PLC_RX_WINDOW_TEST: VOICE seq=107 burst=3/5 tx=73.99ms[0m
+[0;32mI (17014) PLC_RX_WINDOW_TEST: VOICE seq=108 burst=4/5 tx=73.99ms[0m
+[0;32mI (17114) PLC_RX_WINDOW_TEST: VOICE seq=109 burst=5/5 tx=73.99ms[0m
+[0;32mI (17114) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #22 START ----[0m
+[0;32mI (17184) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (17254) PLC_RX_WINDOW_TEST: VOICE seq=110 burst=1/5 tx=73.99ms[0m
+[0;32mI (17354) PLC_RX_WINDOW_TEST: VOICE seq=111 burst=2/5 tx=73.99ms[0m
+[0;32mI (17454) PLC_RX_WINDOW_TEST: VOICE seq=112 burst=3/5 tx=73.99ms[0m
+[0;32mI (17554) PLC_RX_WINDOW_TEST: VOICE seq=113 burst=4/5 tx=73.99ms[0m
+[0;32mI (17654) PLC_RX_WINDOW_TEST: VOICE seq=114 burst=5/5 tx=73.99ms[0m
+[0;32mI (17654) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #23 START ----[0m
+[0;32mI (17724) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (17794) PLC_RX_WINDOW_TEST: VOICE seq=115 burst=1/5 tx=73.99ms[0m
+[0;32mI (17894) PLC_RX_WINDOW_TEST: VOICE seq=116 burst=2/5 tx=73.99ms[0m
+[0;32mI (17994) PLC_RX_WINDOW_TEST: VOICE seq=117 burst=3/5 tx=73.99ms[0m
+[0;32mI (18094) PLC_RX_WINDOW_TEST: VOICE seq=118 burst=4/5 tx=73.99ms[0m
+[0;32mI (18194) PLC_RX_WINDOW_TEST: VOICE seq=119 burst=5/5 tx=73.99ms[0m
+[0;32mI (18194) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #24 START ----[0m
+[0;32mI (18264) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (18334) PLC_RX_WINDOW_TEST: VOICE seq=120 burst=1/5 tx=73.99ms[0m
+[0;32mI (18434) PLC_RX_WINDOW_TEST: VOICE seq=121 burst=2/5 tx=73.99ms[0m
+[0;32mI (18534) PLC_RX_WINDOW_TEST: VOICE seq=122 burst=3/5 tx=73.99ms[0m
+[0;32mI (18634) PLC_RX_WINDOW_TEST: VOICE seq=123 burst=4/5 tx=73.99ms[0m
+[0;32mI (18734) PLC_RX_WINDOW_TEST: VOICE seq=124 burst=5/5 tx=73.99ms[0m
+[0;32mI (18734) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #25 START ----[0m
+[0;32mI (18804) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (18874) PLC_RX_WINDOW_TEST: VOICE seq=125 burst=1/5 tx=73.99ms[0m
+[0;32mI (18974) PLC_RX_WINDOW_TEST: VOICE seq=126 burst=2/5 tx=73.99ms[0m
+[0;32mI (19074) PLC_RX_WINDOW_TEST: VOICE seq=127 burst=3/5 tx=73.99ms[0m
+[0;32mI (19174) PLC_RX_WINDOW_TEST: VOICE seq=128 burst=4/5 tx=73.99ms[0m
+[0;32mI (19274) PLC_RX_WINDOW_TEST: VOICE seq=129 burst=5/5 tx=73.99ms[0m
+[0;32mI (19274) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #26 START ----[0m
+[0;32mI (19344) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (19414) PLC_RX_WINDOW_TEST: VOICE seq=130 burst=1/5 tx=73.99ms[0m
+[0;32mI (19514) PLC_RX_WINDOW_TEST: VOICE seq=131 burst=2/5 tx=73.99ms[0m
+[0;32mI (19614) PLC_RX_WINDOW_TEST: VOICE seq=132 burst=3/5 tx=73.99ms[0m
+[0;32mI (19714) PLC_RX_WINDOW_TEST: VOICE seq=133 burst=4/5 tx=73.99ms[0m
+[0;32mI (19814) PLC_RX_WINDOW_TEST: VOICE seq=134 burst=5/5 tx=73.99ms[0m
+[0;32mI (19814) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #27 START ----[0m
+[0;32mI (19884) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (19954) PLC_RX_WINDOW_TEST: VOICE seq=135 burst=1/5 tx=73.99ms[0m
+[0;32mI (20054) PLC_RX_WINDOW_TEST: VOICE seq=136 burst=2/5 tx=73.99ms[0m
+[0;32mI (20154) PLC_RX_WINDOW_TEST: VOICE seq=137 burst=3/5 tx=73.99ms[0m
+[0;32mI (20254) PLC_RX_WINDOW_TEST: VOICE seq=138 burst=4/5 tx=73.99ms[0m
+[0;32mI (20354) PLC_RX_WINDOW_TEST: VOICE seq=139 burst=5/5 tx=73.99ms[0m
+[0;32mI (20354) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #28 START ----[0m
+[0;32mI (20424) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (20494) PLC_RX_WINDOW_TEST: VOICE seq=140 burst=1/5 tx=73.99ms[0m
+[0;32mI (20594) PLC_RX_WINDOW_TEST: VOICE seq=141 burst=2/5 tx=73.99ms[0m
+[0;32mI (20694) PLC_RX_WINDOW_TEST: VOICE seq=142 burst=3/5 tx=73.99ms[0m
+[0;32mI (20794) PLC_RX_WINDOW_TEST: VOICE seq=143 burst=4/5 tx=73.99ms[0m
+[0;32mI (20894) PLC_RX_WINDOW_TEST: VOICE seq=144 burst=5/5 tx=73.99ms[0m
+[0;32mI (20894) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #29 START ----[0m
+[0;32mI (20964) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (21034) PLC_RX_WINDOW_TEST: VOICE seq=145 burst=1/5 tx=73.99ms[0m
+[0;32mI (21134) PLC_RX_WINDOW_TEST: VOICE seq=146 burst=2/5 tx=73.99ms[0m
+[0;32mI (21234) PLC_RX_WINDOW_TEST: VOICE seq=147 burst=3/5 tx=73.99ms[0m
+[0;32mI (21334) PLC_RX_WINDOW_TEST: VOICE seq=148 burst=4/5 tx=73.99ms[0m
+[0;32mI (21434) PLC_RX_WINDOW_TEST: VOICE seq=149 burst=5/5 tx=73.99ms[0m
+[0;32mI (21434) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #30 START ----[0m
+[0;32mI (21504) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (21574) PLC_RX_WINDOW_TEST: VOICE seq=150 burst=1/5 tx=73.99ms[0m
+[0;32mI (21674) PLC_RX_WINDOW_TEST: VOICE seq=151 burst=2/5 tx=73.99ms[0m
+[0;32mI (21774) PLC_RX_WINDOW_TEST: VOICE seq=152 burst=3/5 tx=73.99ms[0m
+[0;32mI (21874) PLC_RX_WINDOW_TEST: VOICE seq=153 burst=4/5 tx=73.99ms[0m
+[0;32mI (21974) PLC_RX_WINDOW_TEST: VOICE seq=154 burst=5/5 tx=73.99ms[0m
+[0;32mI (21974) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #31 START ----[0m
+[0;32mI (22044) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (22114) PLC_RX_WINDOW_TEST: VOICE seq=155 burst=1/5 tx=73.99ms[0m
+[0;32mI (22214) PLC_RX_WINDOW_TEST: VOICE seq=156 burst=2/5 tx=73.99ms[0m
+[0;32mI (22314) PLC_RX_WINDOW_TEST: VOICE seq=157 burst=3/5 tx=73.99ms[0m
+[0;32mI (22414) PLC_RX_WINDOW_TEST: VOICE seq=158 burst=4/5 tx=73.99ms[0m
+[0;32mI (22514) PLC_RX_WINDOW_TEST: VOICE seq=159 burst=5/5 tx=73.99ms[0m
+[0;32mI (22514) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #32 START ----[0m
+[0;32mI (22584) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (22654) PLC_RX_WINDOW_TEST: VOICE seq=160 burst=1/5 tx=73.99ms[0m
+[0;32mI (22754) PLC_RX_WINDOW_TEST: VOICE seq=161 burst=2/5 tx=73.99ms[0m
+[0;32mI (22854) PLC_RX_WINDOW_TEST: VOICE seq=162 burst=3/5 tx=73.99ms[0m
+[0;32mI (22954) PLC_RX_WINDOW_TEST: VOICE seq=163 burst=4/5 tx=73.99ms[0m
+[0;32mI (23054) PLC_RX_WINDOW_TEST: VOICE seq=164 burst=5/5 tx=73.99ms[0m
+[0;32mI (23054) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #33 START ----[0m
+[0;32mI (23124) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (23194) PLC_RX_WINDOW_TEST: VOICE seq=165 burst=1/5 tx=73.99ms[0m
+[0;32mI (23294) PLC_RX_WINDOW_TEST: VOICE seq=166 burst=2/5 tx=73.99ms[0m
+[0;32mI (23394) PLC_RX_WINDOW_TEST: VOICE seq=167 burst=3/5 tx=73.99ms[0m
+[0;32mI (23494) PLC_RX_WINDOW_TEST: VOICE seq=168 burst=4/5 tx=73.99ms[0m
+[0;32mI (23594) PLC_RX_WINDOW_TEST: VOICE seq=169 burst=5/5 tx=73.99ms[0m
+[0;32mI (23594) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #34 START ----[0m
+[0;32mI (23664) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (23734) PLC_RX_WINDOW_TEST: VOICE seq=170 burst=1/5 tx=73.99ms[0m
+[0;32mI (23834) PLC_RX_WINDOW_TEST: VOICE seq=171 burst=2/5 tx=73.99ms[0m
+[0;32mI (23934) PLC_RX_WINDOW_TEST: VOICE seq=172 burst=3/5 tx=73.99ms[0m
+[0;32mI (24034) PLC_RX_WINDOW_TEST: VOICE seq=173 burst=4/5 tx=73.99ms[0m
+[0;32mI (24134) PLC_RX_WINDOW_TEST: VOICE seq=174 burst=5/5 tx=73.99ms[0m
+[0;32mI (24134) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #35 START ----[0m
+[0;32mI (24204) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (24274) PLC_RX_WINDOW_TEST: VOICE seq=175 burst=1/5 tx=73.99ms[0m
+[0;32mI (24374) PLC_RX_WINDOW_TEST: VOICE seq=176 burst=2/5 tx=73.99ms[0m
+[0;32mI (24474) PLC_RX_WINDOW_TEST: VOICE seq=177 burst=3/5 tx=73.99ms[0m
+[0;32mI (24574) PLC_RX_WINDOW_TEST: VOICE seq=178 burst=4/5 tx=73.99ms[0m
+[0;32mI (24674) PLC_RX_WINDOW_TEST: VOICE seq=179 burst=5/5 tx=73.99ms[0m
+[0;32mI (24674) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #36 START ----[0m
+[0;32mI (24744) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (24814) PLC_RX_WINDOW_TEST: VOICE seq=180 burst=1/5 tx=73.99ms[0m
+[0;32mI (24914) PLC_RX_WINDOW_TEST: VOICE seq=181 burst=2/5 tx=73.99ms[0m
+[0;32mI (25014) PLC_RX_WINDOW_TEST: VOICE seq=182 burst=3/5 tx=73.99ms[0m
+[0;32mI (25114) PLC_RX_WINDOW_TEST: VOICE seq=183 burst=4/5 tx=73.99ms[0m
+[0;32mI (25214) PLC_RX_WINDOW_TEST: VOICE seq=184 burst=5/5 tx=73.99ms[0m
+[0;32mI (25214) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #37 START ----[0m
+[0;32mI (25284) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (25354) PLC_RX_WINDOW_TEST: VOICE seq=185 burst=1/5 tx=73.99ms[0m
+[0;32mI (25454) PLC_RX_WINDOW_TEST: VOICE seq=186 burst=2/5 tx=73.99ms[0m
+[0;32mI (25554) PLC_RX_WINDOW_TEST: VOICE seq=187 burst=3/5 tx=73.99ms[0m
+[0;32mI (25654) PLC_RX_WINDOW_TEST: VOICE seq=188 burst=4/5 tx=73.99ms[0m
+[0;32mI (25754) PLC_RX_WINDOW_TEST: VOICE seq=189 burst=5/5 tx=73.99ms[0m
+[0;32mI (25754) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #38 START ----[0m
+[0;32mI (25824) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (25894) PLC_RX_WINDOW_TEST: VOICE seq=190 burst=1/5 tx=73.99ms[0m
+[0;32mI (25994) PLC_RX_WINDOW_TEST: VOICE seq=191 burst=2/5 tx=73.99ms[0m
+[0;32mI (26094) PLC_RX_WINDOW_TEST: VOICE seq=192 burst=3/5 tx=73.99ms[0m
+[0;32mI (26194) PLC_RX_WINDOW_TEST: VOICE seq=193 burst=4/5 tx=73.99ms[0m
+[0;32mI (26294) PLC_RX_WINDOW_TEST: VOICE seq=194 burst=5/5 tx=73.99ms[0m
+[0;32mI (26294) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #39 START ----[0m
+[0;32mI (26364) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (26434) PLC_RX_WINDOW_TEST: VOICE seq=195 burst=1/5 tx=73.99ms[0m
+[0;32mI (26534) PLC_RX_WINDOW_TEST: VOICE seq=196 burst=2/5 tx=73.99ms[0m
+[0;32mI (26634) PLC_RX_WINDOW_TEST: VOICE seq=197 burst=3/5 tx=73.99ms[0m
+[0;32mI (26734) PLC_RX_WINDOW_TEST: VOICE seq=198 burst=4/5 tx=73.99ms[0m
+[0;32mI (26834) PLC_RX_WINDOW_TEST: VOICE seq=199 burst=5/5 tx=73.99ms[0m
+[0;32mI (26834) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #40 START ----[0m
+[0;32mI (26904) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (26974) PLC_RX_WINDOW_TEST: VOICE seq=200 burst=1/5 tx=73.99ms[0m
+[0;32mI (27074) PLC_RX_WINDOW_TEST: VOICE seq=201 burst=2/5 tx=73.99ms[0m
+[0;32mI (27174) PLC_RX_WINDOW_TEST: VOICE seq=202 burst=3/5 tx=73.99ms[0m
+[0;32mI (27274) PLC_RX_WINDOW_TEST: VOICE seq=203 burst=4/5 tx=73.99ms[0m
+[0;32mI (27374) PLC_RX_WINDOW_TEST: VOICE seq=204 burst=5/5 tx=73.99ms[0m
+[0;32mI (27374) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #41 START ----[0m
+[0;32mI (27444) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (27514) PLC_RX_WINDOW_TEST: VOICE seq=205 burst=1/5 tx=73.99ms[0m
+[0;32mI (27614) PLC_RX_WINDOW_TEST: VOICE seq=206 burst=2/5 tx=73.99ms[0m
+[0;32mI (27714) PLC_RX_WINDOW_TEST: VOICE seq=207 burst=3/5 tx=73.99ms[0m
+[0;32mI (27814) PLC_RX_WINDOW_TEST: VOICE seq=208 burst=4/5 tx=73.99ms[0m
+[0;32mI (27914) PLC_RX_WINDOW_TEST: VOICE seq=209 burst=5/5 tx=73.99ms[0m
+[0;32mI (27914) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #42 START ----[0m
+[0;32mI (27984) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (28054) PLC_RX_WINDOW_TEST: VOICE seq=210 burst=1/5 tx=73.99ms[0m
+[0;32mI (28154) PLC_RX_WINDOW_TEST: VOICE seq=211 burst=2/5 tx=73.99ms[0m
+[0;32mI (28254) PLC_RX_WINDOW_TEST: VOICE seq=212 burst=3/5 tx=73.99ms[0m
+[0;32mI (28354) PLC_RX_WINDOW_TEST: VOICE seq=213 burst=4/5 tx=73.99ms[0m
+[0;32mI (28454) PLC_RX_WINDOW_TEST: VOICE seq=214 burst=5/5 tx=73.99ms[0m
+[0;32mI (28454) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #43 START ----[0m
+[0;32mI (28524) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (28594) PLC_RX_WINDOW_TEST: VOICE seq=215 burst=1/5 tx=73.99ms[0m
+[0;32mI (28694) PLC_RX_WINDOW_TEST: VOICE seq=216 burst=2/5 tx=73.99ms[0m
+[0;32mI (28794) PLC_RX_WINDOW_TEST: VOICE seq=217 burst=3/5 tx=73.99ms[0m
+[0;32mI (28894) PLC_RX_WINDOW_TEST: VOICE seq=218 burst=4/5 tx=73.99ms[0m
+[0;32mI (28994) PLC_RX_WINDOW_TEST: VOICE seq=219 burst=5/5 tx=73.99ms[0m
+[0;32mI (28994) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #44 START ----[0m
+[0;32mI (29064) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (29134) PLC_RX_WINDOW_TEST: VOICE seq=220 burst=1/5 tx=73.99ms[0m
+[0;32mI (29234) PLC_RX_WINDOW_TEST: VOICE seq=221 burst=2/5 tx=73.99ms[0m
+[0;32mI (29334) PLC_RX_WINDOW_TEST: VOICE seq=222 burst=3/5 tx=73.99ms[0m
+[0;32mI (29434) PLC_RX_WINDOW_TEST: VOICE seq=223 burst=4/5 tx=73.99ms[0m
+[0;32mI (29534) PLC_RX_WINDOW_TEST: VOICE seq=224 burst=5/5 tx=73.99ms[0m
+[0;32mI (29534) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #45 START ----[0m
+[0;32mI (29604) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.00ms[0m
+[0;32mI (29674) PLC_RX_WINDOW_TEST: VOICE seq=225 burst=1/5 tx=73.99ms[0m
+[0;32mI (29774) PLC_RX_WINDOW_TEST: VOICE seq=226 burst=2/5 tx=73.99ms[0m
+[0;32mI (29874) PLC_RX_WINDOW_TEST: VOICE seq=227 burst=3/5 tx=73.99ms[0m
+[0;32mI (29974) PLC_RX_WINDOW_TEST: VOICE seq=228 burst=4/5 tx=73.99ms[0m
+[0;32mI (30074) PLC_RX_WINDOW_TEST: VOICE seq=229 burst=5/5 tx=73.99ms[0m
+[0;32mI (30074) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #46 START ----[0m
+[0;32mI (30144) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (30214) PLC_RX_WINDOW_TEST: VOICE seq=230 burst=1/5 tx=73.99ms[0m
+[0;32mI (30314) PLC_RX_WINDOW_TEST: VOICE seq=231 burst=2/5 tx=73.99ms[0m
+[0;32mI (30414) PLC_RX_WINDOW_TEST: VOICE seq=232 burst=3/5 tx=73.99ms[0m
+[0;32mI (30514) PLC_RX_WINDOW_TEST: VOICE seq=233 burst=4/5 tx=73.99ms[0m
+[0;32mI (30614) PLC_RX_WINDOW_TEST: VOICE seq=234 burst=5/5 tx=73.99ms[0m
+[0;32mI (30614) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #47 START ----[0m
+[0;32mI (30684) PLC_RX_WINDOW_TEST: CONTROL NONE window=70.01ms[0m
+[0;32mI (30754) PLC_RX_WINDOW_TEST: VOICE seq=235 burst=1/5 tx=73.99ms[0m
+[0;32mI (30854) PLC_RX_WINDOW_TEST: VOICE seq=236 burst=2/5 tx=73.99ms[0m
+[0;32mI (30954) PLC_RX_WINDOW_TEST: VOICE seq=237 burst=3/5 tx=73.99ms[0m
+[0;32mI (31054) PLC_RX_WINDOW_TEST: VOICE seq=238 burst=4/5 tx=73.99ms[0m
+[0;32mI (31154) PLC_RX_WINDOW_TEST: VOICE seq=239 burst=5/5 tx=73.99ms[0m
+[0;32mI (31154) PLC_RX_WINDOW_TEST: ---- CONTROL WINDOW #48 START ----[0m

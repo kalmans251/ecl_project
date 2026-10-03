@@ -1,0 +1,68 @@
+Command: ninja flash
+[1/9] Linking C static library esp-idf/main/libmain.a
+[2/9] Performing build step for 'bootloader'
+[1/1] cd /workspace/hello-p4/build/bootloader && /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python /opt/esp/idf/components/partition_table/check_sizes.py --offset 0x8000 bootloader 0x2000 /workspace/hello-p4/build/bootloader/bootloader.bin
+Bootloader binary size 0x5a70 bytes. 0x590 bytes (6%) free.
+[3/7] Generating esp-idf/esp_system/ld/sections.ld
+[4/7] Linking CXX executable hello_world.elf
+[5/7] Generating binary image from built executable
+esptool v5.4.0
+Creating ESP32-P4 image...
+Merged 4 ELF sections.
+Successfully created ESP32-P4 image.
+Generated /workspace/hello-p4/build/hello_world.bin
+[6/7] cd /workspace/hello-p4/build && /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python /opt/esp/idf/components/partition_table/check_sizes.py --offset 0x8000 partition --type app /workspace/hello-p4/build/partition_table/partition-table.bin /workspace/hello-p4/build/hello_world.bin
+hello_world.bin binary size 0x3b2d0 bytes. Smallest app partition is 0x100000 bytes. 0xc4d30 bytes (77%) free.
+[6/7] Running utility command for flash
+esptool --chip esp32p4 -p /dev/ttyACM0 -b 460800 --before=default-reset --after=hard-reset write-flash --flash-mode dio --flash-freq 80m --flash-size 16MB 0x2000 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin 0x10000 hello_world.bin
+esptool v5.4.0
+Serial port /dev/ttyACM0:
+Connecting...
+Connected to ESP32-P4 on /dev/ttyACM0:
+Chip type:          ESP32-P4 (revision v1.0)
+Features:           Dual Core + LP Core, 400MHz
+Crystal frequency:  40MHz
+USB mode:           USB-Serial/JTAG
+MAC:                30:ed:a0:e1:5b:f5
+
+Uploading stub flasher...
+Running stub flasher...
+Stub flasher running.
+Changing baud rate to 460800...
+Changed.
+
+Configuring flash size...
+
+Writing 'bootloader/bootloader.bin' at 0x00002000...
+SHA digest in image updated.
+Flash will be erased from 0x00002000 to 0x00007fff...
+Compressed 23152 bytes to 14186...
+Writing at 0x00007a70 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% 13.85kB/13.85kB [0s] 
+Wrote 23152 bytes (14186 compressed) at 0x00002000 in 0.4 seconds (462.4 kbit/s).
+Verifying written data...
+Hash of data verified.
+
+Writing 'partition_table/partition-table.bin' at 0x00008000...
+Flash will be erased from 0x00008000 to 0x00008fff...
+Compressed 3072 bytes to 103...
+Writing at 0x00008c00 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% 103B/103B [0s] 
+Wrote 3072 bytes (103 compressed) at 0x00008000 in 0.0 seconds (1989.1 kbit/s).
+Verifying written data...
+Hash of data verified.
+
+Writing 'hello_world.bin' at 0x00010000...
+Flash will be erased from 0x00010000 to 0x0004bfff...
+Compressed 242384 bytes to 124047...
+Writing at 0x0001b25c ━━━╸                            13.2% 16.00kB/121.14kB [0s] 
+Writing at 0x00021964 ━━━━━━━╸                        26.4% 32.00kB/121.14kB [0s] 
+Writing at 0x00028c4e ━━━━━━━━━━━╸                    39.6% 48.00kB/121.14kB [0s] 
+Writing at 0x000307c5 ━━━━━━━━━━━━━━━╸                52.8% 64.00kB/121.14kB [1s] 
+Writing at 0x000376fe ━━━━━━━━━━━━━━━━━━━╸            66.0% 80.00kB/121.14kB [1s] 
+Writing at 0x0003eda2 ━━━━━━━━━━━━━━━━━━━━━━━╸        79.2% 96.00kB/121.14kB [1s] 
+Writing at 0x00045dfc ━━━━━━━━━━━━━━━━━━━━━━━━━━━╸    92.5% 112.00kB/121.14kB [1s] 
+Writing at 0x0004b2d0 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100.0% 121.14kB/121.14kB [2s] 
+Wrote 242384 bytes (124047 compressed) at 0x00010000 in 2.2 seconds (866.9 kbit/s).
+Verifying written data...
+Hash of data verified.
+
+Hard resetting via RTS pin...

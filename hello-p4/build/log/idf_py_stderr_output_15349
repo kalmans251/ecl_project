@@ -1,0 +1,20 @@
+Command: ninja all
+NOTE: Kconfig parser version: 1
+NOTE: Kconfig defaults policy: use sdkconfig
+NOTE: Status: Finished successfully
+CMake Error at /opt/esp/idf/tools/cmake/component.cmake:494 (add_library):
+  Cannot find source file:
+
+    /workspace/hello-p4/main/main.c
+Call Stack (most recent call first):
+  main/CMakeLists.txt:1 (idf_component_register)
+
+
+CMake Error at /opt/esp/idf/tools/cmake/component.cmake:494 (add_library):
+  No SOURCES given to target: __idf_main
+Call Stack (most recent call first):
+  main/CMakeLists.txt:1 (idf_component_register)
+
+
+CMake Generate step failed.  Build files cannot be regenerated correctly.
+ninja: error: rebuilding 'build.ninja': subcommand failed

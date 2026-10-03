@@ -1,0 +1,1379 @@
+Command: /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python /opt/esp/idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace /workspace/hello-p4/build/hello_world.elf /workspace/hello-p4/build/bootloader/bootloader.elf -m '/home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python' '/opt/esp/idf/tools/idf.py' '-p' '/dev/ttyACM0'
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0x30f (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff03cbc
+Core1 Saved PC:0x4ff03cbc
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x15e0
+load:0x4ff28ed0,len:0xe54
+load:0x4ff2bbd0,len:0x35dc
+entry 0x4ff28eda
+[0;32mI (27) boot: ESP-IDF v6.0.2 2nd stage bootloader[0m
+[0;32mI (28) boot: compile time Sep 22 2026 07:07:55[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (29) boot: chip revision: v1.0[0m
+[0;32mI (31) boot: efuse block revision: v0.3[0m
+[0;32mI (34) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (38) boot.esp32p4: SPI Mode       : DIO[0m
+[0;32mI (42) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (46) boot: Enabling RNG early entropy source...[0m
+[0;32mI (50) boot: Partition Table:[0m
+[0;32mI (53) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (59) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (66) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (72) boot:  2 factory          factory app      00 00 00010000 00100000[0m
+[0;32mI (79) boot: End of partition table[0m
+[0;32mI (82) esp_image: segment 0: paddr=00010020 vaddr=40020020 size=08c98h ( 35992) map[0m
+[0;32mI (95) esp_image: segment 1: paddr=00018cc0 vaddr=30100000 size=00088h (   136) load[0m
+[0;32mI (97) esp_image: segment 2: paddr=00018d50 vaddr=4ff00000 size=072c8h ( 29384) load[0m
+[0;32mI (109) esp_image: segment 3: paddr=00020020 vaddr=40000020 size=175c8h ( 95688) map[0m
+[0;32mI (126) esp_image: segment 4: paddr=000375f0 vaddr=4ff072c8 size=060d8h ( 24792) load[0m
+[0;32mI (131) esp_image: segment 5: paddr=0003d6d0 vaddr=4ff0d400 size=02414h (  9236) load[0m
+[0;32mI (137) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (138) boot: Disabling RNG early entropy source...[0m
+[0;32mI (152) cpu_start: Multicore app[0m
+[0;32mI (162) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (163) cpu_start: Pro cpu start user code[0m
+[0;32mI (163) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (165) app_init: Application information:[0m
+[0;32mI (169) app_init: Project name:     hello_world[0m
+[0;32mI (173) app_init: App version:      1[0m
+[0;32mI (176) app_init: Compile time:     Sep 22 2026 07:08:03[0m
+[0;32mI (181) app_init: ELF file SHA256:  8219e095a...[0m
+[0;32mI (186) app_init: ESP-IDF:          v6.0.2[0m
+[0;32mI (189) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (193) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (197) efuse_init: Chip rev:         v1.0[0m
+[0;32mI (201) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (207) heap_init: At 4FF11010 len 00029FB0 (167 KiB): RETENT_RAM[0m
+[0;32mI (213) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (218) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (224) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM[0m
+[0;32mI (229) heap_init: At 30100088 len 00001F78 (7 KiB): SPM[0m
+[0;32mI (235) spi_flash: detected chip: generic[0m
+[0;32mI (238) spi_flash: flash io: dio[0m
+[0;32mI (241) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (247) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (254) main_task: Started on CPU0[0m
+[0;32mI (254) main_task: Calling app_main()[0m
+[0;32mI (264) PLC_TEST: ================================[0m
+[0;32mI (264) PLC_TEST: PLCMODEM2 TEST START[0m
+[0;32mI (264) PLC_TEST: UART  : UART1[0m
+[0;32mI (274) PLC_TEST: TX    : GPIO 48[0m
+[0;32mI (274) PLC_TEST: RX    : GPIO 47[0m
+[0;32mI (274) PLC_TEST: BAUD  : 9600[0m
+[0;32mI (284) PLC_TEST: DELAY : 50 ms[0m
+[0;32mI (284) PLC_TEST: ================================[0m
+[0;32mI (3094) PLC_TEST: RX RAW (7 bytes): [PING 1[0m
+]
+[0;32mI (3094) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (3144) PLC_TEST: TX: PONG 1[0m
+
+[0;32mI (5204) PLC_TEST: RX RAW (14 bytes): [PING 2[0m
+PING 3
+]
+[0;32mI (5204) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (5254) PLC_TEST: TX: PONG 2[0m
+
+[0;32mI (7314) PLC_TEST: RX RAW (14 bytes): [PING 4[0m
+PING 5
+]
+[0;32mI (7314) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (7364) PLC_TEST: TX: PONG 4[0m
+
+[0;32mI (9424) PLC_TEST: RX RAW (14 bytes): [PING 6[0m
+PING 7
+]
+[0;32mI (9424) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (9474) PLC_TEST: TX: PONG 6[0m
+
+[0;32mI (11534) PLC_TEST: RX RAW (14 bytes): [PING 8[0m
+PING 9
+]
+[0;32mI (11534) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (11584) PLC_TEST: TX: PONG 8[0m
+
+[0;32mI (13584) PLC_TEST: RX RAW (8 bytes): [PING 10[0m
+]
+[0;32mI (13584) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (13634) PLC_TEST: TX: PONG 10[0m
+
+[0;32mI (15694) PLC_TEST: RX RAW (8 bytes): [PING 12[0m
+]
+[0;32mI (15694) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (15744) PLC_TEST: TX: PONG 12[0m
+
+[0;32mI (17804) PLC_TEST: RX RAW (16 bytes): [PING 13[0m
+PING 14
+]
+[0;32mI (17804) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (17854) PLC_TEST: TX: PONG 13[0m
+
+[0;32mI (19914) PLC_TEST: RX RAW (16 bytes): [PING 15[0m
+PING 16
+]
+[0;32mI (19914) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (19964) PLC_TEST: TX: PONG 15[0m
+
+[0;32mI (22034) PLC_TEST: RX RAW (16 bytes): [PING 17[0m
+PING 18
+]
+[0;32mI (22034) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (22084) PLC_TEST: TX: PONG 17[0m
+
+[0;32mI (24084) PLC_TEST: RX RAW (8 bytes): [PING 19[0m
+]
+[0;32mI (24084) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (24134) PLC_TEST: TX: PONG 19[0m
+
+[0;32mI (26194) PLC_TEST: RX RAW (8 bytes): [PING 21[0m
+]
+[0;32mI (26194) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (26244) PLC_TEST: TX: PONG 21[0m
+
+[0;32mI (30324) PLC_TEST: RX RAW (36 bytes): [PING 22[0m
+PING 23
+�T}]
+[0;32mI (30324) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (30374) PLC_TEST: TX: PONG 22[0m
+
+[0;32mI (32434) PLC_TEST: RX RAW (16 bytes): [PING 25[0m
+PING 26
+]
+[0;32mI (32434) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (32484) PLC_TEST: TX: PONG 25[0m
+
+[0;32mI (34554) PLC_TEST: RX RAW (16 bytes): [PING 27[0m
+PING 28
+]
+[0;32mI (34554) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (34604) PLC_TEST: TX: PONG 27[0m
+
+[0;32mI (36664) PLC_TEST: RX RAW (16 bytes): [PING 29[0m
+PING 30
+]
+[0;32mI (36664) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (36714) PLC_TEST: TX: PONG 29[0m
+
+[0;32mI (38774) PLC_TEST: RX RAW (16 bytes): [PING 31[0m
+PING 32
+]
+[0;32mI (38774) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (38824) PLC_TEST: TX: PONG 31[0m
+
+[0;32mI (40884) PLC_TEST: RX RAW (16 bytes): [PING 33[0m
+PING 34
+]
+[0;32mI (40884) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (40934) PLC_TEST: TX: PONG 33[0m
+
+[0;32mI (42994) PLC_TEST: RX RAW (16 bytes): [PING 35[0m
+PING 36
+]
+[0;32mI (42994) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (43044) PLC_TEST: TX: PONG 35[0m
+
+[0;32mI (45104) PLC_TEST: RX RAW (16 bytes): [PING 37[0m
+PING 38
+]
+[0;32mI (45104) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (45154) PLC_TEST: TX: PONG 37[0m
+
+[0;32mI (47214) PLC_TEST: RX RAW (16 bytes): [PING 39[0m
+PING 40
+]
+[0;32mI (47214) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (47264) PLC_TEST: TX: PONG 39[0m
+
+[0;32mI (49264) PLC_TEST: RX RAW (8 bytes): [PING 41[0m
+]
+[0;32mI (49264) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (49314) PLC_TEST: TX: PONG 41[0m
+
+[0;32mI (51384) PLC_TEST: RX RAW (8 bytes): [PING 43[0m
+]
+[0;32mI (51384) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (51434) PLC_TEST: TX: PONG 43[0m
+
+[0;32mI (53494) PLC_TEST: RX RAW (16 bytes): [PING 44[0m
+PING 45
+]
+[0;32mI (53494) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (53544) PLC_TEST: TX: PONG 44[0m
+
+[0;32mI (55544) PLC_TEST: RX RAW (8 bytes): [PING 46[0m
+]
+[0;32mI (55544) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (55594) PLC_TEST: TX: PONG 46[0m
+
+[0;32mI (57654) PLC_TEST: RX RAW (8 bytes): [PING 48[0m
+]
+[0;32mI (57654) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (57704) PLC_TEST: TX: PONG 48[0m
+
+[0;32mI (61784) PLC_TEST: RX RAW (36 bytes): [PING 49[0m
+PING 50
+� ��]
+[0;32mI (61784) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (61834) PLC_TEST: TX: PONG 49[0m
+
+[0;32mI (63894) PLC_TEST: RX RAW (16 bytes): [PING 52[0m
+PING 53
+]
+[0;32mI (63894) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (63944) PLC_TEST: TX: PONG 52[0m
+
+[0;32mI (67954) PLC_TEST: RX RAW (23 bytes): [PING 54[0m
+PING 55
+PING 1
+]
+[0;32mI (67954) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (68004) PLC_TEST: TX: PONG 54[0m
+
+[0;32mI (71164) PLC_TEST: RX RAW (7 bytes): [PING 2[0m
+]
+[0;32mI (71164) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (71214) PLC_TEST: TX: PONG 2[0m
+
+[0;32mI (73474) PLC_TEST: RX RAW (7 bytes): [PING 3[0m
+]
+[0;32mI (73474) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (73524) PLC_TEST: TX: PONG 3[0m
+
+[0;32mI (75784) PLC_TEST: RX RAW (7 bytes): [PING 4[0m
+]
+[0;32mI (75784) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (75834) PLC_TEST: TX: PONG 4[0m
+
+[0;32mI (78094) PLC_TEST: RX RAW (7 bytes): [PING 5[0m
+]
+[0;32mI (78094) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (78144) PLC_TEST: TX: PONG 5[0m
+
+[0;32mI (80404) PLC_TEST: RX RAW (7 bytes): [PING 6[0m
+]
+[0;32mI (80404) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (80454) PLC_TEST: TX: PONG 6[0m
+
+[0;32mI (82714) PLC_TEST: RX RAW (7 bytes): [PING 7[0m
+]
+[0;32mI (82714) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (82764) PLC_TEST: TX: PONG 7[0m
+
+[0;32mI (85024) PLC_TEST: RX RAW (7 bytes): [PING 8[0m
+]
+[0;32mI (85024) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (85074) PLC_TEST: TX: PONG 8[0m
+
+[0;32mI (87334) PLC_TEST: RX RAW (7 bytes): [PING 9[0m
+]
+[0;32mI (87334) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (87384) PLC_TEST: TX: PONG 9[0m
+
+[0;32mI (89644) PLC_TEST: RX RAW (8 bytes): [PING 10[0m
+]
+[0;32mI (89644) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (89694) PLC_TEST: TX: PONG 10[0m
+
+[0;32mI (92384) PLC_TEST: RX RAW (20 bytes): [PING 11[0m
+�!��]
+[0;32mI (92384) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (92434) PLC_TEST: TX: PONG 11[0m
+
+[0;32mI (94694) PLC_TEST: RX RAW (8 bytes): [PING 12[0m
+]
+[0;32mI (94694) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (94744) PLC_TEST: TX: PONG 12[0m
+
+[0;32mI (97004) PLC_TEST: RX RAW (8 bytes): [PING 13[0m
+]
+[0;32mI (97004) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (97054) PLC_TEST: TX: PONG 13[0m
+
+[0;32mI (99314) PLC_TEST: RX RAW (8 bytes): [PING 14[0m
+]
+[0;32mI (99314) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (99364) PLC_TEST: TX: PONG 14[0m
+
+[0;32mI (101634) PLC_TEST: RX RAW (8 bytes): [PING 15[0m
+]
+[0;32mI (101634) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (101684) PLC_TEST: TX: PONG 15[0m
+
+[0;32mI (103954) PLC_TEST: RX RAW (8 bytes): [PING 16[0m
+]
+[0;32mI (103954) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (104004) PLC_TEST: TX: PONG 16[0m
+
+[0;32mI (106264) PLC_TEST: RX RAW (8 bytes): [PING 17[0m
+]
+[0;32mI (106264) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (106314) PLC_TEST: TX: PONG 17[0m
+
+[0;32mI (108574) PLC_TEST: RX RAW (8 bytes): [PING 18[0m
+]
+[0;32mI (108574) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (108624) PLC_TEST: TX: PONG 18[0m
+
+[0;32mI (111894) PLC_TEST: RX RAW (8 bytes): [PING 19[0m
+]
+[0;32mI (111894) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (111944) PLC_TEST: TX: PONG 19[0m
+
+[0;32mI (114214) PLC_TEST: RX RAW (8 bytes): [PING 20[0m
+]
+[0;32mI (114214) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (114264) PLC_TEST: TX: PONG 20[0m
+
+[0;32mI (116524) PLC_TEST: RX RAW (8 bytes): [PING 21[0m
+]
+[0;32mI (116524) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (116574) PLC_TEST: TX: PONG 21[0m
+
+[0;32mI (118834) PLC_TEST: RX RAW (8 bytes): [PING 22[0m
+]
+[0;32mI (118834) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (118884) PLC_TEST: TX: PONG 22[0m
+
+[0;32mI (121154) PLC_TEST: RX RAW (8 bytes): [PING 23[0m
+]
+[0;32mI (121154) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (121204) PLC_TEST: TX: PONG 23[0m
+
+[0;32mI (123624) PLC_TEST: RX RAW (20 bytes): [PING 24[0m
+�"��]
+[0;32mI (123624) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (123674) PLC_TEST: TX: PONG 24[0m
+
+[0;32mI (125944) PLC_TEST: RX RAW (8 bytes): [PING 25[0m
+]
+[0;32mI (125944) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (125994) PLC_TEST: TX: PONG 25[0m
+
+[0;32mI (128264) PLC_TEST: RX RAW (8 bytes): [PING 26[0m
+]
+[0;32mI (128264) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (128314) PLC_TEST: TX: PONG 26[0m
+
+[0;32mI (130574) PLC_TEST: RX RAW (8 bytes): [PING 27[0m
+]
+[0;32mI (130574) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (130624) PLC_TEST: TX: PONG 27[0m
+
+[0;32mI (132884) PLC_TEST: RX RAW (8 bytes): [PING 28[0m
+]
+[0;32mI (132884) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (132934) PLC_TEST: TX: PONG 28[0m
+
+[0;32mI (135194) PLC_TEST: RX RAW (8 bytes): [PING 29[0m
+]
+[0;32mI (135194) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (135244) PLC_TEST: TX: PONG 29[0m
+
+[0;32mI (154874) PLC_TEST: RX RAW (12 bytes): [�#��][0m
+[0;33mW (154874) PLC_TEST: Not PING: �#��
+[0;32mI (186114) PLC_TEST: RX RAW (12 bytes): [�$a)][0m
+[0;33mW (186114) PLC_TEST: Not PING: �$a)[0m
+[0;32mI (217354) PLC_TEST: RX RAW (12 bytes): [�%V][0m
+[0;33mW (217354) PLC_TEST: Not PING: �%V[0m
+[0;32mI (250254) PLC_TEST: RX RAW (7 bytes): [PING 1[0m
+]
+[0;32mI (250254) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (250304) PLC_TEST: TX: PONG 1[0m
+
+[0;32mI (252564) PLC_TEST: RX RAW (7 bytes): [PING 2[0m
+]
+[0;32mI (252564) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (252614) PLC_TEST: TX: PONG 2[0m
+
+[0;32mI (254874) PLC_TEST: RX RAW (7 bytes): [PING 3[0m
+]
+[0;32mI (254874) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (254924) PLC_TEST: TX: PONG 3[0m
+
+[0;32mI (257184) PLC_TEST: RX RAW (7 bytes): [PING 4[0m
+]
+[0;32mI (257184) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (257234) PLC_TEST: TX: PONG 4[0m
+
+[0;32mI (259494) PLC_TEST: RX RAW (7 bytes): [PING 5[0m
+]
+[0;32mI (259494) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (259544) PLC_TEST: TX: PONG 5[0m
+
+[0;32mI (261804) PLC_TEST: RX RAW (7 bytes): [PING 6[0m
+]
+[0;32mI (261804) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (261854) PLC_TEST: TX: PONG 6[0m
+
+[0;32mI (264114) PLC_TEST: RX RAW (7 bytes): [PING 7[0m
+]
+[0;32mI (264114) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (264164) PLC_TEST: TX: PONG 7[0m
+
+[0;32mI (266424) PLC_TEST: RX RAW (7 bytes): [PING 8[0m
+]
+[0;32mI (266424) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (266474) PLC_TEST: TX: PONG 8[0m
+
+[0;32mI (268734) PLC_TEST: RX RAW (7 bytes): [PING 9[0m
+]
+[0;32mI (268734) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (268784) PLC_TEST: TX: PONG 9[0m
+
+[0;32mI (271044) PLC_TEST: RX RAW (8 bytes): [PING 10[0m
+]
+[0;32mI (271044) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (271094) PLC_TEST: TX: PONG 10[0m
+
+[0;32mI (273364) PLC_TEST: RX RAW (8 bytes): [PING 11[0m
+]
+[0;32mI (273364) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (273414) PLC_TEST: TX: PONG 11[0m
+
+[0;32mI (275684) PLC_TEST: RX RAW (8 bytes): [PING 12[0m
+]
+[0;32mI (275684) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (275734) PLC_TEST: TX: PONG 12[0m
+
+[0;32mI (278004) PLC_TEST: RX RAW (8 bytes): [PING 13[0m
+]
+[0;32mI (278004) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (278054) PLC_TEST: TX: PONG 13[0m
+
+[0;32mI (280314) PLC_TEST: RX RAW (8 bytes): [PING 14[0m
+]
+[0;32mI (280314) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (280364) PLC_TEST: TX: PONG 14[0m
+
+[0;32mI (282624) PLC_TEST: RX RAW (8 bytes): [PING 15[0m
+]
+[0;32mI (282624) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (282674) PLC_TEST: TX: PONG 15[0m
+
+[0;32mI (284944) PLC_TEST: RX RAW (8 bytes): [PING 16[0m
+]
+[0;32mI (284944) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (284994) PLC_TEST: TX: PONG 16[0m
+
+[0;32mI (287254) PLC_TEST: RX RAW (8 bytes): [PING 17[0m
+]
+[0;32mI (287254) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (287304) PLC_TEST: TX: PONG 17[0m
+
+[0;32mI (289574) PLC_TEST: RX RAW (8 bytes): [PING 18[0m
+]
+[0;32mI (289574) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (289624) PLC_TEST: TX: PONG 18[0m
+
+[0;32mI (291884) PLC_TEST: RX RAW (8 bytes): [PING 19[0m
+]
+[0;32mI (291884) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (291934) PLC_TEST: TX: PONG 19[0m
+
+[0;32mI (294204) PLC_TEST: RX RAW (8 bytes): [PING 20[0m
+]
+[0;32mI (294204) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (294254) PLC_TEST: TX: PONG 20[0m
+
+[0;32mI (296514) PLC_TEST: RX RAW (8 bytes): [PING 21[0m
+]
+[0;32mI (296514) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (296564) PLC_TEST: TX: PONG 21[0m
+
+[0;32mI (298824) PLC_TEST: RX RAW (8 bytes): [PING 22[0m
+]
+[0;32mI (298824) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (298874) PLC_TEST: TX: PONG 22[0m
+
+[0;32mI (301134) PLC_TEST: RX RAW (8 bytes): [PING 23[0m
+]
+[0;32mI (301134) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (301184) PLC_TEST: TX: PONG 23[0m
+
+[0;32mI (303444) PLC_TEST: RX RAW (8 bytes): [PING 24[0m
+]
+[0;32mI (303444) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (303494) PLC_TEST: TX: PONG 24[0m
+
+[0;32mI (305754) PLC_TEST: RX RAW (8 bytes): [PING 25[0m
+]
+[0;32mI (305754) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (305804) PLC_TEST: TX: PONG 25[0m
+
+[0;32mI (308074) PLC_TEST: RX RAW (8 bytes): [PING 26[0m
+]
+[0;32mI (308074) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (308124) PLC_TEST: TX: PONG 26[0m
+
+[0;32mI (310384) PLC_TEST: RX RAW (8 bytes): [PING 27[0m
+]
+[0;32mI (310384) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (310434) PLC_TEST: TX: PONG 27[0m
+
+[0;32mI (312704) PLC_TEST: RX RAW (8 bytes): [PING 28[0m
+]
+[0;32mI (312704) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (312754) PLC_TEST: TX: PONG 28[0m
+
+[0;32mI (315014) PLC_TEST: RX RAW (8 bytes): [PING 29[0m
+]
+[0;32mI (315014) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (315064) PLC_TEST: TX: PONG 29[0m
+
+[0;32mI (317324) PLC_TEST: RX RAW (8 bytes): [PING 30[0m
+]
+[0;32mI (317324) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (317374) PLC_TEST: TX: PONG 30[0m
+
+[0;32mI (319634) PLC_TEST: RX RAW (8 bytes): [PING 31[0m
+]
+[0;32mI (319634) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (319684) PLC_TEST: TX: PONG 31[0m
+
+[0;32mI (321944) PLC_TEST: RX RAW (8 bytes): [PING 32[0m
+]
+[0;32mI (321944) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (321994) PLC_TEST: TX: PONG 32[0m
+
+[0;32mI (324264) PLC_TEST: RX RAW (8 bytes): [PING 33[0m
+]
+[0;32mI (324264) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (324314) PLC_TEST: TX: PONG 33[0m
+
+[0;32mI (326574) PLC_TEST: RX RAW (8 bytes): [PING 34[0m
+]
+[0;32mI (326574) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (326624) PLC_TEST: TX: PONG 34[0m
+
+[0;32mI (328884) PLC_TEST: RX RAW (8 bytes): [PING 35[0m
+]
+[0;32mI (328884) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (328934) PLC_TEST: TX: PONG 35[0m
+
+[0;32mI (331194) PLC_TEST: RX RAW (8 bytes): [PING 36[0m
+]
+[0;32mI (331194) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (331244) PLC_TEST: TX: PONG 36[0m
+
+[0;32mI (333504) PLC_TEST: RX RAW (8 bytes): [PING 37[0m
+]
+[0;32mI (333504) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (333554) PLC_TEST: TX: PONG 37[0m
+
+[0;32mI (335814) PLC_TEST: RX RAW (8 bytes): [PING 38[0m
+]
+[0;32mI (335814) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (335864) PLC_TEST: TX: PONG 38[0m
+
+[0;32mI (338134) PLC_TEST: RX RAW (8 bytes): [PING 39[0m
+]
+[0;32mI (338134) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (338184) PLC_TEST: TX: PONG 39[0m
+
+[0;32mI (340444) PLC_TEST: RX RAW (8 bytes): [PING 40[0m
+]
+[0;32mI (340444) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (340494) PLC_TEST: TX: PONG 40[0m
+
+[0;32mI (342754) PLC_TEST: RX RAW (8 bytes): [PING 41[0m
+]
+[0;32mI (342754) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (342804) PLC_TEST: TX: PONG 41[0m
+
+[0;32mI (345074) PLC_TEST: RX RAW (8 bytes): [PING 42[0m
+]
+[0;32mI (345074) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (345124) PLC_TEST: TX: PONG 42[0m
+
+[0;32mI (347394) PLC_TEST: RX RAW (8 bytes): [PING 43[0m
+]
+[0;32mI (347394) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (347444) PLC_TEST: TX: PONG 43[0m
+
+[0;32mI (349704) PLC_TEST: RX RAW (8 bytes): [PING 44[0m
+]
+[0;32mI (349704) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (349754) PLC_TEST: TX: PONG 44[0m
+
+[0;32mI (352014) PLC_TEST: RX RAW (8 bytes): [PING 45[0m
+]
+[0;32mI (352014) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (352064) PLC_TEST: TX: PONG 45[0m
+
+[0;32mI (354324) PLC_TEST: RX RAW (8 bytes): [PING 46[0m
+]
+[0;32mI (354324) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (354374) PLC_TEST: TX: PONG 46[0m
+
+[0;32mI (356634) PLC_TEST: RX RAW (8 bytes): [PING 47[0m
+]
+[0;32mI (356634) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (356684) PLC_TEST: TX: PONG 47[0m
+
+[0;32mI (358944) PLC_TEST: RX RAW (8 bytes): [PING 48[0m
+]
+[0;32mI (358944) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (358994) PLC_TEST: TX: PONG 48[0m
+
+[0;32mI (361254) PLC_TEST: RX RAW (8 bytes): [PING 49[0m
+]
+[0;32mI (361254) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (361304) PLC_TEST: TX: PONG 49[0m
+
+[0;32mI (363564) PLC_TEST: RX RAW (8 bytes): [PING 50[0m
+]
+[0;32mI (363564) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (363614) PLC_TEST: TX: PONG 50[0m
+
+[0;32mI (365874) PLC_TEST: RX RAW (8 bytes): [PING 51[0m
+]
+[0;32mI (365874) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (365924) PLC_TEST: TX: PONG 51[0m
+
+[0;32mI (368184) PLC_TEST: RX RAW (8 bytes): [PING 52[0m
+]
+[0;32mI (368184) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (368234) PLC_TEST: TX: PONG 52[0m
+
+[0;32mI (370494) PLC_TEST: RX RAW (8 bytes): [PING 53[0m
+]
+[0;32mI (370494) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (370544) PLC_TEST: TX: PONG 53[0m
+
+[0;32mI (372814) PLC_TEST: RX RAW (8 bytes): [PING 54[0m
+]
+[0;32mI (372814) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (372864) PLC_TEST: TX: PONG 54[0m
+
+[0;32mI (375124) PLC_TEST: RX RAW (8 bytes): [PING 55[0m
+]
+[0;32mI (375124) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (375174) PLC_TEST: TX: PONG 55[0m
+
+[0;32mI (377434) PLC_TEST: RX RAW (8 bytes): [PING 56[0m
+]
+[0;32mI (377434) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (377484) PLC_TEST: TX: PONG 56[0m
+
+[0;32mI (379744) PLC_TEST: RX RAW (8 bytes): [PING 57[0m
+]
+[0;32mI (379744) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (379794) PLC_TEST: TX: PONG 57[0m
+
+[0;32mI (382054) PLC_TEST: RX RAW (8 bytes): [PING 58[0m
+]
+[0;32mI (382054) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (382104) PLC_TEST: TX: PONG 58[0m
+
+[0;32mI (384364) PLC_TEST: RX RAW (8 bytes): [PING 59[0m
+]
+[0;32mI (384364) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (384414) PLC_TEST: TX: PONG 59[0m
+
+[0;32mI (386684) PLC_TEST: RX RAW (8 bytes): [PING 60[0m
+]
+[0;32mI (386684) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (386734) PLC_TEST: TX: PONG 60[0m
+
+[0;32mI (389004) PLC_TEST: RX RAW (8 bytes): [PING 61[0m
+]
+[0;32mI (389004) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (389054) PLC_TEST: TX: PONG 61[0m
+
+[0;32mI (391324) PLC_TEST: RX RAW (8 bytes): [PING 62[0m
+]
+[0;32mI (391324) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (391374) PLC_TEST: TX: PONG 62[0m
+
+[0;32mI (393634) PLC_TEST: RX RAW (8 bytes): [PING 63[0m
+]
+[0;32mI (393634) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (393684) PLC_TEST: TX: PONG 63[0m
+
+[0;32mI (395954) PLC_TEST: RX RAW (8 bytes): [PING 64[0m
+]
+[0;32mI (395954) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (396004) PLC_TEST: TX: PONG 64[0m
+
+[0;32mI (398264) PLC_TEST: RX RAW (8 bytes): [PING 65[0m
+]
+[0;32mI (398264) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (398314) PLC_TEST: TX: PONG 65[0m
+
+[0;32mI (400574) PLC_TEST: RX RAW (8 bytes): [PING 66[0m
+]
+[0;32mI (400574) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (400624) PLC_TEST: TX: PONG 66[0m
+
+[0;32mI (402884) PLC_TEST: RX RAW (8 bytes): [PING 67[0m
+]
+[0;32mI (402884) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (402934) PLC_TEST: TX: PONG 67[0m
+
+[0;32mI (405194) PLC_TEST: RX RAW (8 bytes): [PING 68[0m
+]
+[0;32mI (405194) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (405244) PLC_TEST: TX: PONG 68[0m
+
+[0;32mI (407504) PLC_TEST: RX RAW (8 bytes): [PING 69[0m
+]
+[0;32mI (407504) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (407554) PLC_TEST: TX: PONG 69[0m
+
+[0;32mI (409814) PLC_TEST: RX RAW (8 bytes): [PING 70[0m
+]
+[0;32mI (409814) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (409864) PLC_TEST: TX: PONG 70[0m
+
+[0;32mI (412124) PLC_TEST: RX RAW (8 bytes): [PING 71[0m
+]
+[0;32mI (412124) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (412174) PLC_TEST: TX: PONG 71[0m
+
+[0;32mI (414444) PLC_TEST: RX RAW (8 bytes): [PING 72[0m
+]
+[0;32mI (414444) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (414494) PLC_TEST: TX: PONG 72[0m
+
+[0;32mI (416754) PLC_TEST: RX RAW (8 bytes): [PING 73[0m
+]
+[0;32mI (416754) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (416804) PLC_TEST: TX: PONG 73[0m
+
+[0;32mI (419064) PLC_TEST: RX RAW (8 bytes): [PING 74[0m
+]
+[0;32mI (419064) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (419114) PLC_TEST: TX: PONG 74[0m
+
+[0;32mI (421384) PLC_TEST: RX RAW (8 bytes): [PING 75[0m
+]
+[0;32mI (421384) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (421434) PLC_TEST: TX: PONG 75[0m
+
+[0;32mI (423704) PLC_TEST: RX RAW (8 bytes): [PING 76[0m
+]
+[0;32mI (423704) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (423754) PLC_TEST: TX: PONG 76[0m
+
+[0;32mI (426014) PLC_TEST: RX RAW (8 bytes): [PING 77[0m
+]
+[0;32mI (426014) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (426064) PLC_TEST: TX: PONG 77[0m
+
+[0;32mI (428334) PLC_TEST: RX RAW (8 bytes): [PING 78[0m
+]
+[0;32mI (428334) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (428384) PLC_TEST: TX: PONG 78[0m
+
+[0;32mI (430644) PLC_TEST: RX RAW (8 bytes): [PING 79[0m
+]
+[0;32mI (430644) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (430694) PLC_TEST: TX: PONG 79[0m
+
+[0;32mI (432954) PLC_TEST: RX RAW (8 bytes): [PING 80[0m
+]
+[0;32mI (432954) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (433004) PLC_TEST: TX: PONG 80[0m
+
+[0;32mI (435274) PLC_TEST: RX RAW (8 bytes): [PING 81[0m
+]
+[0;32mI (435274) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (435324) PLC_TEST: TX: PONG 81[0m
+
+[0;32mI (437594) PLC_TEST: RX RAW (8 bytes): [PING 82[0m
+]
+[0;32mI (437594) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (437644) PLC_TEST: TX: PONG 82[0m
+
+[0;32mI (439904) PLC_TEST: RX RAW (8 bytes): [PING 83[0m
+]
+[0;32mI (439904) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (439954) PLC_TEST: TX: PONG 83[0m
+
+[0;32mI (442214) PLC_TEST: RX RAW (8 bytes): [PING 84[0m
+]
+[0;32mI (442214) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (442264) PLC_TEST: TX: PONG 84[0m
+
+[0;32mI (444534) PLC_TEST: RX RAW (8 bytes): [PING 85[0m
+]
+[0;32mI (444534) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (444584) PLC_TEST: TX: PONG 85[0m
+
+[0;32mI (446844) PLC_TEST: RX RAW (8 bytes): [PING 86[0m
+]
+[0;32mI (446844) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (446894) PLC_TEST: TX: PONG 86[0m
+
+[0;32mI (449154) PLC_TEST: RX RAW (8 bytes): [PING 87[0m
+]
+[0;32mI (449154) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (449204) PLC_TEST: TX: PONG 87[0m
+
+[0;32mI (451464) PLC_TEST: RX RAW (8 bytes): [PING 88[0m
+]
+[0;32mI (451464) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (451514) PLC_TEST: TX: PONG 88[0m
+
+[0;32mI (453774) PLC_TEST: RX RAW (8 bytes): [PING 89[0m
+]
+[0;32mI (453774) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (453824) PLC_TEST: TX: PONG 89[0m
+
+[0;32mI (456094) PLC_TEST: RX RAW (8 bytes): [PING 90[0m
+]
+[0;32mI (456094) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (456144) PLC_TEST: TX: PONG 90[0m
+
+[0;32mI (458414) PLC_TEST: RX RAW (8 bytes): [PING 91[0m
+]
+[0;32mI (458414) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (458464) PLC_TEST: TX: PONG 91[0m
+
+[0;32mI (460734) PLC_TEST: RX RAW (8 bytes): [PING 92[0m
+]
+[0;32mI (460734) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (460784) PLC_TEST: TX: PONG 92[0m
+
+[0;32mI (463044) PLC_TEST: RX RAW (8 bytes): [PING 93[0m
+]
+[0;32mI (463044) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (463094) PLC_TEST: TX: PONG 93[0m
+
+[0;32mI (465354) PLC_TEST: RX RAW (8 bytes): [PING 94[0m
+]
+[0;32mI (465354) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (465404) PLC_TEST: TX: PONG 94[0m
+
+[0;32mI (467674) PLC_TEST: RX RAW (8 bytes): [PING 95[0m
+]
+[0;32mI (467674) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (467724) PLC_TEST: TX: PONG 95[0m
+
+[0;32mI (469994) PLC_TEST: RX RAW (8 bytes): [PING 96[0m
+]
+[0;32mI (469994) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (470044) PLC_TEST: TX: PONG 96[0m
+
+[0;32mI (472304) PLC_TEST: RX RAW (8 bytes): [PING 97[0m
+]
+[0;32mI (472304) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (472354) PLC_TEST: TX: PONG 97[0m
+
+[0;32mI (474614) PLC_TEST: RX RAW (8 bytes): [PING 98[0m
+]
+[0;32mI (474614) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (474664) PLC_TEST: TX: PONG 98[0m
+
+[0;32mI (476924) PLC_TEST: RX RAW (8 bytes): [PING 99[0m
+]
+[0;32mI (476924) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (476974) PLC_TEST: TX: PONG 99[0m
+
+[0;32mI (479244) PLC_TEST: RX RAW (9 bytes): [PING 100[0m
+]
+[0;32mI (479244) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (479294) PLC_TEST: TX: PONG 100[0m
+
+[0;32mI (916194) PLC_TEST: RX RAW (7 bytes): [PING 1[0m
+]
+[0;32mI (916194) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (916244) PLC_TEST: TX: PONG 1[0m
+
+[0;32mI (918504) PLC_TEST: RX RAW (7 bytes): [PING 2[0m
+]
+[0;32mI (918504) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (918554) PLC_TEST: TX: PONG 2[0m
+
+[0;32mI (920814) PLC_TEST: RX RAW (7 bytes): [PING 3[0m
+]
+[0;32mI (920814) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (920864) PLC_TEST: TX: PONG 3[0m
+
+[0;32mI (923124) PLC_TEST: RX RAW (7 bytes): [PING 4[0m
+]
+[0;32mI (923124) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (923174) PLC_TEST: TX: PONG 4[0m
+
+[0;32mI (925434) PLC_TEST: RX RAW (7 bytes): [PING 5[0m
+]
+[0;32mI (925434) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (925484) PLC_TEST: TX: PONG 5[0m
+
+[0;32mI (927744) PLC_TEST: RX RAW (7 bytes): [PING 6[0m
+]
+[0;32mI (927744) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (927794) PLC_TEST: TX: PONG 6[0m
+
+[0;32mI (930054) PLC_TEST: RX RAW (7 bytes): [PING 7[0m
+]
+[0;32mI (930054) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (930104) PLC_TEST: TX: PONG 7[0m
+
+[0;32mI (932364) PLC_TEST: RX RAW (7 bytes): [PING 8[0m
+]
+[0;32mI (932364) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (932414) PLC_TEST: TX: PONG 8[0m
+
+[0;32mI (934674) PLC_TEST: RX RAW (7 bytes): [PING 9[0m
+]
+[0;32mI (934674) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (934724) PLC_TEST: TX: PONG 9[0m
+
+[0;32mI (936984) PLC_TEST: RX RAW (8 bytes): [PING 10[0m
+]
+[0;32mI (936984) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (937034) PLC_TEST: TX: PONG 10[0m
+
+[0;32mI (939304) PLC_TEST: RX RAW (8 bytes): [PING 11[0m
+]
+[0;32mI (939304) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (939354) PLC_TEST: TX: PONG 11[0m
+
+[0;32mI (941614) PLC_TEST: RX RAW (8 bytes): [PING 12[0m
+]
+[0;32mI (941614) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (941664) PLC_TEST: TX: PONG 12[0m
+
+[0;32mI (943924) PLC_TEST: RX RAW (8 bytes): [PING 13[0m
+]
+[0;32mI (943924) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (943974) PLC_TEST: TX: PONG 13[0m
+
+[0;32mI (946244) PLC_TEST: RX RAW (8 bytes): [PING 14[0m
+]
+[0;32mI (946244) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (946294) PLC_TEST: TX: PONG 14[0m
+
+[0;32mI (948564) PLC_TEST: RX RAW (8 bytes): [PING 15[0m
+]
+[0;32mI (948564) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (948614) PLC_TEST: TX: PONG 15[0m
+
+[0;32mI (950884) PLC_TEST: RX RAW (8 bytes): [PING 16[0m
+]
+[0;32mI (950884) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (950934) PLC_TEST: TX: PONG 16[0m
+
+[0;32mI (953194) PLC_TEST: RX RAW (8 bytes): [PING 17[0m
+]
+[0;32mI (953194) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (953244) PLC_TEST: TX: PONG 17[0m
+
+[0;32mI (955504) PLC_TEST: RX RAW (8 bytes): [PING 18[0m
+]
+[0;32mI (955504) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (955554) PLC_TEST: TX: PONG 18[0m
+
+[0;32mI (957814) PLC_TEST: RX RAW (8 bytes): [PING 19[0m
+]
+[0;32mI (957814) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (957864) PLC_TEST: TX: PONG 19[0m
+
+[0;32mI (960134) PLC_TEST: RX RAW (8 bytes): [PING 20[0m
+]
+[0;32mI (960134) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (960184) PLC_TEST: TX: PONG 20[0m
+
+[0;32mI (962454) PLC_TEST: RX RAW (8 bytes): [PING 21[0m
+]
+[0;32mI (962454) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (962504) PLC_TEST: TX: PONG 21[0m
+
+[0;32mI (964774) PLC_TEST: RX RAW (8 bytes): [PING 22[0m
+]
+[0;32mI (964774) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (964824) PLC_TEST: TX: PONG 22[0m
+
+[0;32mI (967084) PLC_TEST: RX RAW (8 bytes): [PING 23[0m
+]
+[0;32mI (967084) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (967134) PLC_TEST: TX: PONG 23[0m
+
+[0;32mI (969394) PLC_TEST: RX RAW (8 bytes): [PING 24[0m
+]
+[0;32mI (969394) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (969444) PLC_TEST: TX: PONG 24[0m
+
+[0;32mI (971704) PLC_TEST: RX RAW (8 bytes): [PING 25[0m
+]
+[0;32mI (971704) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (971754) PLC_TEST: TX: PONG 25[0m
+
+[0;32mI (974024) PLC_TEST: RX RAW (8 bytes): [PING 26[0m
+]
+[0;32mI (974024) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (974074) PLC_TEST: TX: PONG 26[0m
+
+[0;32mI (976334) PLC_TEST: RX RAW (8 bytes): [PING 27[0m
+]
+[0;32mI (976334) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (976384) PLC_TEST: TX: PONG 27[0m
+
+[0;32mI (978654) PLC_TEST: RX RAW (8 bytes): [PING 28[0m
+]
+[0;32mI (978654) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (978704) PLC_TEST: TX: PONG 28[0m
+
+[0;32mI (980964) PLC_TEST: RX RAW (8 bytes): [PING 29[0m
+]
+[0;32mI (980964) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (981014) PLC_TEST: TX: PONG 29[0m
+
+[0;32mI (983274) PLC_TEST: RX RAW (8 bytes): [PING 30[0m
+]
+[0;32mI (983274) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (983324) PLC_TEST: TX: PONG 30[0m
+
+[0;32mI (985584) PLC_TEST: RX RAW (8 bytes): [PING 31[0m
+]
+[0;32mI (985584) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (985634) PLC_TEST: TX: PONG 31[0m
+
+[0;32mI (987894) PLC_TEST: RX RAW (8 bytes): [PING 32[0m
+]
+[0;32mI (987894) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (987944) PLC_TEST: TX: PONG 32[0m
+
+[0;32mI (990204) PLC_TEST: RX RAW (8 bytes): [PING 33[0m
+]
+[0;32mI (990204) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (990254) PLC_TEST: TX: PONG 33[0m
+
+[0;32mI (992524) PLC_TEST: RX RAW (8 bytes): [PING 34[0m
+]
+[0;32mI (992524) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (992574) PLC_TEST: TX: PONG 34[0m
+
+[0;32mI (994834) PLC_TEST: RX RAW (8 bytes): [PING 35[0m
+]
+[0;32mI (994834) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (994884) PLC_TEST: TX: PONG 35[0m
+
+[0;32mI (997144) PLC_TEST: RX RAW (8 bytes): [PING 36[0m
+]
+[0;32mI (997144) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (997194) PLC_TEST: TX: PONG 36[0m
+
+[0;32mI (999454) PLC_TEST: RX RAW (8 bytes): [PING 37[0m
+]
+[0;32mI (999454) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (999504) PLC_TEST: TX: PONG 37[0m
+
+[0;32mI (1001774) PLC_TEST: RX RAW (8 bytes): [PING 38[0m
+]
+[0;32mI (1001774) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1001824) PLC_TEST: TX: PONG 38[0m
+
+[0;32mI (1004094) PLC_TEST: RX RAW (8 bytes): [PING 39[0m
+]
+[0;32mI (1004094) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1004144) PLC_TEST: TX: PONG 39[0m
+
+[0;32mI (1006414) PLC_TEST: RX RAW (8 bytes): [PING 40[0m
+]
+[0;32mI (1006414) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1006464) PLC_TEST: TX: PONG 40[0m
+
+[0;32mI (1008724) PLC_TEST: RX RAW (8 bytes): [PING 41[0m
+]
+[0;32mI (1008724) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1008774) PLC_TEST: TX: PONG 41[0m
+
+[0;32mI (1011034) PLC_TEST: RX RAW (8 bytes): [PING 42[0m
+]
+[0;32mI (1011034) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1011084) PLC_TEST: TX: PONG 42[0m
+
+[0;32mI (1013354) PLC_TEST: RX RAW (8 bytes): [PING 43[0m
+]
+[0;32mI (1013354) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1013404) PLC_TEST: TX: PONG 43[0m
+
+[0;32mI (1015674) PLC_TEST: RX RAW (8 bytes): [PING 44[0m
+]
+[0;32mI (1015674) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1015724) PLC_TEST: TX: PONG 44[0m
+
+[0;32mI (1017984) PLC_TEST: RX RAW (8 bytes): [PING 45[0m
+]
+[0;32mI (1017984) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1018034) PLC_TEST: TX: PONG 45[0m
+
+[0;32mI (1020294) PLC_TEST: RX RAW (8 bytes): [PING 46[0m
+]
+[0;32mI (1020294) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1020344) PLC_TEST: TX: PONG 46[0m
+
+[0;32mI (1022604) PLC_TEST: RX RAW (8 bytes): [PING 47[0m
+]
+[0;32mI (1022604) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1022654) PLC_TEST: TX: PONG 47[0m
+
+[0;32mI (1024914) PLC_TEST: RX RAW (8 bytes): [PING 48[0m
+]
+[0;32mI (1024914) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1024964) PLC_TEST: TX: PONG 48[0m
+
+[0;32mI (1027224) PLC_TEST: RX RAW (8 bytes): [PING 49[0m
+]
+[0;32mI (1027224) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1027274) PLC_TEST: TX: PONG 49[0m
+
+[0;32mI (1029534) PLC_TEST: RX RAW (8 bytes): [PING 50[0m
+]
+[0;32mI (1029534) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1029584) PLC_TEST: TX: PONG 50[0m
+
+[0;32mI (1031854) PLC_TEST: RX RAW (8 bytes): [PING 51[0m
+]
+[0;32mI (1031854) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1031904) PLC_TEST: TX: PONG 51[0m
+
+[0;32mI (1034164) PLC_TEST: RX RAW (8 bytes): [PING 52[0m
+]
+[0;32mI (1034164) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1034214) PLC_TEST: TX: PONG 52[0m
+
+[0;32mI (1036474) PLC_TEST: RX RAW (8 bytes): [PING 53[0m
+]
+[0;32mI (1036474) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1036524) PLC_TEST: TX: PONG 53[0m
+
+[0;32mI (1038794) PLC_TEST: RX RAW (8 bytes): [PING 54[0m
+]
+[0;32mI (1038794) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1038844) PLC_TEST: TX: PONG 54[0m
+
+[0;32mI (1041104) PLC_TEST: RX RAW (8 bytes): [PING 55[0m
+]
+[0;32mI (1041104) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1041154) PLC_TEST: TX: PONG 55[0m
+
+[0;32mI (1043414) PLC_TEST: RX RAW (8 bytes): [PING 56[0m
+]
+[0;32mI (1043414) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1043464) PLC_TEST: TX: PONG 56[0m
+
+[0;32mI (1045724) PLC_TEST: RX RAW (8 bytes): [PING 57[0m
+]
+[0;32mI (1045724) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1045774) PLC_TEST: TX: PONG 57[0m
+
+[0;32mI (1048034) PLC_TEST: RX RAW (8 bytes): [PING 58[0m
+]
+[0;32mI (1048034) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1048084) PLC_TEST: TX: PONG 58[0m
+
+[0;32mI (1050354) PLC_TEST: RX RAW (8 bytes): [PING 59[0m
+]
+[0;32mI (1050354) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1050404) PLC_TEST: TX: PONG 59[0m
+
+[0;32mI (1052674) PLC_TEST: RX RAW (8 bytes): [PING 60[0m
+]
+[0;32mI (1052674) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1052724) PLC_TEST: TX: PONG 60[0m
+
+[0;32mI (1054994) PLC_TEST: RX RAW (8 bytes): [PING 61[0m
+]
+[0;32mI (1054994) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1055044) PLC_TEST: TX: PONG 61[0m
+
+[0;32mI (1057314) PLC_TEST: RX RAW (8 bytes): [PING 62[0m
+]
+[0;32mI (1057314) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1057364) PLC_TEST: TX: PONG 62[0m
+
+[0;32mI (1059624) PLC_TEST: RX RAW (8 bytes): [PING 63[0m
+]
+[0;32mI (1059624) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1059674) PLC_TEST: TX: PONG 63[0m
+
+[0;32mI (1061934) PLC_TEST: RX RAW (8 bytes): [PING 64[0m
+]
+[0;32mI (1061934) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1061984) PLC_TEST: TX: PONG 64[0m
+
+[0;32mI (1064254) PLC_TEST: RX RAW (8 bytes): [PING 65[0m
+]
+[0;32mI (1064254) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1064304) PLC_TEST: TX: PONG 65[0m
+
+[0;32mI (1066574) PLC_TEST: RX RAW (8 bytes): [PING 66[0m
+]
+[0;32mI (1066574) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1066624) PLC_TEST: TX: PONG 66[0m
+
+[0;32mI (1068884) PLC_TEST: RX RAW (8 bytes): [PING 67[0m
+]
+[0;32mI (1068884) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1068934) PLC_TEST: TX: PONG 67[0m
+
+[0;32mI (1071194) PLC_TEST: RX RAW (8 bytes): [PING 68[0m
+]
+[0;32mI (1071194) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1071244) PLC_TEST: TX: PONG 68[0m
+
+[0;32mI (1073504) PLC_TEST: RX RAW (8 bytes): [PING 69[0m
+]
+[0;32mI (1073504) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1073554) PLC_TEST: TX: PONG 69[0m
+
+[0;32mI (1075814) PLC_TEST: RX RAW (8 bytes): [PING 70[0m
+]
+[0;32mI (1075814) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1075864) PLC_TEST: TX: PONG 70[0m
+
+[0;32mI (1078124) PLC_TEST: RX RAW (8 bytes): [PING 71[0m
+]
+[0;32mI (1078124) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1078174) PLC_TEST: TX: PONG 71[0m
+
+[0;32mI (1080444) PLC_TEST: RX RAW (8 bytes): [PING 72[0m
+]
+[0;32mI (1080444) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1080494) PLC_TEST: TX: PONG 72[0m
+
+[0;32mI (1082764) PLC_TEST: RX RAW (8 bytes): [PING 73[0m
+]
+[0;32mI (1082764) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1082814) PLC_TEST: TX: PONG 73[0m
+
+[0;32mI (1085084) PLC_TEST: RX RAW (8 bytes): [PING 74[0m
+]
+[0;32mI (1085084) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1085134) PLC_TEST: TX: PONG 74[0m
+
+[0;32mI (1087404) PLC_TEST: RX RAW (8 bytes): [PING 75[0m
+]
+[0;32mI (1087404) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1087454) PLC_TEST: TX: PONG 75[0m
+
+[0;32mI (1089724) PLC_TEST: RX RAW (8 bytes): [PING 76[0m
+]
+[0;32mI (1089724) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1089774) PLC_TEST: TX: PONG 76[0m
+
+[0;32mI (1092034) PLC_TEST: RX RAW (8 bytes): [PING 77[0m
+]
+[0;32mI (1092034) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1092084) PLC_TEST: TX: PONG 77[0m
+
+[0;32mI (1094344) PLC_TEST: RX RAW (8 bytes): [PING 78[0m
+]
+[0;32mI (1094344) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1094394) PLC_TEST: TX: PONG 78[0m
+
+[0;32mI (1096654) PLC_TEST: RX RAW (8 bytes): [PING 79[0m
+]
+[0;32mI (1096654) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1096704) PLC_TEST: TX: PONG 79[0m
+
+[0;32mI (1098974) PLC_TEST: RX RAW (8 bytes): [PING 80[0m
+]
+[0;32mI (1098974) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1099024) PLC_TEST: TX: PONG 80[0m
+
+[0;32mI (1101294) PLC_TEST: RX RAW (8 bytes): [PING 81[0m
+]
+[0;32mI (1101294) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1101344) PLC_TEST: TX: PONG 81[0m
+
+[0;32mI (1103604) PLC_TEST: RX RAW (8 bytes): [PING 82[0m
+]
+[0;32mI (1103604) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1103654) PLC_TEST: TX: PONG 82[0m
+
+[0;32mI (1105924) PLC_TEST: RX RAW (8 bytes): [PING 83[0m
+]
+[0;32mI (1105924) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1105974) PLC_TEST: TX: PONG 83[0m
+
+[0;32mI (1108234) PLC_TEST: RX RAW (8 bytes): [PING 84[0m
+]
+[0;32mI (1108234) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1108284) PLC_TEST: TX: PONG 84[0m
+
+[0;32mI (1110554) PLC_TEST: RX RAW (8 bytes): [PING 85[0m
+]
+[0;32mI (1110554) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1110604) PLC_TEST: TX: PONG 85[0m
+
+[0;32mI (1112874) PLC_TEST: RX RAW (8 bytes): [PING 86[0m
+]
+[0;32mI (1112874) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1112924) PLC_TEST: TX: PONG 86[0m
+
+[0;32mI (1115184) PLC_TEST: RX RAW (8 bytes): [PING 87[0m
+]
+[0;32mI (1115184) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1115234) PLC_TEST: TX: PONG 87[0m
+
+[0;32mI (1117494) PLC_TEST: RX RAW (8 bytes): [PING 88[0m
+]
+[0;32mI (1117494) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1117544) PLC_TEST: TX: PONG 88[0m
+
+[0;32mI (1119804) PLC_TEST: RX RAW (8 bytes): [PING 89[0m
+]
+[0;32mI (1119804) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1119854) PLC_TEST: TX: PONG 89[0m
+
+[0;32mI (1122114) PLC_TEST: RX RAW (8 bytes): [PING 90[0m
+]
+[0;32mI (1122114) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1122164) PLC_TEST: TX: PONG 90[0m
+
+[0;32mI (1124434) PLC_TEST: RX RAW (8 bytes): [PING 91[0m
+]
+[0;32mI (1124434) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1124484) PLC_TEST: TX: PONG 91[0m
+
+[0;32mI (1126754) PLC_TEST: RX RAW (8 bytes): [PING 92[0m
+]
+[0;32mI (1126754) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1126804) PLC_TEST: TX: PONG 92[0m
+
+[0;32mI (1129064) PLC_TEST: RX RAW (8 bytes): [PING 93[0m
+]
+[0;32mI (1129064) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1129114) PLC_TEST: TX: PONG 93[0m
+
+[0;32mI (1131374) PLC_TEST: RX RAW (8 bytes): [PING 94[0m
+]
+[0;32mI (1131374) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1131424) PLC_TEST: TX: PONG 94[0m
+
+[0;32mI (1133684) PLC_TEST: RX RAW (8 bytes): [PING 95[0m
+]
+[0;32mI (1133684) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1133734) PLC_TEST: TX: PONG 95[0m
+
+[0;32mI (1135994) PLC_TEST: RX RAW (8 bytes): [PING 96[0m
+]
+[0;32mI (1135994) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1136044) PLC_TEST: TX: PONG 96[0m
+
+[0;32mI (1138304) PLC_TEST: RX RAW (8 bytes): [PING 97[0m
+]
+[0;32mI (1138304) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1138354) PLC_TEST: TX: PONG 97[0m
+
+[0;32mI (1140614) PLC_TEST: RX RAW (8 bytes): [PING 98[0m
+]
+[0;32mI (1140614) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1140664) PLC_TEST: TX: PONG 98[0m
+
+[0;32mI (1142924) PLC_TEST: RX RAW (8 bytes): [PING 99[0m
+]
+[0;32mI (1142924) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1142974) PLC_TEST: TX: PONG 99[0m
+
+[0;32mI (1145244) PLC_TEST: RX RAW (9 bytes): [PING 100[0m
+]
+[0;32mI (1145244) PLC_TEST: PING detected - wait 50 ms[0m
+[0;32mI (1145294) PLC_TEST: TX: PONG 100[0m
+

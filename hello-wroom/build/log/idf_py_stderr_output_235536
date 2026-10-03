@@ -1,0 +1,43 @@
+Command: /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python /opt/esp/idf/tools/idf_monitor.py -p /dev/ttyUSB0 -b 115200 --toolchain-prefix xtensa-esp32-elf- --target esp32 --revision 0 /workspace/hello-wroom/build/hello-wroom.elf /workspace/hello-wroom/build/bootloader/bootloader.elf -m '/home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python' '/opt/esp/idf/tools/idf.py' '-p' '/dev/ttyUSB0'
+--- esp-idf-monitor 1.10.0 on /dev/ttyUSB0 115200
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+--- 0x40080400: _invalid_pc_placeholder at /opt/esp/idf/components/xtensa/xtensa_vectors.S:2259
+--- 0x40080644: call_start_cpu0 at /opt/esp/idf/components/bootloader/subproject/main/bootloader_start.c:27
+--- WARNING: Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig
+--- WARNING: Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig
+--- 0x40093a64: _frxt_dispatch at /opt/esp/idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/portasm.S:510
+--- 0x400939b5: _frxt_int_exit at /opt/esp/idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/portasm.S:263
+--- 0x40084f80: _xt_handle_exc at /opt/esp/idf/components/xtensa/xtensa_vectors.S:760
+--- 0x40093a03: _frxt_dispatch at /opt/esp/idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/portasm.S:452
+--- 0x40093932: _frxt_int_enter at /opt/esp/idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/portasm.S:140
+--- 0x40084f80: _xt_handle_exc at /opt/esp/idf/components/xtensa/xtensa_vectors.S:760
+--- 0x4000c2e0: memcpy in ROM
+--- 0x4000c2f6: memcpy in ROM
+--- 0x40093a61: _frxt_dispatch at /opt/esp/idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/portasm.S:509
+--- 0x400939b2: _frxt_int_exit at /opt/esp/idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/portasm.S:246
+--- 0x40080400: _invalid_pc_placeholder at /opt/esp/idf/components/xtensa/xtensa_vectors.S:2259
+--- 0x40080644: call_start_cpu0 at /opt/esp/idf/components/bootloader/subproject/main/bootloader_start.c:27
+--- WARNING: Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig
+--- WARNING: Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig
+--- 0x40093308: esp_error_check_failed_print at /opt/esp/idf/components/esp_system/esp_err.c:37
+--- 0x400fedd6: sdspi_host_start_command at /opt/esp/idf/components/esp_driver_sdspi/src/sdspi_host.c:500
+--- 0x400ff186: sdspi_host_do_transaction at /opt/esp/idf/components/esp_driver_sdspi/src/sdspi_transaction.c:153
+--- 0x4012652d: sdmmc_send_cmd at /opt/esp/idf/components/sdmmc/sdmmc_cmd.c:58
+--- 0x40100249: sdmmc_send_cmd_send_status at /opt/esp/idf/components/sdmmc/sdmmc_cmd.c:430
+--- 0x4010066d: sdmmc_read_sectors_dma at /opt/esp/idf/components/sdmmc/sdmmc_cmd.c:738
+--- 0x40100741: sdmmc_read_sectors at /opt/esp/idf/components/sdmmc/sdmmc_cmd.c:657
+--- 0x400fcd90: ff_sdmmc_read at /opt/esp/idf/components/fatfs/diskio/diskio_sdmmc.c:55
+--- 0x400f96fa: ff_disk_read at /opt/esp/idf/components/fatfs/diskio/diskio.c:97
+--- 0x400fb584: f_read at /opt/esp/idf/components/fatfs/src/ff.c:4003
+--- 0x400fdde8: vfs_fat_read at /opt/esp/idf/components/fatfs/vfs/vfs_fat.c:494
+--- 0x400dd9f9: esp_vfs_read at /opt/esp/idf/components/vfs/vfs_calls.c:103
+--- 0x400d6a76: read at /opt/esp/idf/components/esp_libc/src/syscalls.c:46
+--- 0x40121d4d: bufio_read at /builds/idf/crosstool-NG/.build/xtensa-esp-elf/build/build-picolibc-build-x86_64-build_pc-linux-gnu/../../../src/picolibc-git-1738c754/newlib/libc/tinystdio/stdio_private.h:174(inlined by) fread at /builds/idf/crosstool-NG/.build/xtensa-esp-elf/build/build-picolibc-build-x86_64-build_pc-linux-gnu/../../../src/picolibc-git-1738c754/newlib/libc/tinystdio/fread.c:112
+--- 0x400e255a: play_mp3_file at /workspace/hello-wroom/main/mp3_player_test.c:332
+--- 0x400e27ad: mp3_player_test_task at /workspace/hello-wroom/main/mp3_player_test.c:764
+--- 0x40128836: vPortTaskWrapper at /opt/esp/idf/components/freertos/FreeRTOS-Kernel/portable/xtensa/port.c:147
+--- 0x40080400: _invalid_pc_placeholder at /opt/esp/idf/components/xtensa/xtensa_vectors.S:2259
+--- 0x40080644: call_start_cpu0 at /opt/esp/idf/components/bootloader/subproject/main/bootloader_start.c:27
+--- WARNING: Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig
+--- WARNING: Failed to decode multiple lines in a row. Try checking the baud rate and XTAL frequency setting in menuconfig
+

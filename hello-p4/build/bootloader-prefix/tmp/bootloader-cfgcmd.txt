@@ -1,0 +1,1 @@
+cmd='/usr/bin/cmake;-DSDKCONFIG=/workspace/hello-p4/sdkconfig;-DIDF_PATH=/opt/esp/idf;-DIDF_TARGET=esp32p4;-DPYTHON_DEPS_CHECKED=1;-DPYTHON=/home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python;-DEXTRA_COMPONENT_DIRS=;-DPROJECT_SOURCE_DIR=/workspace/hello-p4;-DIGNORE_EXTRA_COMPONENT=;-DIDF_BUILD_V2=;-GNinja;<SOURCE_DIR><SOURCE_SUBDIR>'

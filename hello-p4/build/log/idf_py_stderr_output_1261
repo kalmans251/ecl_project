@@ -1,0 +1,9 @@
+Command: /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python /opt/esp/idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 301 --decode-panic backtrace -m '/home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python' '/opt/esp/idf/tools/idf.py' '-p' '/dev/ttyACM0'
+--- esp-idf-monitor 1.10.0 on /dev/ttyACM0 115200
+--- WARNING: No ELF files found. Please provide the ELF file paths, required for binary log decoding.
+--- Quit: Ctrl+] | Menu: Ctrl+T | Help: Ctrl+T followed by Ctrl+H
+--- WARNING: Writing to serial is timing out. Please make sure that your application supports an interactive console and that you have picked the correct console for serial communication.
+--- WARNING: Writing to serial is timing out. Please make sure that your application supports an interactive console and that you have picked the correct console for serial communication.
+--- WARNING: Writing to serial is timing out. Please make sure that your application supports an interactive console and that you have picked the correct console for serial communication.
+--- WARNING: Writing to serial is timing out. Please make sure that your application supports an interactive console and that you have picked the correct console for serial communication.
+
