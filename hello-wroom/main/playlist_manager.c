@@ -895,7 +895,10 @@ bool playlist_manager_start(void)
     {
         if (
             s_mode ==
-            MUSIC_PLAY_MODE_SHUFFLE
+                MUSIC_PLAY_MODE_SHUFFLE
+            ||
+            s_mode ==
+                MUSIC_PLAY_MODE_AGE
         )
         {
             index =
@@ -958,7 +961,10 @@ bool playlist_manager_next(void)
 
     if (
         s_mode ==
-        MUSIC_PLAY_MODE_SHUFFLE
+            MUSIC_PLAY_MODE_SHUFFLE
+        ||
+        s_mode ==
+            MUSIC_PLAY_MODE_AGE
     )
     {
         next_index =
