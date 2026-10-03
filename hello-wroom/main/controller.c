@@ -15,6 +15,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
+#include "playlist_manager.h"
 
 static const char *TAG =
     "CONTROLLER";
@@ -25,15 +26,6 @@ s_controller_queue =
     NULL;
 
 
-/* ============================================================
- * TEMPORARY MUSIC
- *
- * 다음 단계에서
- * 연령대 group / catalog 방식으로 교체.
- * ============================================================ */
-
-#define TEMP_MUSIC_PATH \
-    "/sdcard/music/20/DOHKYU~1.MP3"
 
 
 /* ============================================================
@@ -248,14 +240,39 @@ static void handle_music(
 
 
             if (
-                !music_player_start(
-                    TEMP_MUSIC_PATH
-                )
+                !playlist_manager_start()
             )
             {
                 ESP_LOGE(
                     TAG,
-                    "Music START failed"
+                    "Playlist START failed"
+                );
+            }
+
+
+            break;
+        }
+
+
+        /* ====================================================
+         * NEXT
+         * ==================================================== */
+
+        case CMD_NEXT:
+        {
+            ESP_LOGI(
+                TAG,
+                "MUSIC NEXT"
+            );
+
+
+            if (
+                !playlist_manager_next()
+            )
+            {
+                ESP_LOGE(
+                    TAG,
+                    "Playlist NEXT failed"
                 );
             }
 
@@ -315,6 +332,82 @@ static void handle_music(
 
 
             music_player_resume();
+
+
+            break;
+        }
+
+
+        /* ====================================================
+         * SET
+         *
+         * payload[0] = MUSIC_SET_*
+         * payload[1] = value
+         * ==================================================== */
+
+        case CMD_SET:
+        {
+            if (
+                frame->payload_len <
+                2
+            )
+            {
+                ESP_LOGW(
+                    TAG,
+                    "MUSIC SET payload too short"
+                );
+
+
+                break;
+            }
+
+
+            uint8_t type =
+                frame->payload[0];
+
+
+            uint8_t value =
+                frame->payload[1];
+
+
+            if (
+                type ==
+                MUSIC_SET_PLAY_MODE
+            )
+            {
+                if (
+                    !playlist_manager_set_mode(
+                        (music_play_mode_t)
+                        value
+                    )
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Invalid play mode=%u",
+                        value
+                    );
+                }
+            }
+            else if (
+                type ==
+                MUSIC_SET_GROUP
+            )
+            {
+                if (
+                    !playlist_manager_set_group(
+                        (music_group_t)
+                        value
+                    )
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Invalid music group=%u",
+                        value
+                    );
+                }
+            }
 
 
             break;

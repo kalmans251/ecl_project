@@ -20,6 +20,8 @@ idf_component_register(
         "audio_output.c"
         "music_player.c"
 
+        "playlist_manager.c"
+
     INCLUDE_DIRS
         "."
 

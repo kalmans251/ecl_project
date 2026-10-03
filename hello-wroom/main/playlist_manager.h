@@ -1,0 +1,65 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "protocol.h"
+
+
+/* ============================================================
+ * INIT
+ * ============================================================ */
+
+bool playlist_manager_init(void);
+
+
+/* ============================================================
+ * MODE
+ * ============================================================ */
+
+bool playlist_manager_set_mode(
+    music_play_mode_t mode
+);
+
+music_play_mode_t
+playlist_manager_get_mode(void);
+
+
+/* ============================================================
+ * GROUP
+ * ============================================================ */
+
+bool playlist_manager_set_group(
+    music_group_t group
+);
+
+music_group_t
+playlist_manager_get_group(void);
+
+
+/* ============================================================
+ * PLAY CONTROL
+ * ============================================================ */
+
+/*
+ * 현재 선택된 곡 재생.
+ *
+ * 아직 선택된 곡이 없으면
+ * 현재 모드에 맞는 첫 곡을 선택.
+ */
+bool playlist_manager_start(void);
+
+
+/*
+ * 현재 모드에 맞는 다음 곡 선택 후 재생.
+ */
+bool playlist_manager_next(void);
+
+
+/* ============================================================
+ * INFO
+ * ============================================================ */
+
+uint16_t playlist_manager_get_track_count(void);
+
+int16_t playlist_manager_get_current_index(void);

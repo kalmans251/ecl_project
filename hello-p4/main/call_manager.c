@@ -500,14 +500,16 @@ bool call_manager_start(
      * 통화 종료 후 이어서 재생하기 위해서.
      * ======================================================== */
 
-    if (
-        s_restore.music_enabled
-    )
-    {
-        music_policy_add_pause_reason(
-            MUSIC_PAUSE_REASON_CALL
-        );
-    }
+    /*
+    * 통화 중에는 음악이 존재하는지와 관계없이
+    * MUSIC 재생 자체를 block한다.
+    *
+    * 통화 도중 새로운 MUSIC START가 들어와도
+    * music_policy_on_started()가 즉시 PAUSE시킨다.
+    */
+    music_policy_add_pause_reason(
+        MUSIC_PAUSE_REASON_CALL
+    );
 
 
     /* ========================================================

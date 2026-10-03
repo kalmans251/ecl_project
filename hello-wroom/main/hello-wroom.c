@@ -18,6 +18,7 @@
 
 #include "esp_log.h"
 
+#include "playlist_manager.h"
 
 static const char *TAG =
     "MAIN";
@@ -179,6 +180,22 @@ void app_main(void)
         return;
     }
 
+    /* ========================================================
+    * PLAYLIST
+    * ======================================================== */
+
+    if (
+        !playlist_manager_init()
+    )
+    {
+        ESP_LOGE(
+            TAG,
+            "Playlist manager init failed"
+        );
+
+
+        return;
+    }
 
     ESP_LOGI(
         TAG,
