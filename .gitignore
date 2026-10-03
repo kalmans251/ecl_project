@@ -1,0 +1,9 @@
+# ESP-IDF build outputs
+hello-p4/build/
+hello-wroom/build/
+
+# PlatformIO
+esp32-s3-arduino/.pio/
+
+# Misc
+*.log

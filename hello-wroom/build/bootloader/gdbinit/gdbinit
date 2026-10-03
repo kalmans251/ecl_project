@@ -1,2 +1,0 @@
-source /workspace/hello-wroom/build/bootloader/gdbinit/symbols
-source /workspace/hello-wroom/build/bootloader/gdbinit/connect
