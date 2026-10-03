@@ -1,7 +1,0 @@
-Command: ninja all
-Default value for GDMA_CTRL_FUNC_IN_IRAM in sdkconfig is n but it is y according to Kconfig.
-Using default value from sdkconfig (n).
-NOTE: Kconfig parser version: 1
-NOTE: Kconfig defaults policy: use sdkconfig
-NOTE: Status: Finished with notifications
-NOTE: /opt/esp/idf/components/esp_driver_dma/Kconfig:3: GDMA_CTRL_FUNC_IN_IRAM: Kconfig default value: y, sdkconfig default value: n, using n from sdkconfig
