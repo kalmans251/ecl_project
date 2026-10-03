@@ -1418,6 +1418,11 @@ static play_result_t play_mp3_file(
         );
 
 
+        send_music_event(
+            MUSIC_EVENT_STOPPED
+        );
+
+
         return PLAY_RESULT_STOPPED;
     }
 

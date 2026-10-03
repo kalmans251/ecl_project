@@ -105,7 +105,10 @@ typedef enum
     CMD_DATA             = 0x23,
 
     CMD_PAUSE            = 0x24,
-    CMD_RESUME           = 0x25
+    CMD_RESUME           = 0x25,
+
+    CMD_NEXT             = 0x26,
+    CMD_PREVIOUS         = 0x27
 
 } command_t;
 
@@ -150,10 +153,66 @@ typedef enum
 
     MUSIC_EVENT_RESUMED   = 0x04,
 
-    MUSIC_EVENT_ERROR     = 0x05
+    MUSIC_EVENT_ERROR     = 0x05,
 
+    MUSIC_EVENT_STOPPED   = 0x06
 } music_event_t;
 
+/* ============================================================
+ * MUSIC PLAY MODE
+ * ============================================================ */
+
+typedef enum
+{
+    MUSIC_PLAY_MODE_SEQUENTIAL =
+        0x01,
+
+    MUSIC_PLAY_MODE_SHUFFLE =
+        0x02,
+
+    MUSIC_PLAY_MODE_AGE =
+        0x03
+
+} music_play_mode_t;
+
+
+/* ============================================================
+ * MUSIC GROUP
+ * ============================================================ */
+
+typedef enum
+{
+    MUSIC_GROUP_DEFAULT =
+        0x00,
+
+    MUSIC_GROUP_10S =
+        0x01,
+
+    MUSIC_GROUP_20S =
+        0x02,
+
+    MUSIC_GROUP_30S =
+        0x03,
+
+    MUSIC_GROUP_40S =
+        0x04
+
+} music_group_t;
+
+
+/* ============================================================
+ * MUSIC SET TYPE
+ * ============================================================ */
+
+typedef enum
+{
+    MUSIC_SET_PLAY_MODE =
+        0x01,
+
+    MUSIC_SET_GROUP =
+        0x02
+
+} music_set_type_t;
 
 /* ============================================================
  * Protocol Frame

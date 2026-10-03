@@ -427,3 +427,27 @@ void music_policy_on_error(void)
         false
     );
 }
+
+void music_policy_on_stopped(void)
+{
+    system_state_set_music_playing(
+        false
+    );
+
+
+    system_state_set_music_enabled(
+        false
+    );
+
+
+    /*
+     * STOP 이후 새 START에서
+     * 이전 USER PAUSE가 남아서 막히지 않도록 제거.
+     *
+     * 현재 music_enabled=false이므로
+     * RESUME 명령은 발생하지 않는다.
+     */
+    music_policy_remove_pause_reason(
+        MUSIC_PAUSE_REASON_USER
+    );
+}

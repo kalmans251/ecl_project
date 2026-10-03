@@ -17,6 +17,7 @@ idf_component_register(
         "sleep_manager.c"
         "call_manager.c"
         "music_policy.c"
+        "music_manager.c"
 
     PRIV_REQUIRES
         spi_flash

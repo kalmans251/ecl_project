@@ -27,6 +27,8 @@
 #include "call_manager.h"
 #include "music_policy.h"
 
+#include "music_manager.h"
+
 /* ============================================================
  * LOG TAG
  * ============================================================ */
@@ -432,6 +434,11 @@ static void handle_led(
             {
                 music_policy_remove_pause_reason(
                     MUSIC_PAUSE_REASON_LED
+                );
+
+
+                music_manager_on_led_mode_changed(
+                    new_mode
                 );
             }
 
@@ -1053,22 +1060,70 @@ static void handle_detection(
             DETECTION_SOURCE_RADAR
         )
         {
+            activity_state_t before =
+                sleep_manager_get_state();
+
+
             detection_manager_set_source(
                 DETECTION_SOURCE_RADAR
             );
-            
+
+
+            music_manager_on_detection_source_changed(
+                DETECTION_SOURCE_RADAR
+            );
+
+
             sleep_manager_reset_activity();
+
+
+            if (
+                before ==
+                    ACTIVITY_SLEEPING
+                ||
+                before ==
+                    ACTIVITY_WAIT_AGE
+            )
+            {
+                music_manager_on_wake(
+                    AGE_GROUP_UNKNOWN
+                );
+            }
         }
         else if (
             source ==
             DETECTION_SOURCE_CCTV
         )
         {
+            activity_state_t before =
+                sleep_manager_get_state();
+
+
             detection_manager_set_source(
                 DETECTION_SOURCE_CCTV
             );
 
+
+            music_manager_on_detection_source_changed(
+                DETECTION_SOURCE_CCTV
+            );
+
+
             sleep_manager_reset_activity();
+
+
+            if (
+                before ==
+                    ACTIVITY_SLEEPING
+                ||
+                before ==
+                    ACTIVITY_WAIT_AGE
+            )
+            {
+                music_manager_on_wake(
+                    AGE_GROUP_UNKNOWN
+                );
+            }
         }
 
 
@@ -1138,10 +1193,44 @@ static void handle_detection(
                 accepted
             )
             {
+                activity_state_t before =
+                    sleep_manager_get_state();
+
+
+                bool wait_for_age =
+                    music_manager_requires_age_for_wake();
+
+
                 sleep_manager_on_new_detection(
                     DETECTION_SOURCE_CCTV,
-                    seq
+                    seq,
+                    wait_for_age
                 );
+
+
+                activity_state_t after =
+                    sleep_manager_get_state();
+
+
+                /*
+                * 실제 SLEEPING -> ACTIVE가 된 경우만
+                * 음악 Wake 처리.
+                *
+                * SLEEP_PENDING -> ACTIVE는 현재곡이
+                * 계속 재생 중이므로 NEXT 하면 안 됨.
+                */
+                if (
+                    before ==
+                        ACTIVITY_SLEEPING
+                    &&
+                    after ==
+                        ACTIVITY_ACTIVE
+                )
+                {
+                    music_manager_on_wake(
+                        AGE_GROUP_UNKNOWN
+                    );
+                }
             }
 
 
@@ -1190,10 +1279,45 @@ static void handle_detection(
                 accepted
             )
             {
+                activity_state_t before =
+                    sleep_manager_get_state();
+
+
+                /*
+                * AGE mode라면 다음 곡에서 사용할
+                * 그룹을 갱신.
+                */
+                music_manager_on_age_result(
+                    age
+                );
+
+
                 sleep_manager_on_cctv_age_result(
                     seq,
                     age
                 );
+
+
+                activity_state_t after =
+                    sleep_manager_get_state();
+
+
+                /*
+                * 이 AGE_RESULT가 실제 Wake trigger였다면
+                * 이제 다음곡을 시작.
+                */
+                if (
+                    before ==
+                        ACTIVITY_WAIT_AGE
+                    &&
+                    after ==
+                        ACTIVITY_ACTIVE
+                )
+                {
+                    music_manager_on_wake(
+                        age
+                    );
+                }
             }
 
 
@@ -1235,10 +1359,33 @@ static void handle_detection(
                 accepted
             )
             {
+                activity_state_t before =
+                    sleep_manager_get_state();
+
+
                 sleep_manager_on_new_detection(
                     DETECTION_SOURCE_RADAR,
-                    seq
+                    seq,
+                    false
                 );
+
+
+                activity_state_t after =
+                    sleep_manager_get_state();
+
+
+                if (
+                    before ==
+                        ACTIVITY_SLEEPING
+                    &&
+                    after ==
+                        ACTIVITY_ACTIVE
+                )
+                {
+                    music_manager_on_wake(
+                        AGE_GROUP_UNKNOWN
+                    );
+                }
             }
 
 
@@ -1258,102 +1405,269 @@ static void handle_music(
     const protocol_frame_t *frame
 )
 {
-    /*
-     * WROOM -> P4
-     *
-     * SERVICE_MUSIC
-     * CMD_DATA
-     *
-     * payload[0] = MUSIC_EVENT_*
-     */
+    /* ========================================================
+     * WROOM -> P4 EVENT
+     * ======================================================== */
 
     if (
-        frame->command !=
-        CMD_DATA
+        frame->src ==
+        NODE_WROOM
+    )
+    {
+        if (
+            frame->command !=
+                CMD_DATA
+            ||
+            frame->length <
+                1
+        )
+        {
+            return;
+        }
+
+
+        uint8_t event =
+            frame->payload[0];
+
+
+        switch (
+            event
+        )
+        {
+            case MUSIC_EVENT_STARTED:
+            {
+                music_policy_on_started();
+
+
+                ESP_LOGI(
+                    TAG,
+                    "MUSIC STARTED"
+                );
+
+
+                break;
+            }
+
+
+            case MUSIC_EVENT_FINISHED:
+            {
+                activity_state_t before =
+                    sleep_manager_get_state();
+
+
+                music_policy_on_finished();
+
+
+                ESP_LOGI(
+                    TAG,
+                    "MUSIC FINISHED"
+                );
+
+
+                sleep_manager_on_music_finished();
+
+
+                activity_state_t after =
+                    sleep_manager_get_state();
+
+
+                bool entered_sleep =
+                    (
+                        before ==
+                            ACTIVITY_SLEEP_PENDING
+                        &&
+                        after ==
+                            ACTIVITY_SLEEPING
+                    );
+
+
+                music_manager_on_track_finished(
+                    entered_sleep
+                );
+
+
+                break;
+            }
+
+
+            case MUSIC_EVENT_PAUSED:
+            {
+                music_policy_on_paused();
+
+
+                ESP_LOGI(
+                    TAG,
+                    "MUSIC PAUSED"
+                );
+
+
+                break;
+            }
+
+
+            case MUSIC_EVENT_RESUMED:
+            {
+                music_policy_on_resumed();
+
+
+                ESP_LOGI(
+                    TAG,
+                    "MUSIC RESUMED"
+                );
+
+
+                break;
+            }
+
+
+            case MUSIC_EVENT_STOPPED:
+            {
+                music_policy_on_stopped();
+
+
+                ESP_LOGI(
+                    TAG,
+                    "MUSIC STOPPED"
+                );
+
+
+                break;
+            }
+
+
+            case MUSIC_EVENT_ERROR:
+            {
+                music_policy_on_error();
+
+
+                ESP_LOGW(
+                    TAG,
+                    "MUSIC ERROR"
+                );
+
+
+                break;
+            }
+
+
+            default:
+            {
+                break;
+            }
+        }
+
+
+        return;
+    }
+
+
+    /* ========================================================
+     * PI -> P4 MUSIC CONTROL
+     *
+     * 이제 관제는 WROOM을 직접 제어하지 않고
+     * P4에 음악 명령을 준다.
+     * ======================================================== */
+
+    if (
+        frame->src !=
+        NODE_PI
     )
     {
         return;
     }
 
 
-    if (
-        frame->length <
-        1
+    switch (
+        frame->command
     )
     {
-        return;
-    }
-
-
-    uint8_t event =
-        frame->payload[0];
-
-
-    switch (event)
-    {
-        case MUSIC_EVENT_STARTED:
+        case CMD_START:
         {
-            music_policy_on_started();
-
-            ESP_LOGI(
-                TAG,
-                "MUSIC STARTED"
-            );
+            music_manager_start();
 
             break;
         }
 
 
-        case MUSIC_EVENT_FINISHED:
+        case CMD_STOP:
         {
-            music_policy_on_finished();
-
-            ESP_LOGI(
-                TAG,
-                "MUSIC FINISHED"
-            );
-
-
-            sleep_manager_on_music_finished();
+            music_manager_stop();
 
             break;
         }
 
 
-        case MUSIC_EVENT_PAUSED:
+        case CMD_PAUSE:
         {
-            music_policy_on_paused();
-
-            ESP_LOGI(
-                TAG,
-                "MUSIC PAUSED"
-            );
+            music_manager_user_pause();
 
             break;
         }
 
 
-        case MUSIC_EVENT_RESUMED:
+        case CMD_RESUME:
         {
-            music_policy_on_resumed();
-
-            ESP_LOGI(
-                TAG,
-                "MUSIC RESUMED"
-            );
+            music_manager_user_resume();
 
             break;
         }
 
 
-        case MUSIC_EVENT_ERROR:
+        case CMD_NEXT:
         {
-            music_policy_on_error();
+            music_manager_next();
 
-            ESP_LOGW(
-                TAG,
-                "MUSIC ERROR"
-            );
+            break;
+        }
+
+
+        case CMD_SET:
+        {
+            if (
+                frame->length <
+                2
+            )
+            {
+                break;
+            }
+
+
+            uint8_t type =
+                frame->payload[0];
+
+
+            uint8_t value =
+                frame->payload[1];
+
+
+            if (
+                type ==
+                MUSIC_SET_PLAY_MODE
+            )
+            {
+                if (
+                    !music_manager_set_mode(
+                        (music_play_mode_t)
+                        value
+                    )
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Music mode rejected=%u",
+                        value
+                    );
+                }
+            }
+
+
+            /*
+             * MUSIC_SET_GROUP는 Pi에서 직접 사용하지 않는다.
+             *
+             * AGE 그룹은 CCTV AGE_RESULT를 받은 P4가
+             * 자동으로 결정한다.
+             */
+
 
             break;
         }

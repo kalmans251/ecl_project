@@ -65,7 +65,8 @@ void sleep_manager_set_enabled(
 
 void sleep_manager_on_new_detection(
     detection_source_t source,
-    uint32_t seq
+    uint32_t seq,
+    bool wait_for_age
 );
 
 

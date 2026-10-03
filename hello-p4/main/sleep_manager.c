@@ -406,7 +406,8 @@ void sleep_manager_set_enabled(
 
 void sleep_manager_on_new_detection(
     detection_source_t source,
-    uint32_t seq
+    uint32_t seq,
+    bool wait_for_age
 )
 {
     p4_system_state_t system;
@@ -484,13 +485,21 @@ void sleep_manager_on_new_detection(
     )
     {
         /*
-         * RADAR
-         *
-         * 나이를 기다릴 필요가 없음.
-         */
+        * RADAR는 항상 즉시 Wake.
+        *
+        * CCTV도 AGE 모드가 아니면
+        * AGE_RESULT를 기다릴 이유가 없다.
+        */
         if (
             source ==
-            DETECTION_SOURCE_RADAR
+                DETECTION_SOURCE_RADAR
+            ||
+            (
+                source ==
+                    DETECTION_SOURCE_CCTV
+                &&
+                !wait_for_age
+            )
         )
         {
             unlock_manager();
@@ -498,18 +507,16 @@ void sleep_manager_on_new_detection(
 
             ESP_LOGI(
                 TAG,
-                "RADAR wake"
+                source ==
+                    DETECTION_SOURCE_RADAR
+                    ?
+                    "RADAR wake"
+                    :
+                    "CCTV wake immediately / AGE mode OFF"
             );
 
 
             enter_active();
-
-
-            /*
-             * 여기서 나중에:
-             * 기본 Radar 음악 시작 명령
-             * 을 Music Manager로 보낼 예정.
-             */
 
 
             return;
@@ -517,14 +524,13 @@ void sleep_manager_on_new_detection(
 
 
         /*
-         * CCTV
-         *
-         * 나이가 판별될 때까지
-         * 실제 출력은 Sleep 상태 유지.
-         */
+        * CCTV + AGE mode
+        */
         if (
             source ==
-            DETECTION_SOURCE_CCTV
+                DETECTION_SOURCE_CCTV
+            &&
+            wait_for_age
         )
         {
             s_activity =
@@ -542,7 +548,7 @@ void sleep_manager_on_new_detection(
 
             ESP_LOGI(
                 TAG,
-                "CCTV wake pending AGE seq=%lu",
+                "CCTV AGE wake pending seq=%lu",
                 (unsigned long)seq
             );
 

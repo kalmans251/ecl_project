@@ -176,6 +176,9 @@ typedef enum
     MUSIC_EVENT_ERROR =
         0x05,
 
+    MUSIC_EVENT_STOPPED =
+        0x06
+
 } music_event_t;
 
 /* ============================================================
@@ -219,6 +222,7 @@ typedef enum
     MUSIC_GROUP_40S =
         0x04
 
+        
 } music_group_t;
 
 

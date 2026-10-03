@@ -8,6 +8,7 @@
 
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_random.h"
 
 #include "music_player.h"
 #include "sd_card.h"

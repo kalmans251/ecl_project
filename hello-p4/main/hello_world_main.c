@@ -28,6 +28,8 @@
 #include "call_manager.h"
 #include "music_policy.h"
 
+#include "music_manager.h"
+
 void app_main(void)
 {
     printf("\n");
@@ -44,14 +46,16 @@ void app_main(void)
 
     system_state_init();
 
+    detection_manager_init();
+
     music_policy_init();
     /* Hardware */
+
+    music_manager_init();
 
     plc_uart_init();
 
     wroom_uart_init();
-
-    detection_manager_init();
 
     power_control_init();
 

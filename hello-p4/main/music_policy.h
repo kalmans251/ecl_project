@@ -72,3 +72,5 @@ void music_policy_on_resumed(void);
 void music_policy_on_finished(void);
 
 void music_policy_on_error(void);
+
+void music_policy_on_stopped(void);
