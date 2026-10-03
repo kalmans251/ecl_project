@@ -476,6 +476,8 @@ static void handle_led(
                 */
                 else if (
                     previous_state.call_active
+                    &&
+                    previous_state.music_enabled
                 )
                 {
                     system_state_set_music_paused_by_led_mode(

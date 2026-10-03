@@ -1079,3 +1079,82 @@ static bool idle_timeout_expired(void)
         >=
         SLEEP_IDLE_TIMEOUT_MS;
 }
+
+/* ============================================================
+ * LED MODE CHANGED
+ *
+ * MUSIC -> BASIC / WEATHER 중 SLEEP_PENDING이면
+ * 더 이상 곡 FINISHED를 기다리지 않는다.
+ * ============================================================ */
+
+void sleep_manager_on_led_mode_changed(
+    led_mode_t mode
+)
+{
+    /*
+     * MUSIC으로 전환되는 경우에는
+     * 여기서 Sleep 처리할 필요 없음.
+     */
+    if (
+        mode ==
+        LED_MODE_MUSIC
+    )
+    {
+        return;
+    }
+
+
+    p4_system_state_t system;
+
+
+    system_state_get(
+        &system
+    );
+
+
+    if (
+        !system.sleep_mode_enabled ||
+        system.call_active
+    )
+    {
+        return;
+    }
+
+
+    activity_state_t activity =
+        sleep_manager_get_state();
+
+
+    /*
+     * 이미 현재 곡 종료를 기다리고 있었는데
+     * BASIC / WEATHER로 바뀌면 음악은 PAUSE된다.
+     *
+     * PAUSE된 곡은 FINISHED가 발생하지 않으므로
+     * 더 이상 기다리지 않고 Sleep 상태를 재평가한다.
+     */
+    if (
+        activity ==
+        ACTIVITY_SLEEP_PENDING
+    )
+    {
+        if (
+            idle_timeout_expired()
+        )
+        {
+            ESP_LOGI(
+                TAG,
+                "LED left MUSIC during SLEEP_PENDING -> SLEEP NOW"
+            );
+
+
+            enter_sleeping();
+        }
+        else
+        {
+            /*
+             * 아주 직전에 새 사람이 감지된 경우 보호.
+             */
+            enter_active();
+        }
+    }
+}
