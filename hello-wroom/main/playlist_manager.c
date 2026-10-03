@@ -867,8 +867,7 @@ bool playlist_manager_start(void)
 
     if (
         catalog == NULL ||
-        catalog->count ==
-        0
+        catalog->count == 0
     )
     {
         ESP_LOGW(
@@ -876,37 +875,44 @@ bool playlist_manager_start(void)
             "No tracks"
         );
 
-
         return false;
     }
 
 
-    int16_t index =
-        catalog->current_index;
+    int16_t index;
 
 
     /*
-     * 아직 아무 곡도 선택되지 않은 상태.
+     * SHUFFLE / AGE:
+     * 새 START마다 새 랜덤곡 선택.
+     *
+     * 직전 곡과 같은 곡은
+     * choose_shuffle_index()가 제외한다.
      */
     if (
-        index <
-        0
+        s_mode == MUSIC_PLAY_MODE_SHUFFLE
+        ||
+        s_mode == MUSIC_PLAY_MODE_AGE
     )
     {
+        index =
+            choose_shuffle_index(
+                catalog
+            );
+    }
+    else
+    {
+        /*
+         * SEQUENTIAL:
+         * 기존 위치가 있으면 유지,
+         * 없으면 첫 곡.
+         */
+        index =
+            catalog->current_index;
+
         if (
-            s_mode ==
-                MUSIC_PLAY_MODE_SHUFFLE
-            ||
-            s_mode ==
-                MUSIC_PLAY_MODE_AGE
+            index < 0
         )
-        {
-            index =
-                choose_shuffle_index(
-                    catalog
-                );
-        }
-        else
         {
             index =
                 0;
