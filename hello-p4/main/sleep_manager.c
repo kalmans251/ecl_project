@@ -1040,45 +1040,7 @@ void sleep_manager_task(
     }
 }
 
-/* ============================================================
- * IDLE TIMEOUT CHECK
- * ============================================================ */
 
-static bool idle_timeout_expired(void)
-{
-    detection_summary_t detection;
-
-    detection_manager_get_summary(
-        &detection
-    );
-
-
-    int64_t reference_ms =
-        detection.last_detection_ms;
-
-
-    /*
-     * Sleep 기능을 켠 직후에는
-     * enable 시점을 기준으로 한다.
-     */
-    if (
-        s_enabled_since_ms >
-        reference_ms
-    )
-    {
-        reference_ms =
-            s_enabled_since_ms;
-    }
-
-
-    return
-        (
-            now_ms() -
-            reference_ms
-        )
-        >=
-        SLEEP_IDLE_TIMEOUT_MS;
-}
 
 /* ============================================================
  * LED MODE CHANGED
