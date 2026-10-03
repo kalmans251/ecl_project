@@ -1,0 +1,2 @@
+source /workspace/hello-wroom/build/gdbinit/symbols
+source /workspace/hello-wroom/build/gdbinit/connect

@@ -42,14 +42,14 @@ void app_main(void)
 
     router_init();
 
+    system_state_init();
+
     music_policy_init();
     /* Hardware */
 
     plc_uart_init();
 
     wroom_uart_init();
-
-    system_state_init();
 
     detection_manager_init();
 

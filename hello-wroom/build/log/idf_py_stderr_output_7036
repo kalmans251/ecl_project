@@ -1,0 +1,9 @@
+Command: ninja flash
+ERROR: A fatal error occurred: Invalid head of packet (0x00): Possible serial noise or corruption.
+[31mCMake Error at /opt/esp/idf/components/esptool_py/run_serial_tool.cmake:67 (message):
+  
+  /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python;-m;esptool;--chip;esp32
+  failed.
+
+
+[0m

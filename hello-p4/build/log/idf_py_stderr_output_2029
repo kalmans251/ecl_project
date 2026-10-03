@@ -1,0 +1,5 @@
+Command: ninja /dev/ttyACM0
+NOTE: Kconfig parser version: 1
+NOTE: Kconfig defaults policy: use sdkconfig
+NOTE: Status: Finished successfully
+ninja: error: unknown target '/dev/ttyACM0'

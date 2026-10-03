@@ -706,39 +706,14 @@ bool call_manager_end(void)
 
 
         /*
-         * 통화 직전 곡이 실제 재생 중이었고
-         * 당시 Sleep 상태가 아니었다면 RESUME.
-         */
-
-        p4_system_state_t current_state;
-
-
-        system_state_get(
-            &current_state
-        );
-
-
-        /*
-        * 통화 직전 음악이 재생 중이었더라도
-        * 현재 LED 모드가 BASIC/WEATHER라면
-        * 음악을 다시 틀면 안 된다.
+        * 통화가 끝났으므로 CALL block은 반드시 제거.
+        *
+        * LED / USER / EMERGENCY 등의 다른 reason이 남아 있으면
+        * music_policy가 RESUME하지 않는다.
         */
-
-        if (
-            restore.music_enabled
-            &&
-            restore.music_was_playing
-            &&
-            !restore.sleep_active
-            &&
-            current_state.led_mode ==
-                LED_MODE_MUSIC
-        )
-        {
-            music_policy_remove_pause_reason(
-                MUSIC_PAUSE_REASON_CALL
-            );
-        }
+        music_policy_remove_pause_reason(
+            MUSIC_PAUSE_REASON_CALL
+        );
     }
 
 

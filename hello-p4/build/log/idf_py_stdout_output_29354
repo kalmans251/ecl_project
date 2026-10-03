@@ -1,0 +1,367 @@
+Command: /home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python /opt/esp/idf/tools/idf_monitor.py -p /dev/ttyACM0 -b 115200 --toolchain-prefix riscv32-esp-elf- --target esp32p4 --revision 100 --decode-panic backtrace /workspace/hello-p4/build/hello_world.elf /workspace/hello-p4/build/bootloader/bootloader.elf -m '/home/coder/.espressif/python_env/idf6.0_py3.10_env/bin/python' '/opt/esp/idf/tools/idf.py' '-p' '/dev/ttyACM0'
+ESP-ROM:esp32p4-eco2-20240710
+Build:Jul 10 2024
+rst:0x17 (CHIP_USB_UART_RESET),boot:0x30f (SPI_FAST_FLASH_BOOT)
+Core0 Saved PC:0x4ff03cbc
+Core1 Saved PC:0x4ff03cbc
+SPI mode:DIO, clock div:1
+load:0x4ff33ce0,len:0x15e0
+load:0x4ff28ed0,len:0xe54
+load:0x4ff2bbd0,len:0x35dc
+entry 0x4ff28eda
+[0;32mI (27) boot: ESP-IDF v6.0.2 2nd stage bootloader[0m
+[0;32mI (28) boot: compile time Sep 22 2026 07:07:55[0m
+[0;32mI (28) boot: Multicore bootloader[0m
+[0;32mI (30) boot: chip revision: v1.0[0m
+[0;32mI (31) boot: efuse block revision: v0.3[0m
+[0;32mI (34) boot.esp32p4: SPI Speed      : 80MHz[0m
+[0;32mI (38) boot.esp32p4: SPI Mode       : DIO[0m
+[0;32mI (42) boot.esp32p4: SPI Flash Size : 16MB[0m
+[0;32mI (46) boot: Enabling RNG early entropy source...[0m
+[0;32mI (50) boot: Partition Table:[0m
+[0;32mI (53) boot: ## Label            Usage          Type ST Offset   Length[0m
+[0;32mI (59) boot:  0 nvs              WiFi data        01 02 00009000 00006000[0m
+[0;32mI (66) boot:  1 phy_init         RF data          01 01 0000f000 00001000[0m
+[0;32mI (72) boot:  2 factory          factory app      00 00 00010000 00100000[0m
+[0;32mI (79) boot: End of partition table[0m
+[0;32mI (82) esp_image: segment 0: paddr=00010020 vaddr=40020020 size=08cc8h ( 36040) map[0m
+[0;32mI (95) esp_image: segment 1: paddr=00018cf0 vaddr=30100000 size=00088h (   136) load[0m
+[0;32mI (97) esp_image: segment 2: paddr=00018d80 vaddr=4ff00000 size=07298h ( 29336) load[0m
+[0;32mI (109) esp_image: segment 3: paddr=00020020 vaddr=40000020 size=175e0h ( 95712) map[0m
+[0;32mI (126) esp_image: segment 4: paddr=00037608 vaddr=4ff07298 size=06108h ( 24840) load[0m
+[0;32mI (131) esp_image: segment 5: paddr=0003d718 vaddr=4ff0d400 size=02414h (  9236) load[0m
+[0;32mI (137) boot: Loaded app from partition at offset 0x10000[0m
+[0;32mI (138) boot: Disabling RNG early entropy source...[0m
+[0;32mI (152) cpu_start: Multicore app[0m
+[0;32mI (163) cpu_start: GPIO 38 and 37 are used as console UART I/O pins[0m
+[0;32mI (163) cpu_start: Pro cpu start user code[0m
+[0;32mI (163) cpu_start: cpu freq: 360000000 Hz[0m
+[0;32mI (165) app_init: Application information:[0m
+[0;32mI (169) app_init: Project name:     hello_world[0m
+[0;32mI (173) app_init: App version:      1[0m
+[0;32mI (176) app_init: Compile time:     Sep 22 2026 07:08:03[0m
+[0;32mI (181) app_init: ELF file SHA256:  d62aa02f3...[0m
+[0;32mI (186) app_init: ESP-IDF:          v6.0.2[0m
+[0;32mI (189) efuse_init: Min chip rev:     v1.0[0m
+[0;32mI (193) efuse_init: Max chip rev:     v1.99 [0m
+[0;32mI (197) efuse_init: Chip rev:         v1.0[0m
+[0;32mI (201) heap_init: Initializing. RAM available for dynamic allocation:[0m
+[0;32mI (207) heap_init: At 4FF11010 len 00029FB0 (167 KiB): RETENT_RAM[0m
+[0;32mI (213) heap_init: At 4FF3AFC0 len 00004BF0 (18 KiB): RAM[0m
+[0;32mI (218) heap_init: At 4FF40000 len 00060000 (384 KiB): RAM[0m
+[0;32mI (224) heap_init: At 50108080 len 00007F80 (31 KiB): RTCRAM[0m
+[0;32mI (229) heap_init: At 30100088 len 00001F78 (7 KiB): SPM[0m
+[0;32mI (235) spi_flash: detected chip: generic[0m
+[0;32mI (238) spi_flash: flash io: dio[0m
+[0;32mI (241) sleep_gpio: Configure to isolate all GPIO pins in sleep state[0m
+[0;32mI (247) sleep_gpio: Enable automatic switching of GPIO sleep configuration[0m
+[0;32mI (254) main_task: Started on CPU0[0m
+[0;32mI (254) main_task: Calling app_main()[0m
+[0;32mI (264) PLC_TEST: ================================[0m
+[0;32mI (264) PLC_TEST: PLCMODEM2 MIN RTT TEST[0m
+[0;32mI (264) PLC_TEST: UART  : UART1[0m
+[0;32mI (274) PLC_TEST: TX    : GPIO 48[0m
+[0;32mI (274) PLC_TEST: RX    : GPIO 47[0m
+[0;32mI (274) PLC_TEST: BAUD  : 9600[0m
+[0;32mI (284) PLC_TEST: DELAY : 50 ms[0m
+[0;32mI (284) PLC_TEST: ================================[0m
+[0;32mI (6864) PLC_TEST: RX: [PING 1][0m
+[0;32mI (6914) PLC_TEST: TX: [PONG 1[0m
+]
+[0;32mI (6974) PLC_TEST: RX: [PING 2][0m
+[0;32mI (7024) PLC_TEST: TX: [PONG 2[0m
+]
+[0;32mI (7084) PLC_TEST: RX: [PING 3][0m
+[0;32mI (7134) PLC_TEST: TX: [PONG 3[0m
+]
+[0;32mI (7194) PLC_TEST: RX: [PING 4][0m
+[0;32mI (7244) PLC_TEST: TX: [PONG 4[0m
+]
+[0;32mI (7304) PLC_TEST: RX: [PING 5][0m
+[0;32mI (7354) PLC_TEST: TX: [PONG 5[0m
+]
+[0;32mI (7414) PLC_TEST: RX: [PING 6][0m
+[0;32mI (7464) PLC_TEST: TX: [PONG 6[0m
+]
+[0;32mI (7524) PLC_TEST: RX: [PING 7][0m
+[0;32mI (7574) PLC_TEST: TX: [PONG 7[0m
+]
+[0;32mI (7634) PLC_TEST: RX: [PING 8][0m
+[0;32mI (7684) PLC_TEST: TX: [PONG 8[0m
+]
+[0;32mI (7744) PLC_TEST: RX: [PING 9][0m
+[0;32mI (7794) PLC_TEST: TX: [PONG 9[0m
+]
+[0;32mI (7854) PLC_TEST: RX: [PING 10][0m
+[0;32mI (7904) PLC_TEST: TX: [PONG 10[0m
+]
+[0;32mI (7964) PLC_TEST: RX: [PING 11][0m
+[0;32mI (8024) PLC_TEST: TX: [PONG 11[0m
+]
+[0;32mI (8084) PLC_TEST: RX: [PING 12][0m
+[0;32mI (8134) PLC_TEST: TX: [PONG 12[0m
+]
+[0;32mI (8194) PLC_TEST: RX: [PING 13][0m
+[0;32mI (8244) PLC_TEST: TX: [PONG 13[0m
+]
+[0;32mI (8304) PLC_TEST: RX: [PING 14][0m
+[0;32mI (8354) PLC_TEST: TX: [PONG 14[0m
+]
+[0;32mI (8414) PLC_TEST: RX: [PING 15][0m
+[0;32mI (8464) PLC_TEST: TX: [PONG 15[0m
+]
+[0;32mI (8524) PLC_TEST: RX: [PING 16][0m
+[0;32mI (8574) PLC_TEST: TX: [PONG 16[0m
+]
+[0;32mI (8634) PLC_TEST: RX: [PING 17][0m
+[0;32mI (8684) PLC_TEST: TX: [PONG 17[0m
+]
+[0;32mI (8754) PLC_TEST: RX: [PING 18][0m
+[0;32mI (8804) PLC_TEST: TX: [PONG 18[0m
+]
+[0;32mI (8864) PLC_TEST: RX: [PING 19][0m
+[0;32mI (8914) PLC_TEST: TX: [PONG 19[0m
+]
+[0;32mI (8984) PLC_TEST: RX: [PING 20][0m
+[0;32mI (9034) PLC_TEST: TX: [PONG 20[0m
+]
+[0;32mI (9094) PLC_TEST: RX: [PING 21][0m
+[0;32mI (9144) PLC_TEST: TX: [PONG 21[0m
+]
+[0;32mI (9204) PLC_TEST: RX: [PING 22][0m
+[0;32mI (9254) PLC_TEST: TX: [PONG 22[0m
+]
+[0;32mI (9314) PLC_TEST: RX: [PING 23][0m
+[0;32mI (9364) PLC_TEST: TX: [PONG 23[0m
+]
+[0;32mI (9424) PLC_TEST: RX: [PING 24][0m
+[0;32mI (9474) PLC_TEST: TX: [PONG 24[0m
+]
+[0;32mI (9534) PLC_TEST: RX: [PING 25][0m
+[0;32mI (9584) PLC_TEST: TX: [PONG 25[0m
+]
+[0;32mI (9644) PLC_TEST: RX: [PING 26][0m
+[0;32mI (9704) PLC_TEST: TX: [PONG 26[0m
+]
+[0;32mI (9764) PLC_TEST: RX: [PING 27][0m
+[0;32mI (9814) PLC_TEST: TX: [PONG 27[0m
+]
+[0;32mI (9874) PLC_TEST: RX: [PING 28][0m
+[0;32mI (9924) PLC_TEST: TX: [PONG 28[0m
+]
+[0;32mI (9984) PLC_TEST: RX: [PING 29][0m
+[0;32mI (10034) PLC_TEST: TX: [PONG 29[0m
+]
+[0;32mI (10094) PLC_TEST: RX: [PING 30][0m
+[0;32mI (10144) PLC_TEST: TX: [PONG 30[0m
+]
+[0;32mI (10204) PLC_TEST: RX: [PING 31][0m
+[0;32mI (10254) PLC_TEST: TX: [PONG 31[0m
+]
+[0;32mI (10314) PLC_TEST: RX: [PING 32][0m
+[0;32mI (10364) PLC_TEST: TX: [PONG 32[0m
+]
+[0;32mI (10424) PLC_TEST: RX: [PING 33][0m
+[0;32mI (10484) PLC_TEST: TX: [PONG 33[0m
+]
+[0;32mI (10544) PLC_TEST: RX: [PING 34][0m
+[0;32mI (10594) PLC_TEST: TX: [PONG 34[0m
+]
+[0;32mI (10654) PLC_TEST: RX: [PING 35][0m
+[0;32mI (10704) PLC_TEST: TX: [PONG 35[0m
+]
+[0;32mI (10774) PLC_TEST: RX: [PING 36][0m
+[0;32mI (10824) PLC_TEST: TX: [PONG 36[0m
+]
+[0;32mI (10884) PLC_TEST: RX: [PING 37][0m
+[0;32mI (10934) PLC_TEST: TX: [PONG 37[0m
+]
+[0;32mI (10994) PLC_TEST: RX: [PING 38][0m
+[0;32mI (11044) PLC_TEST: TX: [PONG 38[0m
+]
+[0;32mI (11104) PLC_TEST: RX: [PING 39][0m
+[0;32mI (11154) PLC_TEST: TX: [PONG 39[0m
+]
+[0;32mI (11214) PLC_TEST: RX: [PING 40][0m
+[0;32mI (11274) PLC_TEST: TX: [PONG 40[0m
+]
+[0;32mI (11334) PLC_TEST: RX: [PING 41][0m
+[0;32mI (11384) PLC_TEST: TX: [PONG 41[0m
+]
+[0;32mI (11444) PLC_TEST: RX: [PING 42][0m
+[0;32mI (11494) PLC_TEST: TX: [PONG 42[0m
+]
+[0;32mI (11564) PLC_TEST: RX: [PING 43][0m
+[0;32mI (11614) PLC_TEST: TX: [PONG 43[0m
+]
+[0;32mI (11674) PLC_TEST: RX: [PING 44][0m
+[0;32mI (11734) PLC_TEST: TX: [PONG 44[0m
+]
+[0;32mI (11794) PLC_TEST: RX: [PING 45][0m
+[0;32mI (11844) PLC_TEST: TX: [PONG 45[0m
+]
+[0;32mI (11914) PLC_TEST: RX: [PING 46][0m
+[0;32mI (11964) PLC_TEST: TX: [PONG 46[0m
+]
+[0;32mI (12024) PLC_TEST: RX: [PING 47][0m
+[0;32mI (12074) PLC_TEST: TX: [PONG 47[0m
+]
+[0;32mI (12134) PLC_TEST: RX: [PING 48][0m
+[0;32mI (12184) PLC_TEST: TX: [PONG 48[0m
+]
+[0;32mI (12244) PLC_TEST: RX: [PING 49][0m
+[0;32mI (12304) PLC_TEST: TX: [PONG 49[0m
+]
+[0;32mI (12364) PLC_TEST: RX: [PING 50][0m
+[0;32mI (12414) PLC_TEST: TX: [PONG 50[0m
+]
+[0;32mI (12484) PLC_TEST: RX: [PING 51][0m
+[0;32mI (12534) PLC_TEST: TX: [PONG 51[0m
+]
+[0;32mI (12594) PLC_TEST: RX: [PING 52][0m
+[0;32mI (12644) PLC_TEST: TX: [PONG 52[0m
+]
+[0;32mI (12704) PLC_TEST: RX: [PING 53][0m
+[0;32mI (12764) PLC_TEST: TX: [PONG 53[0m
+]
+[0;32mI (12834) PLC_TEST: RX: [PING 54][0m
+[0;32mI (12884) PLC_TEST: TX: [PONG 54[0m
+]
+[0;32mI (12944) PLC_TEST: RX: [PING 55][0m
+[0;32mI (12994) PLC_TEST: TX: [PONG 55[0m
+]
+[0;32mI (13064) PLC_TEST: RX: [PING 56][0m
+[0;32mI (13114) PLC_TEST: TX: [PONG 56[0m
+]
+[0;32mI (13174) PLC_TEST: RX: [PING 57][0m
+[0;32mI (13224) PLC_TEST: TX: [PONG 57[0m
+]
+[0;32mI (13284) PLC_TEST: RX: [PING 58][0m
+[0;32mI (13334) PLC_TEST: TX: [PONG 58[0m
+]
+[0;32mI (13394) PLC_TEST: RX: [PING 59][0m
+[0;32mI (13444) PLC_TEST: TX: [PONG 59[0m
+]
+[0;32mI (13514) PLC_TEST: RX: [PING 60][0m
+[0;32mI (13564) PLC_TEST: TX: [PONG 60[0m
+]
+[0;32mI (13634) PLC_TEST: RX: [PING 61][0m
+[0;32mI (13684) PLC_TEST: TX: [PONG 61[0m
+]
+[0;32mI (13754) PLC_TEST: RX: [PING 62][0m
+[0;32mI (13804) PLC_TEST: TX: [PONG 62[0m
+]
+[0;32mI (13864) PLC_TEST: RX: [PING 63][0m
+[0;32mI (13914) PLC_TEST: TX: [PONG 63[0m
+]
+[0;32mI (13974) PLC_TEST: RX: [PING 64][0m
+[0;32mI (14024) PLC_TEST: TX: [PONG 64[0m
+]
+[0;32mI (14094) PLC_TEST: RX: [PING 65][0m
+[0;32mI (14144) PLC_TEST: TX: [PONG 65[0m
+]
+[0;32mI (14204) PLC_TEST: RX: [PING 66][0m
+[0;32mI (14254) PLC_TEST: TX: [PONG 66[0m
+]
+[0;32mI (14314) PLC_TEST: RX: [PING 67][0m
+[0;32mI (14364) PLC_TEST: TX: [PONG 67[0m
+]
+[0;32mI (14434) PLC_TEST: RX: [PING 68][0m
+[0;32mI (14484) PLC_TEST: TX: [PONG 68[0m
+]
+[0;32mI (14554) PLC_TEST: RX: [PING 69][0m
+[0;32mI (14604) PLC_TEST: TX: [PONG 69[0m
+]
+[0;32mI (14664) PLC_TEST: RX: [PING 70][0m
+[0;32mI (14714) PLC_TEST: TX: [PONG 70[0m
+]
+[0;32mI (14774) PLC_TEST: RX: [PING 71][0m
+[0;32mI (14824) PLC_TEST: TX: [PONG 71[0m
+]
+[0;32mI (14894) PLC_TEST: RX: [PING 72][0m
+[0;32mI (14944) PLC_TEST: TX: [PONG 72[0m
+]
+[0;32mI (15004) PLC_TEST: RX: [PING 73][0m
+[0;32mI (15054) PLC_TEST: TX: [PONG 73[0m
+]
+[0;32mI (15114) PLC_TEST: RX: [PING 74][0m
+[0;32mI (15164) PLC_TEST: TX: [PONG 74[0m
+]
+[0;32mI (15224) PLC_TEST: RX: [PING 75][0m
+[0;32mI (15274) PLC_TEST: TX: [PONG 75[0m
+]
+[0;32mI (15334) PLC_TEST: RX: [PING 76][0m
+[0;32mI (15384) PLC_TEST: TX: [PONG 76[0m
+]
+[0;32mI (15444) PLC_TEST: RX: [PING 77][0m
+[0;32mI (15494) PLC_TEST: TX: [PONG 77[0m
+]
+[0;32mI (15554) PLC_TEST: RX: [PING 78][0m
+[0;32mI (15604) PLC_TEST: TX: [PONG 78[0m
+]
+[0;32mI (15664) PLC_TEST: RX: [PING 79][0m
+[0;32mI (15714) PLC_TEST: TX: [PONG 79[0m
+]
+[0;32mI (15774) PLC_TEST: RX: [PING 80][0m
+[0;32mI (15824) PLC_TEST: TX: [PONG 80[0m
+]
+[0;32mI (15884) PLC_TEST: RX: [PING 81][0m
+[0;32mI (15934) PLC_TEST: TX: [PONG 81[0m
+]
+[0;32mI (15994) PLC_TEST: RX: [PING 82][0m
+[0;32mI (16044) PLC_TEST: TX: [PONG 82[0m
+]
+[0;32mI (16104) PLC_TEST: RX: [PING 83][0m
+[0;32mI (16154) PLC_TEST: TX: [PONG 83[0m
+]
+[0;32mI (16214) PLC_TEST: RX: [PING 84][0m
+[0;32mI (16264) PLC_TEST: TX: [PONG 84[0m
+]
+[0;32mI (16334) PLC_TEST: RX: [PING 85][0m
+[0;32mI (16384) PLC_TEST: TX: [PONG 85[0m
+]
+[0;32mI (16444) PLC_TEST: RX: [PING 86][0m
+[0;32mI (16494) PLC_TEST: TX: [PONG 86[0m
+]
+[0;32mI (16554) PLC_TEST: RX: [PING 87][0m
+[0;32mI (16604) PLC_TEST: TX: [PONG 87[0m
+]
+[0;32mI (16664) PLC_TEST: RX: [PING 88][0m
+[0;32mI (16714) PLC_TEST: TX: [PONG 88[0m
+]
+[0;32mI (16774) PLC_TEST: RX: [PING 89][0m
+[0;32mI (16824) PLC_TEST: TX: [PONG 89[0m
+]
+[0;32mI (16884) PLC_TEST: RX: [PING 90][0m
+[0;32mI (16934) PLC_TEST: TX: [PONG 90[0m
+]
+[0;32mI (16994) PLC_TEST: RX: [PING 91][0m
+[0;32mI (17054) PLC_TEST: TX: [PONG 91[0m
+]
+[0;32mI (17124) PLC_TEST: RX: [PING 92][0m
+[0;32mI (17174) PLC_TEST: TX: [PONG 92[0m
+]
+[0;32mI (17234) PLC_TEST: RX: [PING 93][0m
+[0;32mI (17284) PLC_TEST: TX: [PONG 93[0m
+]
+[0;32mI (17344) PLC_TEST: RX: [PING 94][0m
+[0;32mI (17394) PLC_TEST: TX: [PONG 94[0m
+]
+[0;32mI (17454) PLC_TEST: RX: [PING 95][0m
+[0;32mI (17504) PLC_TEST: TX: [PONG 95[0m
+]
+[0;32mI (17564) PLC_TEST: RX: [PING 96][0m
+[0;32mI (17614) PLC_TEST: TX: [PONG 96[0m
+]
+[0;32mI (17674) PLC_TEST: RX: [PING 97][0m
+[0;32mI (17724) PLC_TEST: TX: [PONG 97[0m
+]
+[0;32mI (17784) PLC_TEST: RX: [PING 98][0m
+[0;32mI (17834) PLC_TEST: TX: [PONG 98[0m
+]
+[0;32mI (17894) PLC_TEST: RX: [PING 99][0m
+[0;32mI (17944) PLC_TEST: TX: [PONG 99[0m
+]
+[0;32mI (18014) PLC_TEST: RX: [PING 100][0m
+[0;32mI (18064) PLC_TEST: TX: [PONG 100[0m
+]

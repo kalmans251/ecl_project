@@ -1,0 +1,2 @@
+source /workspace/hello-p4/build/gdbinit/symbols
+source /workspace/hello-p4/build/gdbinit/connect

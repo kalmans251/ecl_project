@@ -333,7 +333,6 @@ bool music_policy_is_blocked(void)
 /* ============================================================
  * PLAYER EVENTS
  * ============================================================ */
-
 void music_policy_on_started(void)
 {
     system_state_set_music_enabled(
@@ -344,6 +343,28 @@ void music_policy_on_started(void)
     system_state_set_music_playing(
         true
     );
+
+
+    /*
+     * START 이벤트가 왔더라도 현재 block reason이 있다면
+     * policy를 우선하여 즉시 PAUSE.
+     *
+     * 이후 Playlist / Wake 기능을 추가할 때 특히 중요.
+     */
+    if (
+        music_policy_is_blocked()
+    )
+    {
+        ESP_LOGI(
+            TAG,
+            "STARTED while blocked -> PAUSE"
+        );
+
+
+        send_music_command(
+            CMD_PAUSE
+        );
+    }
 }
 
 
