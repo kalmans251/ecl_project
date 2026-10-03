@@ -26,6 +26,7 @@
 #include "sleep_manager.h"
 
 #include "call_manager.h"
+#include "music_policy.h"
 
 void app_main(void)
 {
@@ -41,7 +42,7 @@ void app_main(void)
 
     router_init();
 
-
+    music_policy_init();
     /* Hardware */
 
     plc_uart_init();

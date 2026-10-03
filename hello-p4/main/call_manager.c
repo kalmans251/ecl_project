@@ -14,7 +14,7 @@
 
 #include "system_state.h"
 #include "projector_control.h"
-
+#include "music_policy.h"
 
 static const char *TAG =
     "CALL";
@@ -197,48 +197,8 @@ static bool send_frame_to_node(
 }
 
 
-/* ============================================================
- * MUSIC PAUSE
- * ============================================================ */
-
-static void request_music_pause(void)
-{
-    ESP_LOGI(
-        TAG,
-        "MUSIC -> PAUSE"
-    );
 
 
-    send_frame_to_node(
-        NODE_WROOM,
-        SERVICE_MUSIC,
-        CMD_PAUSE,
-        NULL,
-        0
-    );
-}
-
-
-/* ============================================================
- * MUSIC RESUME
- * ============================================================ */
-
-static void request_music_resume(void)
-{
-    ESP_LOGI(
-        TAG,
-        "MUSIC -> RESUME"
-    );
-
-
-    send_frame_to_node(
-        NODE_WROOM,
-        SERVICE_MUSIC,
-        CMD_RESUME,
-        NULL,
-        0
-    );
-}
 
 
 /* ============================================================
@@ -541,10 +501,12 @@ bool call_manager_start(
      * ======================================================== */
 
     if (
-        s_restore.music_was_playing
+        s_restore.music_enabled
     )
     {
-        request_music_pause();
+        music_policy_add_pause_reason(
+            MUSIC_PAUSE_REASON_CALL
+        );
     }
 
 
@@ -773,7 +735,9 @@ bool call_manager_end(void)
                 LED_MODE_MUSIC
         )
         {
-            request_music_resume();
+            music_policy_remove_pause_reason(
+                MUSIC_PAUSE_REASON_CALL
+            );
         }
     }
 

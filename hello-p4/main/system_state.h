@@ -91,15 +91,6 @@ typedef struct
 
     bool music_playing;
 
-    /*
-    * MUSIC LED 모드에서 BASIC/WEATHER로 변경되면서
-    * P4가 음악을 일시정지시켰는지 기억.
-    *
-    * true:
-    *   다시 MUSIC 모드가 되었을 때 RESUME 가능
-    */
-    bool music_paused_by_led_mode;
-
     /* --------------------------------------------------------
      * PROJECTOR
      * -------------------------------------------------------- */

@@ -25,6 +25,7 @@
 #include "sleep_manager.h"
 
 #include "call_manager.h"
+#include "music_policy.h"
 
 /* ============================================================
  * LOG TAG
@@ -141,52 +142,6 @@ static void send_response(
     );
 }
 
-/* ============================================================
- * SEND COMMAND TO WROOM
- * ============================================================ */
-
-static bool send_music_command_to_wroom(
-    uint8_t command
-)
-{
-    protocol_frame_t frame;
-
-
-    memset(
-        &frame,
-        0,
-        sizeof(frame)
-    );
-
-
-    frame.railing_id =
-        RAILING_ID;
-
-    frame.src =
-        NODE_P4;
-
-    frame.dst =
-        NODE_WROOM;
-
-    frame.service =
-        SERVICE_MUSIC;
-
-    frame.command =
-        command;
-
-    frame.length =
-        0;
-
-
-    return
-        xQueueSend(
-            router_queue,
-            &frame,
-            pdMS_TO_TICKS(100)
-        )
-        ==
-        pdTRUE;
-}
 
 /* ============================================================
  * SYSTEM SERVICE
@@ -448,42 +403,9 @@ static void handle_led(
                 );
 
 
-                /*
-                * 실제 재생 중이었다면 현재 위치에서 PAUSE.
-                */
-                if (
-                    previous_state.music_playing
-                )
-                {
-                    system_state_set_music_paused_by_led_mode(
-                        true
-                    );
-
-
-                    send_music_command_to_wroom(
-                        CMD_PAUSE
-                    );
-
-
-                    ESP_LOGI(
-                        TAG,
-                        "MUSIC -> PAUSE by LED mode"
-                    );
-                }
-                /*
-                * 통화 때문에 이미 PAUSE된 상태에서
-                * LED 모드가 바뀐 경우도 기억한다.
-                */
-                else if (
-                    previous_state.call_active
-                    &&
-                    previous_state.music_enabled
-                )
-                {
-                    system_state_set_music_paused_by_led_mode(
-                        true
-                    );
-                }
+                music_policy_add_pause_reason(
+                    MUSIC_PAUSE_REASON_LED
+                );
 
 
                 /*
@@ -508,37 +430,9 @@ static void handle_led(
                     LED_MODE_MUSIC
             )
             {
-                p4_system_state_t current_state;
-
-
-                system_state_get(
-                    &current_state
+                music_policy_remove_pause_reason(
+                    MUSIC_PAUSE_REASON_LED
                 );
-
-
-                /*
-                * LED 모드 때문에 PAUSE된 곡만 RESUME.
-                *
-                * Sleep 중이거나 통화 중이면 아직 재생하면 안 됨.
-                */
-                if (
-                    current_state.music_paused_by_led_mode
-                    &&
-                    !current_state.sleep_active
-                    &&
-                    !current_state.call_active
-                )
-                {
-                    send_music_command_to_wroom(
-                        CMD_RESUME
-                    );
-
-
-                    ESP_LOGI(
-                        TAG,
-                        "MUSIC -> RESUME by LED mode"
-                    );
-                }
             }
 
             /*
@@ -1399,21 +1293,12 @@ static void handle_music(
     {
         case MUSIC_EVENT_STARTED:
         {
-            system_state_set_music_enabled(
-                true
-            );
-
-
-            system_state_set_music_playing(
-                true
-            );
-
+            music_policy_on_started();
 
             ESP_LOGI(
                 TAG,
                 "MUSIC STARTED"
             );
-
 
             break;
         }
@@ -1421,20 +1306,7 @@ static void handle_music(
 
         case MUSIC_EVENT_FINISHED:
         {
-            system_state_set_music_playing(
-                false
-            );
-
-
-            system_state_set_music_enabled(
-                false
-            );
-
-
-            system_state_set_music_paused_by_led_mode(
-                false
-            );
-
+            music_policy_on_finished();
 
             ESP_LOGI(
                 TAG,
@@ -1444,30 +1316,18 @@ static void handle_music(
 
             sleep_manager_on_music_finished();
 
-
             break;
         }
 
 
         case MUSIC_EVENT_PAUSED:
         {
-            /*
-            * music_enabled는 유지.
-            *
-            * 곡 자체는 살아있고 현재 위치에서
-            * 멈춰 있는 상태이기 때문.
-            */
-
-            system_state_set_music_playing(
-                false
-            );
-
+            music_policy_on_paused();
 
             ESP_LOGI(
                 TAG,
                 "MUSIC PAUSED"
             );
-
 
             break;
         }
@@ -1475,26 +1335,12 @@ static void handle_music(
 
         case MUSIC_EVENT_RESUMED:
         {
-            system_state_set_music_enabled(
-                true
-            );
-
-
-            system_state_set_music_playing(
-                true
-            );
-
-
-            system_state_set_music_paused_by_led_mode(
-                false
-            );
-
+            music_policy_on_resumed();
 
             ESP_LOGI(
                 TAG,
                 "MUSIC RESUMED"
             );
-
 
             break;
         }
@@ -1502,26 +1348,12 @@ static void handle_music(
 
         case MUSIC_EVENT_ERROR:
         {
-            system_state_set_music_playing(
-                false
-            );
-
-
-            system_state_set_music_enabled(
-                false
-            );
-
-
-            system_state_set_music_paused_by_led_mode(
-                false
-            );
-
+            music_policy_on_error();
 
             ESP_LOGW(
                 TAG,
                 "MUSIC ERROR"
             );
-
 
             break;
         }
