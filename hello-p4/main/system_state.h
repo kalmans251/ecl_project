@@ -180,9 +180,6 @@ void system_state_set_music_playing(
     bool playing
 );
 
-void system_state_set_music_paused_by_led_mode(
-    bool paused
-);
 
 /* PROJECTOR */
 

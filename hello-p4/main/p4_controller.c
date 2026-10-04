@@ -1085,9 +1085,7 @@ static void handle_detection(
                     ACTIVITY_WAIT_AGE
             )
             {
-                music_manager_on_wake(
-                    AGE_GROUP_UNKNOWN
-                );
+                music_manager_on_wake();
             }
         }
         else if (
@@ -1120,9 +1118,7 @@ static void handle_detection(
                     ACTIVITY_WAIT_AGE
             )
             {
-                music_manager_on_wake(
-                    AGE_GROUP_UNKNOWN
-                );
+                music_manager_on_wake();
             }
         }
 
@@ -1227,9 +1223,7 @@ static void handle_detection(
                         ACTIVITY_ACTIVE
                 )
                 {
-                    music_manager_on_wake(
-                        AGE_GROUP_UNKNOWN
-                    );
+                    music_manager_on_wake();
                 }
             }
 
@@ -1283,9 +1277,9 @@ static void handle_detection(
                     sleep_manager_get_state();
 
 
+            
                 /*
-                * AGE mode라면 다음 곡에서 사용할
-                * 그룹을 갱신.
+                * AGE group 갱신은 여기서 딱 한 번만 수행.
                 */
                 music_manager_on_age_result(
                     age
@@ -1303,8 +1297,9 @@ static void handle_detection(
 
 
                 /*
-                * 이 AGE_RESULT가 실제 Wake trigger였다면
-                * 이제 다음곡을 시작.
+                * 실제 WAIT_AGE -> ACTIVE 전환이 발생했다면
+                * 그룹은 이미 위에서 설정했으므로
+                * 여기서는 음악 Wake만 처리.
                 */
                 if (
                     before ==
@@ -1314,9 +1309,7 @@ static void handle_detection(
                         ACTIVITY_ACTIVE
                 )
                 {
-                    music_manager_on_wake(
-                        age
-                    );
+                    music_manager_on_wake();
                 }
             }
 
@@ -1382,9 +1375,7 @@ static void handle_detection(
                         ACTIVITY_ACTIVE
                 )
                 {
-                    music_manager_on_wake(
-                        AGE_GROUP_UNKNOWN
-                    );
+                    music_manager_on_wake();
                 }
             }
 

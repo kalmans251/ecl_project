@@ -82,10 +82,7 @@ void music_manager_on_track_finished(
 /*
  * 실제 Sleep 상태에서 Active로 복귀했을 때 호출.
  */
-void music_manager_on_wake(
-    age_group_t age
-);
-
+void music_manager_on_wake(void);
 
 /*
  * LED 모드 변경.

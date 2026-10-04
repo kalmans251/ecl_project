@@ -9,7 +9,7 @@
 
 #include "system_state.h"
 #include "projector_control.h"
-
+#include "music_manager.h"
 
 static const char *TAG =
     "SLEEP";
@@ -1025,7 +1025,7 @@ void sleep_manager_task(
 
             if (
                 elapsed >=
-                CCTV_AGE_WAIT_TIMEOUT_MS
+                    CCTV_AGE_WAIT_TIMEOUT_MS
             )
             {
                 ESP_LOGW(
@@ -1034,13 +1034,18 @@ void sleep_manager_task(
                 );
 
 
+                /*
+                * LED / Projector 먼저 복구.
+                */
                 enter_active();
 
 
                 /*
-                 * 다음 Music Manager 단계에서는
-                 * 기존 나잇대 음악을 재생하도록 연결.
-                 */
+                * AGE_RESULT가 유실됐으므로
+                * 기존 AGE group을 그대로 유지한 채
+                * 음악도 정상 Wake.
+                */
+                music_manager_on_wake();
             }
         }
 

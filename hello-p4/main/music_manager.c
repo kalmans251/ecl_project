@@ -447,7 +447,37 @@ music_manager_get_mode(void)
 
 bool music_manager_start(void)
 {
+    bool already_enabled;
+
+
     lock_manager();
+
+    already_enabled =
+        s_session_enabled;
+
+
+    /*
+     * 이미 음악 세션이 켜져 있으면
+     * START를 다시 WROOM으로 보내지 않는다.
+     *
+     * 따라서 START 버튼을 여러 번 눌러도
+     * 현재 곡이 바뀌거나 재시작되지 않는다.
+     */
+    if (
+        already_enabled
+    )
+    {
+        unlock_manager();
+
+
+        ESP_LOGI(
+            TAG,
+            "START ignored: session already enabled"
+        );
+
+
+        return true;
+    }
 
 
     s_session_enabled =
@@ -469,9 +499,8 @@ bool music_manager_start(void)
 
 
     /*
-     * Sleep 중에는 음악을 새로 시작하지 않는다.
-     *
-     * Wake 시 music_manager_on_wake()에서 시작.
+     * Sleep 중에는 세션만 활성화.
+     * 실제 재생은 Wake 시 시작.
      */
     if (
         state.sleep_active
@@ -488,8 +517,8 @@ bool music_manager_start(void)
 
 
     /*
-     * BASIC / WEATHER 상태에서는
-     * 음악 세션만 켜두고 실제 곡은 시작하지 않는다.
+     * BASIC / WEATHER 상태에서도
+     * 세션만 활성화.
      */
     if (
         state.led_mode !=
@@ -506,12 +535,38 @@ bool music_manager_start(void)
     }
 
 
-    return
+    bool sent =
         send_music_command(
             CMD_START,
             NULL,
             0
         );
+
+
+    /*
+     * 실제 START 명령 자체를 전달하지 못했다면
+     * 세션 활성화도 취소.
+     */
+    if (
+        !sent
+    )
+    {
+        lock_manager();
+
+        s_session_enabled =
+            false;
+
+        unlock_manager();
+
+
+        ESP_LOGW(
+            TAG,
+            "START send failed"
+        );
+    }
+
+
+    return sent;
 }
 
 
@@ -916,15 +971,11 @@ void music_manager_on_track_finished(
  * WAKE
  * ============================================================ */
 
-void music_manager_on_wake(
-    age_group_t age
-)
+void music_manager_on_wake(void)
 {
     bool enabled;
 
     bool next_on_wake;
-
-    music_play_mode_t mode;
 
 
     lock_manager();
@@ -935,9 +986,6 @@ void music_manager_on_wake(
 
     next_on_wake =
         s_next_on_wake;
-
-    mode =
-        s_mode;
 
 
     unlock_manager();
@@ -961,11 +1009,11 @@ void music_manager_on_wake(
 
     /*
      * BASIC / WEATHER에서는
-     * 음악을 시작하면 안 됨.
+     * 음악을 재생하지 않는다.
      */
     if (
         state.led_mode !=
-        LED_MODE_MUSIC
+            LED_MODE_MUSIC
     )
     {
         return;
@@ -973,22 +1021,9 @@ void music_manager_on_wake(
 
 
     /*
-     * AGE mode wake.
-     *
-     * 정상 AGE이면 먼저 그룹 갱신.
-     * KEEP_CURRENT이면 기존 그룹 유지.
+     * Sleep 전에 현재 곡이 끝났다면
+     * 다음 곡부터 시작.
      */
-    if (
-        mode ==
-        MUSIC_PLAY_MODE_AGE
-    )
-    {
-        music_manager_on_age_result(
-            age
-        );
-    }
-
-
     if (
         next_on_wake
     )
@@ -1021,8 +1056,7 @@ void music_manager_on_wake(
 
 
     /*
-     * Sleep 전에 실제 곡이 없던 상태라면
-     * START.
+     * Sleep 전에 실제 곡 자체가 없었다면 START.
      */
     system_state_get(
         &state
