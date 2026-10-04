@@ -155,6 +155,37 @@ typedef enum
 
 
 /* ============================================================
+ * CODEC2 VOICE PACKET
+ *
+ * SERVICE_AUDIO + CMD_DATA
+ *
+ * payload[0]      = AUDIO_DATA_CODEC2
+ * payload[1]      = CODEC2_MODE_2400
+ * payload[2]      = AUDIO_DIRECTION_*
+ * payload[3..4]   = packet sequence (big-endian)
+ * payload[5]      = frame count
+ * payload[6]      = bytes per Codec2 frame
+ * payload[7..]    = concatenated Codec2 frames
+ *
+ * Codec2 2400:
+ * 20 ms / frame, 48 bits = 6 bytes.
+ * Recommended aggregation: up to 8 frames = 160 ms.
+ * ============================================================ */
+
+typedef enum
+{
+    CODEC2_MODE_2400 =
+        0x01
+
+} codec2_mode_t;
+
+
+#define CODEC2_2400_BYTES_PER_FRAME      6
+#define CODEC2_MAX_FRAMES_PER_PACKET     8
+#define AUDIO_CODEC2_META_SIZE           7
+
+
+/* ============================================================
  * AUDIO EVENT
  *
  * payload:
