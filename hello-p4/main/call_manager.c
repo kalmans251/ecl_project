@@ -295,6 +295,61 @@ static void request_audio_direction(
 
 
 /* ============================================================
+ * PI CALL STATE EVENT
+ *
+ * SERVICE_AUDIO + CMD_DATA
+ *
+ * payload[0] = AUDIO_DATA_EVENT
+ * payload[1] = audio_event_t
+ * payload[2] = call_origin_t
+ * payload[3] = direction
+ * ============================================================ */
+
+static void notify_pi_call_event(
+    audio_event_t event,
+    call_origin_t origin,
+    uint8_t direction
+)
+{
+    uint8_t payload[4];
+
+
+    payload[0] =
+        AUDIO_DATA_EVENT;
+
+
+    payload[1] =
+        (uint8_t)event;
+
+
+    payload[2] =
+        (uint8_t)origin;
+
+
+    payload[3] =
+        direction;
+
+
+    if (
+        !send_frame_to_node(
+            NODE_PI,
+            SERVICE_AUDIO,
+            CMD_DATA,
+            payload,
+            sizeof(payload)
+        )
+    )
+    {
+        ESP_LOGW(
+            TAG,
+            "Failed to send PI call event=%u",
+            (unsigned)event
+        );
+    }
+}
+
+
+/* ============================================================
  * SAVE RESTORE STATE
  * ============================================================ */
 
@@ -527,6 +582,13 @@ bool call_manager_start(
     );
 
 
+    notify_pi_call_event(
+        AUDIO_EVENT_CALL_STARTED,
+        origin,
+        AUDIO_DIRECTION_FIELD_TX
+    );
+
+
     ESP_LOGI(
         TAG,
         "CALL START origin=%d -> FIELD_TX",
@@ -599,6 +661,17 @@ bool call_manager_set_direction(
 
     request_audio_direction(
         direction
+    );
+
+
+    call_origin_t origin =
+        call_manager_get_origin();
+
+
+    notify_pi_call_event(
+        AUDIO_EVENT_DIRECTION_CHANGED,
+        origin,
+        (uint8_t)direction
     );
 
 
@@ -748,6 +821,13 @@ bool call_manager_end(void)
 
 
     unlock_manager();
+
+
+    notify_pi_call_event(
+        AUDIO_EVENT_CALL_ENDED,
+        origin,
+        0
+    );
 
 
     ESP_LOGI(
