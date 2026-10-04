@@ -1,0 +1,59 @@
+from enum import IntEnum
+
+
+SOF1 = 0xA5
+SOF2 = 0x5A
+
+MAX_PAYLOAD = 128
+HEADER_SIZE = 8
+CRC_SIZE = 2
+MAX_FRAME_SIZE = HEADER_SIZE + MAX_PAYLOAD + CRC_SIZE
+
+
+class Node(IntEnum):
+    PI = 0x01
+    P4 = 0x02
+    WROOM = 0x03
+    S3 = 0x04
+
+
+class Service(IntEnum):
+    SYSTEM = 0x00
+    LED = 0x01
+    MUSIC = 0x02
+    SD = 0x03
+    RADAR = 0x04
+    AUDIO = 0x05
+    EMERGENCY = 0x06
+    POWER = 0x07
+    PROJECTOR = 0x08
+    DETECTION = 0x09
+    SLEEP = 0x0A
+
+
+class Command(IntEnum):
+    PING = 0x01
+    PONG = 0x02
+
+    ECHO = 0x03
+    ECHO_RESPONSE = 0x04
+
+    STATUS_REQUEST = 0x10
+    STATUS_RESPONSE = 0x11
+
+    START = 0x20
+    STOP = 0x21
+    SET = 0x22
+    DATA = 0x23
+    PAUSE = 0x24
+    RESUME = 0x25
+    NEXT = 0x26
+    PREVIOUS = 0x27
+
+
+class EmergencySource(IntEnum):
+    BUTTON = 0x01
+
+
+class EmergencyAction(IntEnum):
+    ACK = 0x01
