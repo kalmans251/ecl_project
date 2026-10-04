@@ -88,6 +88,7 @@ def print_help() -> None:
         "  ping <railing_id>    send SYSTEM/PING to P4\n"
         "  ptt <id> on|off      switch CONTROL_TX / FIELD_TX\n"
         "  hangup <id>          end active call\n"
+        "  voice-status         show Codec2 relay counters\n"
         "  help                 show this help\n"
         "  quit                 exit\n"
     )
@@ -336,6 +337,25 @@ def main() -> int:
 
                 print(
                     f"CALL end requested rail={railing_id}"
+                )
+                continue
+
+            if command == "voice-status":
+                print(
+                    json.dumps(
+                        {
+                            "clients": voice.client_count(),
+                            "field_packets": voice.field_packets,
+                            "control_packets": voice.control_packets,
+                            "dropped_packets": voice.dropped_packets,
+                            "listen": (
+                                None
+                                if args.disable_voice_relay
+                                else f"{args.voice_host}:{args.voice_port}"
+                            ),
+                        },
+                        indent=2,
+                    )
                 )
                 continue
 
