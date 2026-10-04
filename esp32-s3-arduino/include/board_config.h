@@ -104,3 +104,6 @@ static constexpr int PIN_VOICE_CALL_BUTTON =
 
 static constexpr uint32_t EMERGENCY_HOLD_MS =
     3000;
+
+static constexpr uint32_t EMERGENCY_DEBOUNCE_MS =
+    50;
