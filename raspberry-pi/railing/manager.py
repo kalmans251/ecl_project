@@ -195,6 +195,24 @@ class RailingManager:
 
             return True
 
+    def get_call_direction(
+        self,
+        railing_id: int,
+    ) -> int | None:
+        with self._lock:
+            state = self._states.get(
+                railing_id
+            )
+
+            if (
+                state is None
+                or not state.call.active
+                or state.call.direction is None
+            ):
+                return None
+
+            return state.call.direction
+
     def get_active_emergency(
         self,
         railing_id: int,
