@@ -16,6 +16,7 @@ idf_component_register(
         "detection_manager.c"
         "sleep_manager.c"
         "call_manager.c"
+        "emergency_manager.c"
         "music_policy.c"
         "music_manager.c"
 

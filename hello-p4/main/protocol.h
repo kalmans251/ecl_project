@@ -287,3 +287,22 @@ typedef enum
         0x03
 
 } sd_data_type_t;
+
+/* ============================================================
+ * EMERGENCY
+ * ============================================================ */
+
+typedef enum
+{
+    EMERGENCY_SOURCE_BUTTON =
+        0x01
+
+} emergency_source_t;
+
+
+typedef enum
+{
+    EMERGENCY_ACTION_ACK =
+        0x01
+
+} emergency_action_t;

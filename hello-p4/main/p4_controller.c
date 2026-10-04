@@ -28,6 +28,7 @@
 #include "music_policy.h"
 
 #include "music_manager.h"
+#include "emergency_manager.h"
 
 /* ============================================================
  * LOG TAG
@@ -77,6 +78,10 @@ static uint32_t read_u32_be(
         |
         ((uint32_t)data[3]);
 }
+
+static void handle_emergency(
+    const protocol_frame_t *frame
+);
 /* ============================================================
  * PLC TURNAROUND TEST
  *
@@ -672,6 +677,14 @@ void p4_controller_task(
                 break;
             }
 
+            case SERVICE_EMERGENCY:
+            {
+                handle_emergency(
+                    &frame
+                );
+
+                break;
+            }
             
             default:
             {
@@ -1798,5 +1811,114 @@ static void handle_audio(
         {
             break;
         }
+    }
+}
+
+static void handle_emergency(
+    const protocol_frame_t *frame
+)
+{
+    /*
+     * S3 -> P4
+     */
+    if (
+        frame->src ==
+        NODE_S3
+    )
+    {
+        if (
+            frame->length <
+            5
+        )
+        {
+            return;
+        }
+
+
+        uint8_t source =
+            frame->payload[0];
+
+
+        uint32_t seq =
+            read_u32_be(
+                &frame->payload[1]
+            );
+
+
+        if (
+            frame->command ==
+            CMD_START
+        )
+        {
+            emergency_manager_start(
+                source,
+                seq
+            );
+
+
+            return;
+        }
+
+
+        if (
+            frame->command ==
+            CMD_STOP
+        )
+        {
+            emergency_manager_cancel(
+                source,
+                seq
+            );
+
+
+            return;
+        }
+
+
+        return;
+    }
+
+
+    /*
+     * Raspberry Pi -> P4
+     *
+     * 관제 ACK
+     */
+    if (
+        frame->src ==
+        NODE_PI
+        &&
+        frame->command ==
+            CMD_SET
+    )
+    {
+        if (
+            frame->length <
+            5
+        )
+        {
+            return;
+        }
+
+
+        if (
+            frame->payload[0]
+            !=
+            EMERGENCY_ACTION_ACK
+        )
+        {
+            return;
+        }
+
+
+        uint32_t seq =
+            read_u32_be(
+                &frame->payload[1]
+            );
+
+
+        emergency_manager_ack(
+            seq
+        );
     }
 }

@@ -29,6 +29,7 @@
 #include "music_policy.h"
 
 #include "music_manager.h"
+#include "emergency_manager.h"
 
 void app_main(void)
 {
@@ -64,6 +65,8 @@ void app_main(void)
     led_task_init();
 
     call_manager_init();
+
+    emergency_manager_init();
 
     sleep_manager_init();
 

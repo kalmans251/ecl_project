@@ -246,6 +246,7 @@ void emergency_button_clear(void)
     s_button_down_ms =
         0;
 
+    s_active_emergency_seq = 0;
 
     Serial.println(
         "[EMERGENCY] Cleared by ACK"
