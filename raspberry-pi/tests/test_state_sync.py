@@ -86,8 +86,11 @@ class StateSyncTests(unittest.TestCase):
         self,
     ) -> None:
         railings = RailingManager()
+        bus = FakeBus()
+
         audio = AudioManager(
-            railings
+            bus,
+            railings,
         )
 
         started = Frame(
@@ -198,6 +201,56 @@ class StateSyncTests(unittest.TestCase):
         )
         self.assertIsNone(
             state["call"]["direction"]
+        )
+
+    def test_ptt_and_hangup_commands(
+        self,
+    ) -> None:
+        railings = RailingManager()
+        bus = FakeBus()
+
+        audio = AudioManager(
+            bus,
+            railings,
+        )
+
+        audio.set_direction(
+            1,
+            AudioDirection.CONTROL_TX,
+        )
+
+        self.assertEqual(
+            len(bus.sent),
+            1,
+        )
+        self.assertEqual(
+            int(bus.sent[0].service),
+            int(Service.AUDIO),
+        )
+        self.assertEqual(
+            int(bus.sent[0].command),
+            int(Command.SET),
+        )
+        self.assertEqual(
+            bus.sent[0].payload,
+            bytes(
+                [
+                    int(
+                        AudioDirection.CONTROL_TX
+                    )
+                ]
+            ),
+        )
+
+        audio.end_call(1)
+
+        self.assertEqual(
+            len(bus.sent),
+            2,
+        )
+        self.assertEqual(
+            int(bus.sent[1].command),
+            int(Command.STOP),
         )
 
 
