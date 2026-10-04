@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from plc import PlcBus
 from protocol import (
     AudioDataType,
     AudioDirection,
@@ -21,8 +22,10 @@ LOG = logging.getLogger(__name__)
 class AudioManager:
     def __init__(
         self,
+        bus: PlcBus,
         railings: RailingManager,
     ) -> None:
+        self._bus = bus
         self._railings = railings
 
     def handle_frame(
@@ -141,6 +144,62 @@ class AudioManager:
         )
 
         return True
+
+
+    def set_direction(
+        self,
+        railing_id: int,
+        direction: AudioDirection,
+    ) -> None:
+        if direction not in (
+            AudioDirection.FIELD_TX,
+            AudioDirection.CONTROL_TX,
+        ):
+            raise ValueError(
+                f"invalid audio direction: {direction}"
+            )
+
+        self._bus.send_frame(
+            Frame(
+                railing_id=railing_id,
+                src=Node.PI,
+                dst=Node.P4,
+                service=Service.AUDIO,
+                command=Command.SET,
+                payload=bytes(
+                    [
+                        int(direction)
+                    ]
+                ),
+            )
+        )
+
+        LOG.info(
+            "CALL direction request rail=%d direction=%s",
+            railing_id,
+            self._direction_name(
+                int(direction)
+            ),
+        )
+
+    def end_call(
+        self,
+        railing_id: int,
+    ) -> None:
+        self._bus.send_frame(
+            Frame(
+                railing_id=railing_id,
+                src=Node.PI,
+                dst=Node.P4,
+                service=Service.AUDIO,
+                command=Command.STOP,
+            )
+        )
+
+        LOG.info(
+            "CALL end request rail=%d",
+            railing_id,
+        )
 
     @staticmethod
     def _direction_name(
