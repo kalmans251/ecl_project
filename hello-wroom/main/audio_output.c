@@ -421,6 +421,12 @@ uint8_t audio_output_get_volume(void)
 }
 
 
+uint32_t audio_output_get_sample_rate(void)
+{
+    return s_sample_rate;
+}
+
+
 /* ============================================================
  * DEINIT
  * ============================================================ */

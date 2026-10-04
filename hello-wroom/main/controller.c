@@ -5,6 +5,7 @@
 #include "board_config.h"
 
 #include "music_player.h"
+#include "emergency_alert.h"
 
 #include "router.h"
 #include "sd_card.h"
@@ -450,6 +451,97 @@ static void handle_music(
             );
 
 
+            break;
+        }
+    }
+}
+
+
+/* ============================================================
+ * EMERGENCY
+ * ============================================================ */
+
+static void handle_emergency(
+    const protocol_frame_t *frame
+)
+{
+    switch (
+        frame->cmd
+    )
+    {
+        case CMD_START:
+        {
+            ESP_LOGW(
+                TAG,
+                "EMERGENCY START"
+            );
+
+
+            if (
+                !emergency_alert_start()
+            )
+            {
+                ESP_LOGE(
+                    TAG,
+                    "Emergency alert start failed"
+                );
+            }
+
+
+            break;
+        }
+
+
+        case CMD_STOP:
+        {
+            ESP_LOGI(
+                TAG,
+                "EMERGENCY STOP"
+            );
+
+
+            if (
+                !emergency_alert_stop()
+            )
+            {
+                ESP_LOGW(
+                    TAG,
+                    "Emergency alert stop failed"
+                );
+            }
+
+
+            break;
+        }
+
+
+        case CMD_STATUS_REQUEST:
+        {
+            uint8_t payload[1];
+
+
+            payload[0] =
+                emergency_alert_is_active()
+                    ?
+                    1
+                    :
+                    0;
+
+
+            send_reply(
+                frame,
+                CMD_STATUS_RESPONSE,
+                payload,
+                sizeof(payload)
+            );
+
+
+            break;
+        }
+
+
+        default:
+        {
             break;
         }
     }
@@ -973,6 +1065,17 @@ static void controller_task(
             case SERVICE_SD:
             {
                 handle_sd(
+                    &frame
+                );
+
+
+                break;
+            }
+
+
+            case SERVICE_EMERGENCY:
+            {
+                handle_emergency(
                     &frame
                 );
 
