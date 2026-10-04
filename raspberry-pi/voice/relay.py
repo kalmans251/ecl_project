@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import queue
 import socket
 import threading
 
@@ -48,6 +49,9 @@ class VoiceRelay:
         self._server: socket.socket | None = None
         self._stop_event = threading.Event()
         self._accept_thread: threading.Thread | None = None
+        self._broadcast_thread: threading.Thread | None = None
+        self._outbound: queue.Queue[bytes] = queue.Queue(maxsize=2)
+        self.network_dropped_packets = 0
 
         self._clients: set[socket.socket] = set()
         self._clients_lock = threading.Lock()
@@ -91,6 +95,9 @@ class VoiceRelay:
         )
 
         self._accept_thread.start()
+        self._broadcast_thread = threading.Thread(
+            target=self._broadcast_loop, name="voice-tcp-send", daemon=True)
+        self._broadcast_thread.start()
 
         LOG.info(
             "Voice relay listening on %s:%d",
@@ -136,6 +143,16 @@ class VoiceRelay:
             thread.join(
                 timeout=1.0
             )
+
+        thread = self._broadcast_thread
+        self._broadcast_thread = None
+        if thread is not None:
+            thread.join(timeout=1.0)
+        while not self._outbound.empty():
+            try:
+                self._outbound.get_nowait()
+            except queue.Empty:
+                break
 
         LOG.info("Voice relay stopped")
 
@@ -406,6 +423,30 @@ class VoiceRelay:
         self,
         data: bytes,
     ) -> None:
+        # The PLC reader must remain available to service short control grants.
+        # A slow TCP listener must never block that thread on sendall().
+        try:
+            self._outbound.put_nowait(data)
+        except queue.Full:
+            try:
+                self._outbound.get_nowait()
+                self.network_dropped_packets += 1
+            except queue.Empty:
+                pass
+            try:
+                self._outbound.put_nowait(data)
+            except queue.Full:
+                self.network_dropped_packets += 1
+
+    def _broadcast_loop(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                data = self._outbound.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            self._send_broadcast(data)
+
+    def _send_broadcast(self, data: bytes) -> None:
         with self._clients_lock:
             clients = list(
                 self._clients

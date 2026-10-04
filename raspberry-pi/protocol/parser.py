@@ -11,6 +11,10 @@ class FrameParser:
     def reset(self) -> None:
         self._buffer.clear()
 
+    @property
+    def pending_bytes(self) -> int:
+        return len(self._buffer)
+
     def feed(self, data: bytes) -> list[Frame]:
         if data:
             self._buffer.extend(data)

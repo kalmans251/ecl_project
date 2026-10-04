@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 
 from plc import PlcBus
 from protocol import (
@@ -24,9 +26,17 @@ class AudioManager:
         self,
         bus: PlcBus,
         railings: RailingManager,
+        *,
+        ack_timeout: float = 0.5,
+        attempts: int = 3,
     ) -> None:
         self._bus = bus
         self._railings = railings
+        self._ack_timeout = ack_timeout
+        self._attempts = attempts
+        self._condition = threading.Condition()
+        self._control_lock = threading.Lock()
+        self._direction_revision: dict[int, int] = {}
 
     def handle_frame(
         self,
@@ -104,6 +114,11 @@ class AudioManager:
                 )
                 return True
 
+            with self._condition:
+                self._direction_revision[frame.railing_id] = (
+                    self._direction_revision.get(frame.railing_id, 0) + 1)
+                self._condition.notify_all()
+
             LOG.info(
                 "CALL DIRECTION rail=%d direction=%s",
                 frame.railing_id,
@@ -122,6 +137,8 @@ class AudioManager:
             self._railings.call_ended(
                 frame.railing_id
             )
+            with self._condition:
+                self._condition.notify_all()
 
             LOG.info(
                 "CALL ENDED rail=%d origin=%s",
@@ -159,8 +176,7 @@ class AudioManager:
                 f"invalid audio direction: {direction}"
             )
 
-        self._bus.send_frame(
-            Frame(
+        frame = Frame(
                 railing_id=railing_id,
                 src=Node.PI,
                 dst=Node.P4,
@@ -171,29 +187,57 @@ class AudioManager:
                         int(direction)
                     ]
                 ),
-            )
         )
-
-        LOG.info(
-            "CALL direction request rail=%d direction=%s",
-            railing_id,
-            self._direction_name(
-                int(direction)
-            ),
-        )
+        with self._control_lock:
+            for attempt in range(1, self._attempts + 1):
+                current = self._railings.get_call_direction(railing_id)
+                if current is None:
+                    raise RuntimeError("No confirmed active call for this railing")
+                with self._condition:
+                    revision = self._direction_revision.get(railing_id, 0)
+                LOG.info("CALL direction request rail=%d direction=%s attempt=%d/%d",
+                         railing_id, self._direction_name(int(direction)),
+                         attempt, self._attempts)
+                try:
+                    self._bus.send_control_frame(
+                        frame, wait_for_window=(current == int(AudioDirection.FIELD_TX)))
+                except TimeoutError:
+                    if attempt == self._attempts:
+                        raise
+                    continue
+                deadline = time.monotonic() + self._ack_timeout
+                with self._condition:
+                    while True:
+                        confirmed = self._railings.get_call_direction(railing_id)
+                        if confirmed is None:
+                            raise RuntimeError("Call ended before PTT confirmation")
+                        if (self._direction_revision.get(railing_id, 0) > revision
+                                and confirmed == int(direction)):
+                            LOG.info("PTT confirmed rail=%d direction=%s", railing_id,
+                                     self._direction_name(int(direction)))
+                            return
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            break
+                        self._condition.wait(remaining)
+                LOG.warning("No P4 direction confirmation rail=%d attempt=%d",
+                            railing_id, attempt)
+            raise TimeoutError("PTT direction was not confirmed by P4")
 
     def end_call(
         self,
         railing_id: int,
     ) -> None:
-        self._bus.send_frame(
+        self._bus.send_control_frame(
             Frame(
                 railing_id=railing_id,
                 src=Node.PI,
                 dst=Node.P4,
                 service=Service.AUDIO,
                 command=Command.STOP,
-            )
+            ),
+            wait_for_window=(self._railings.get_call_direction(railing_id)
+                             == int(AudioDirection.FIELD_TX)),
         )
 
         LOG.info(
