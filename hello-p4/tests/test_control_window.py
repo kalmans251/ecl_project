@@ -92,24 +92,28 @@ static protocol_frame_t event(void) {
 }
 int main(void) {
     reset();
-    queue[count++] = voice(); queue[count++] = voice();
-    queue[count++] = voice(); queue[count++] = event();
-    process_plc_tx_queue();
-    assert(sent_count == 1 && drained == 1 && index_ == 1);
-    process_plc_tx_queue();
-    assert(sent_count == 3 && drained == 3 && index_ == 2);
+    for (unsigned i = 0; i < PLC_VOICE_PACKETS_PER_GRANT + 1; ++i)
+        queue[count++] = voice();
+    queue[count++] = event();
+    for (unsigned i = 1; i <= PLC_VOICE_PACKETS_PER_GRANT; ++i) {
+        process_plc_tx_queue();
+        assert(index_ == i);
+        assert(sent_count == i + (i == PLC_VOICE_PACKETS_PER_GRANT));
+    }
+    unsigned grant_index = PLC_VOICE_PACKETS_PER_GRANT;
+    assert(drained == sent_count);
     assert(sent[0].payload[0] == AUDIO_DATA_CODEC2);
-    assert(sent[2].payload[0] == AUDIO_DATA_CONTROL_WINDOW);
-    assert(sent[2].payload[2] == PLC_CONTROL_WINDOW_MS);
+    assert(sent[grant_index].payload[0] == AUDIO_DATA_CONTROL_WINDOW);
+    assert(sent[grant_index].payload[2] == PLC_CONTROL_WINDOW_MS);
     assert(s_receive_until_us - now == PLC_CONTROL_WINDOW_MS * 1000);
     now = s_receive_until_us - 1;
     process_plc_tx_queue();
-    assert(sent_count == 3 && index_ == 2); // even non-voice TX must wait
+    assert(sent_count == grant_index + 1);
     mode = CALL_STATE_CONTROL_TX;
     now = s_receive_until_us;
     process_plc_tx_queue();
-    assert(sent_count == 4 && index_ == 4);
-    assert(sent[3].payload[0] == AUDIO_DATA_EVENT); // queued voice was dropped
+    assert(sent_count == grant_index + 2 && index_ == count);
+    assert(sent[grant_index + 1].payload[0] == AUDIO_DATA_EVENT);
 
     reset();
     now = PLC_IDLE_GRANT_MS * 1000;
