@@ -29,6 +29,9 @@ void audio_output_set_volume(
 uint8_t audio_output_get_volume(void);
 
 
+uint32_t audio_output_get_sample_rate(void);
+
+
 void audio_output_deinit(void);
 
 
