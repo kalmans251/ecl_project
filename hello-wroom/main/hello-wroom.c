@@ -5,6 +5,7 @@
 #include "controller.h"
 
 #include "music_player.h"
+#include "emergency_alert.h"
 
 #include "p4_task.h"
 #include "p4_uart.h"
@@ -159,6 +160,20 @@ void app_main(void)
         ESP_LOGE(
             TAG,
             "Music player init failed"
+        );
+
+
+        return;
+    }
+
+
+    if (
+        !emergency_alert_init()
+    )
+    {
+        ESP_LOGE(
+            TAG,
+            "Emergency alert init failed"
         );
 
 
