@@ -6,6 +6,7 @@
 #include "radar_manager.h"
 #include "emergency_button.h"
 #include "audio_session.h"
+#include "microphone_codec2.h"
 
 void setup()
 {
@@ -65,6 +66,9 @@ void setup()
     radar_manager_init();
     emergency_button_init();
     audio_session_init();
+    if (!microphone_codec2_init()) {
+        Serial.println("[MIC] Initialization failed; control functions remain available");
+    }
 
     // --------------------------------------------------------
     // BLE
@@ -87,6 +91,12 @@ void loop()
      * 여기서 실제 처리.
      */
     ble_link_process();
+
+    if (!ble_link_is_connected() && audio_session_is_active()) {
+        // Stop locally; a reconnect requires a fresh call command from P4.
+        audio_session_stop();
+    }
+    microphone_codec2_process();
 
     radar_manager_process();
     

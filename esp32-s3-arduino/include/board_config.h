@@ -66,6 +66,10 @@ static constexpr int PIN_I2S_WS  = 7;
 static constexpr int PIN_I2S_SCK = 6;
 static constexpr int PIN_I2S_SD  = 5;
 
+// INMP441 L/R: GND = LEFT, 3.3 V = RIGHT.
+static constexpr bool MIC_USE_RIGHT_CHANNEL = false;
+static constexpr int MIC_GAIN = 4;
+
 
 // ============================================================
 // LD2450 RADAR

@@ -5,6 +5,7 @@
 #include "protocol.h"
 #include "audio_session.h"
 #include "ble_link.h"
+#include "microphone_codec2.h"
 
 
 static bool
@@ -34,6 +35,7 @@ void audio_session_init(void)
 
 void audio_session_start(void)
 {
+    microphone_codec2_set_enabled(true);
     s_active =
         true;
 
@@ -49,6 +51,7 @@ void audio_session_start(void)
 
 void audio_session_stop(void)
 {
+    microphone_codec2_set_enabled(false);
     s_active =
         false;
 
@@ -77,6 +80,11 @@ bool audio_session_set_direction(
         return false;
     }
 
+
+    if (direction != s_direction) {
+        microphone_codec2_set_enabled(
+            s_active && direction == AUDIO_DIRECTION_FIELD_TX);
+    }
 
     s_direction =
         direction;
@@ -177,7 +185,7 @@ bool audio_session_send_codec2(
         AUDIO_DATA_CODEC2;
 
     frame.payload[1] =
-        CODEC2_MODE_2400;
+        AUDIO_CODEC2_MODE_2400;
 
     frame.payload[2] =
         AUDIO_DIRECTION_FIELD_TX;
