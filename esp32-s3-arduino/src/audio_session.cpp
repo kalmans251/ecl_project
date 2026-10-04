@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <string.h>
 
 #include "protocol.h"
 #include "audio_session.h"
