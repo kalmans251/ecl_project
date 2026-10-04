@@ -1,0 +1,205 @@
+import unittest
+
+from audio import AudioManager
+from emergency import EmergencyManager
+from protocol import (
+    AudioDataType,
+    AudioDirection,
+    AudioEvent,
+    CallOrigin,
+    Command,
+    EmergencyEvent,
+    EmergencySource,
+    Frame,
+    Node,
+    Service,
+)
+from railing import RailingManager
+
+
+class FakeBus:
+    def __init__(self) -> None:
+        self.sent = []
+
+    def send_frame(self, frame: Frame) -> None:
+        self.sent.append(frame)
+
+
+class StateSyncTests(unittest.TestCase):
+    def test_emergency_ack_confirmation_clears_emergency(
+        self,
+    ) -> None:
+        railings = RailingManager()
+        bus = FakeBus()
+
+        emergency = EmergencyManager(
+            bus,
+            railings,
+        )
+
+        railings.emergency_start(
+            1,
+            int(EmergencySource.BUTTON),
+            1234,
+        )
+
+        railings.mark_emergency_ack_sent(
+            1,
+            1234,
+        )
+
+        handled = emergency.handle_frame(
+            Frame(
+                railing_id=1,
+                src=Node.P4,
+                dst=Node.PI,
+                service=Service.EMERGENCY,
+                command=Command.DATA,
+                payload=(
+                    bytes(
+                        [
+                            int(
+                                EmergencyEvent.ACKED
+                            )
+                        ]
+                    )
+                    + (1234).to_bytes(
+                        4,
+                        "big",
+                    )
+                ),
+            )
+        )
+
+        self.assertTrue(handled)
+
+        state = railings.snapshot(1)
+
+        self.assertFalse(
+            state["emergency"]["active"]
+        )
+        self.assertIsNone(
+            state["emergency"]["seq"]
+        )
+
+    def test_call_state_lifecycle(
+        self,
+    ) -> None:
+        railings = RailingManager()
+        audio = AudioManager(
+            railings
+        )
+
+        started = Frame(
+            railing_id=1,
+            src=Node.P4,
+            dst=Node.PI,
+            service=Service.AUDIO,
+            command=Command.DATA,
+            payload=bytes(
+                [
+                    int(AudioDataType.EVENT),
+                    int(
+                        AudioEvent.CALL_STARTED
+                    ),
+                    int(
+                        CallOrigin.EMERGENCY
+                    ),
+                    int(
+                        AudioDirection.FIELD_TX
+                    ),
+                ]
+            ),
+        )
+
+        self.assertTrue(
+            audio.handle_frame(started)
+        )
+
+        state = railings.snapshot(1)
+
+        self.assertTrue(
+            state["call"]["active"]
+        )
+        self.assertEqual(
+            state["call"]["origin"],
+            int(CallOrigin.EMERGENCY),
+        )
+        self.assertEqual(
+            state["call"]["direction"],
+            int(
+                AudioDirection.FIELD_TX
+            ),
+        )
+
+        direction = Frame(
+            railing_id=1,
+            src=Node.P4,
+            dst=Node.PI,
+            service=Service.AUDIO,
+            command=Command.DATA,
+            payload=bytes(
+                [
+                    int(AudioDataType.EVENT),
+                    int(
+                        AudioEvent.DIRECTION_CHANGED
+                    ),
+                    int(
+                        CallOrigin.EMERGENCY
+                    ),
+                    int(
+                        AudioDirection.CONTROL_TX
+                    ),
+                ]
+            ),
+        )
+
+        self.assertTrue(
+            audio.handle_frame(direction)
+        )
+
+        state = railings.snapshot(1)
+
+        self.assertEqual(
+            state["call"]["direction"],
+            int(
+                AudioDirection.CONTROL_TX
+            ),
+        )
+
+        ended = Frame(
+            railing_id=1,
+            src=Node.P4,
+            dst=Node.PI,
+            service=Service.AUDIO,
+            command=Command.DATA,
+            payload=bytes(
+                [
+                    int(AudioDataType.EVENT),
+                    int(
+                        AudioEvent.CALL_ENDED
+                    ),
+                    int(
+                        CallOrigin.EMERGENCY
+                    ),
+                    0,
+                ]
+            ),
+        )
+
+        self.assertTrue(
+            audio.handle_frame(ended)
+        )
+
+        state = railings.snapshot(1)
+
+        self.assertFalse(
+            state["call"]["active"]
+        )
+        self.assertIsNone(
+            state["call"]["direction"]
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
