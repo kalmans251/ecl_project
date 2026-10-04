@@ -57,7 +57,7 @@ s_write_uuid =
         0x02, 0x00, 0x00, 0x00,
         0x00, 0x10, 0x2d, 0x9a,
         0x6c, 0x4b, 0x7f, 0x8e,
-        0x01, 0x00, 0x10, 0x7a
+        0x02, 0x00, 0x10, 0x7a
     );
 
 
@@ -67,7 +67,7 @@ s_notify_uuid =
         0x03, 0x00, 0x00, 0x00,
         0x00, 0x10, 0x2d, 0x9a,
         0x6c, 0x4b, 0x7f, 0x8e,
-        0x01, 0x00, 0x10, 0x7a
+        0x03, 0x00, 0x10, 0x7a
     );
 
 
@@ -200,10 +200,23 @@ static void subscribe_notify(void)
         s_conn_handle ==
         BLE_HS_CONN_HANDLE_NONE
         ||
+        s_write_handle ==
+        0
+        ||
         s_notify_handle ==
         0
     )
     {
+        ESP_LOGE(
+            TAG,
+            "Characteristic handles missing write=%u notify=%u",
+            s_write_handle,
+            s_notify_handle
+        );
+
+        s_ready =
+            false;
+
         return;
     }
 
@@ -255,7 +268,10 @@ static void subscribe_notify(void)
 
         ESP_LOGI(
             TAG,
-            "Notify subscribe requested"
+            "Notify subscribe requested write=%u notify=%u cccd=%u",
+            s_write_handle,
+            s_notify_handle,
+            cccd_handle
         );
     }
     else
