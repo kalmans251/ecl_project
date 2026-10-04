@@ -31,7 +31,14 @@ static uint32_t
     s_emergency_seq =
         1;
 
+        
+static bool
+    s_long_press_consumed =
+        false;
 
+static uint32_t
+    s_active_emergency_seq =
+        0;
 // ============================================================
 // WRITE U32 BE
 // ============================================================
@@ -196,27 +203,9 @@ void emergency_button_process(void)
         HIGH;
 
 
-    /*
-     * 이미 비상상태가 latch 되었으면
-     * 버튼을 다시 눌러도 추가 이벤트를 보내지 않는다.
-     *
-     * 관제 ACK가 들어와 clear될 때까지 유지.
-     */
-    if (
-        s_emergency_active
-    )
-    {
-        return;
-    }
-
-
     uint32_t now =
         millis();
 
-
-    /* ========================================================
-     * BUTTON DOWN
-     * ======================================================== */
 
     if (
         pressed
@@ -229,6 +218,9 @@ void emergency_button_process(void)
             s_button_down =
                 true;
 
+            s_long_press_consumed =
+                false;
+
             s_button_down_ms =
                 now;
 
@@ -240,8 +232,17 @@ void emergency_button_process(void)
 
 
         /*
-         * 3초 이상 연속 HIGH
+         * 한 번 누르고 계속 6초, 9초 유지해도
+         * START -> STOP이 연속 발생하지 않게 함.
          */
+        if (
+            s_long_press_consumed
+        )
+        {
+            return;
+        }
+
+
         if (
             now -
             s_button_down_ms
@@ -249,16 +250,10 @@ void emergency_button_process(void)
             EMERGENCY_HOLD_MS
         )
         {
-            s_emergency_active =
+            s_long_press_consumed =
                 true;
 
-
-            Serial.println(
-                "[EMERGENCY] 3 sec HOLD confirmed"
-            );
-
-
-            send_emergency_event();
+            handle_long_press();
         }
 
 
@@ -266,37 +261,31 @@ void emergency_button_process(void)
     }
 
 
-    /* ========================================================
-     * BUTTON RELEASE
-     * ======================================================== */
-
     if (
         s_button_down
     )
     {
-        uint32_t held =
-            now -
-            s_button_down_ms;
-
-
-        if (
-            held <
-            EMERGENCY_HOLD_MS
-        )
-        {
-            Serial.printf(
-                "[EMERGENCY] Released early (%lu ms)\n",
-                (unsigned long)held
-            );
-        }
-
-
-        s_button_down =
-            false;
-
-        s_button_down_ms =
-            0;
+        Serial.printf(
+            "[EMERGENCY] Button released held=%lu ms\n",
+            (unsigned long)(
+                now -
+                s_button_down_ms
+            )
+        );
     }
+
+
+    s_button_down =
+        false;
+
+    s_long_press_consumed =
+        false;
+        
+    s_active_emergency_seq =
+        0;
+        
+    s_button_down_ms =
+        0;
 }
 
 
@@ -330,4 +319,133 @@ void emergency_button_clear(void)
     Serial.println(
         "[EMERGENCY] Cleared by ACK"
     );
+}
+
+static void send_emergency_start(void)
+{
+    s_active_emergency_seq =
+        s_emergency_seq;
+
+
+    protocol_frame_t frame = {};
+
+    frame.railing_id =
+        RAILING_ID;
+
+    frame.src =
+        NODE_S3;
+
+    frame.dst =
+        NODE_P4;
+
+    frame.service =
+        SERVICE_EMERGENCY;
+
+    frame.command =
+        CMD_START;
+
+    frame.length =
+        5;
+
+    frame.payload[0] =
+        EMERGENCY_SOURCE_BUTTON;
+
+
+    write_u32_be(
+        &frame.payload[1],
+        s_active_emergency_seq
+    );
+
+
+    ble_send_frame(
+        &frame
+    );
+
+
+    Serial.printf(
+        "[EMERGENCY] START seq=%lu\n",
+        (unsigned long)
+            s_active_emergency_seq
+    );
+
+
+    s_emergency_seq++;
+
+    if (
+        s_emergency_seq ==
+        0
+    )
+    {
+        s_emergency_seq =
+            1;
+    }
+}
+
+static void send_emergency_cancel(void)
+{
+    protocol_frame_t frame = {};
+
+    frame.railing_id =
+        RAILING_ID;
+
+    frame.src =
+        NODE_S3;
+
+    frame.dst =
+        NODE_P4;
+
+    frame.service =
+        SERVICE_EMERGENCY;
+
+    frame.command =
+        CMD_STOP;
+
+    frame.length =
+        5;
+
+    frame.payload[0] =
+        EMERGENCY_SOURCE_BUTTON;
+
+
+    write_u32_be(
+        &frame.payload[1],
+        s_active_emergency_seq
+    );
+
+
+    ble_send_frame(
+        &frame
+    );
+
+
+    Serial.printf(
+        "[EMERGENCY] CANCEL seq=%lu\n",
+        (unsigned long)
+            s_active_emergency_seq
+    );
+
+
+    s_active_emergency_seq =
+        0;
+}
+
+static void handle_long_press(void)
+{
+    if (
+        !s_emergency_active
+    )
+    {
+        s_emergency_active =
+            true;
+
+        send_emergency_start();
+
+        return;
+    }
+
+
+    s_emergency_active =
+        false;
+
+    send_emergency_cancel();
 }

@@ -431,13 +431,30 @@ static void handle_emergency(
         frame->command
     )
     {
-        /*
-         * P4가 관제 ACK 처리 후
-         * S3 emergency latch 해제.
-         */
-        case CMD_STOP:
+        case CMD_SET:
         {
-            emergency_button_clear();
+            if (
+                frame->length <
+                1
+            )
+            {
+                break;
+            }
+
+
+            if (
+                frame->payload[0]
+                ==
+                EMERGENCY_ACTION_ACK
+            )
+            {
+                emergency_button_clear();
+
+                Serial.println(
+                    "[EMERGENCY] CONTROL ACK"
+                );
+            }
+
 
             break;
         }
@@ -445,9 +462,7 @@ static void handle_emergency(
 
         case CMD_STATUS_REQUEST:
         {
-            protocol_frame_t response =
-                {};
-
+            protocol_frame_t response = {};
 
             response.railing_id =
                 RAILING_ID;
@@ -469,16 +484,13 @@ static void handle_emergency(
 
             response.payload[0] =
                 emergency_button_is_active()
-                    ?
-                    1
-                    :
-                    0;
+                    ? 1
+                    : 0;
 
 
             ble_send_frame(
                 &response
             );
-
 
             break;
         }
