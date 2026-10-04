@@ -97,6 +97,16 @@ def main() -> int:
             )
             return
 
+        if int(frame.dst) != int(Node.PI):
+            LOG.debug(
+                "Ignoring frame not addressed to PI "
+                "rail=%d src=%02X dst=%02X",
+                frame.railing_id,
+                int(frame.src),
+                int(frame.dst),
+            )
+            return
+
         railings.mark_seen(
             frame.railing_id
         )
