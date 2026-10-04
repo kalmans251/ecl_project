@@ -72,3 +72,15 @@ int16_t playlist_manager_get_current_index(void);
  * ============================================================ */
 
 bool playlist_manager_rescan(void);
+
+/* ============================================================
+ * CATALOG INFO
+ * ============================================================ */
+
+uint32_t playlist_manager_get_catalog_version(void);
+
+uint16_t playlist_manager_get_total_track_count(void);
+
+uint16_t playlist_manager_get_group_track_count(
+    music_group_t group
+);

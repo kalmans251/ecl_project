@@ -18,6 +18,7 @@ static const char *TAG =
     "PLAYLIST";
 
 
+
 /* ============================================================
  * CONFIG
  * ============================================================ */
@@ -171,6 +172,118 @@ static music_group_t
 s_age_group =
     MUSIC_GROUP_DEFAULT;
 
+static uint32_t
+s_catalog_version =
+    0;
+
+/* ============================================================
+ * CATALOG HASH
+ * ============================================================ */
+
+static uint32_t hash_byte(
+    uint32_t hash,
+    uint8_t value
+)
+{
+    hash ^= value;
+    hash *= 16777619u;
+
+    return hash;
+}
+
+
+static uint32_t calculate_catalog_version(void)
+{
+    uint32_t hash =
+        2166136261u;
+
+
+    for (
+        size_t g = 0;
+        g < PLAYLIST_GROUP_COUNT;
+        g++
+    )
+    {
+        playlist_group_catalog_t *catalog =
+            &s_groups[g];
+
+
+        /*
+         * 그룹 구분.
+         */
+        hash =
+            hash_byte(
+                hash,
+                (uint8_t)catalog->group
+            );
+
+
+        /*
+         * 곡 개수도 포함.
+         */
+        hash =
+            hash_byte(
+                hash,
+                (uint8_t)(
+                    catalog->count
+                    >> 8
+                )
+            );
+
+        hash =
+            hash_byte(
+                hash,
+                (uint8_t)(
+                    catalog->count
+                    &
+                    0xFF
+                )
+            );
+
+
+        /*
+         * scan_group() 이후 filename이 정렬되어 있으므로
+         * SD directory enumeration 순서와 무관하게
+         * 동일한 목록이면 동일한 version이 나온다.
+         */
+        for (
+            uint16_t i = 0;
+            i < catalog->count;
+            i++
+        )
+        {
+            const char *name =
+                catalog->tracks[i].filename;
+
+
+            while (
+                *name != '\0'
+            )
+            {
+                hash =
+                    hash_byte(
+                        hash,
+                        (uint8_t)*name
+                    );
+
+                name++;
+            }
+
+
+            /*
+             * 파일명 경계.
+             */
+            hash =
+                hash_byte(
+                    hash,
+                    0
+                );
+        }
+    }
+
+
+    return hash;
+}
 
 /* ============================================================
  * MP3 EXTENSION
@@ -732,6 +845,15 @@ bool playlist_manager_rescan(void)
         );
     }
 
+    s_catalog_version =
+        calculate_catalog_version();
+
+
+    ESP_LOGI(
+        TAG,
+        "Catalog version = 0x%08lX",
+        (unsigned long)s_catalog_version
+    );
 
     /*
      * 재스캔에서는
@@ -1121,4 +1243,68 @@ playlist_manager_get_current_index(void)
 
     return
         catalog->current_index;
+}
+
+/* ============================================================
+ * CATALOG VERSION
+ * ============================================================ */
+
+uint32_t
+playlist_manager_get_catalog_version(void)
+{
+    return s_catalog_version;
+}
+
+
+/* ============================================================
+ * TOTAL TRACK COUNT
+ * ============================================================ */
+
+uint16_t
+playlist_manager_get_total_track_count(void)
+{
+    uint16_t total =
+        0;
+
+
+    for (
+        size_t i = 0;
+        i < PLAYLIST_GROUP_COUNT;
+        i++
+    )
+    {
+        total +=
+            s_groups[i].count;
+    }
+
+
+    return total;
+}
+
+
+/* ============================================================
+ * GROUP TRACK COUNT
+ * ============================================================ */
+
+uint16_t
+playlist_manager_get_group_track_count(
+    music_group_t group
+)
+{
+    playlist_group_catalog_t *catalog =
+        find_group(
+            group
+        );
+
+
+    if (
+        catalog == NULL
+    )
+    {
+        return 0;
+    }
+
+
+    return
+        catalog->count;
 }

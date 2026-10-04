@@ -463,11 +463,180 @@ static void handle_sd(
     const protocol_frame_t *frame
 )
 {
-    ESP_LOGI(
-        TAG,
-        "SD cmd=0x%02X",
+    switch (
         frame->cmd
-    );
+    )
+    {
+        /* ====================================================
+         * STATUS
+         *
+         * response payload
+         *
+         * [0]     SD READY
+         * [1..4]  catalog_version
+         * [5..6]  total
+         * [7..8]  default
+         * [9..10] 10s
+         * [11..12]20s
+         * [13..14]30s
+         * [15..16]40s
+         * ==================================================== */
+
+        case CMD_STATUS_REQUEST:
+        {
+            uint8_t payload[
+                17
+            ];
+
+
+            uint32_t version =
+                playlist_manager_get_catalog_version();
+
+
+            uint16_t total =
+                playlist_manager_get_total_track_count();
+
+
+            uint16_t count_default =
+                playlist_manager_get_group_track_count(
+                    MUSIC_GROUP_DEFAULT
+                );
+
+            uint16_t count_10 =
+                playlist_manager_get_group_track_count(
+                    MUSIC_GROUP_10S
+                );
+
+            uint16_t count_20 =
+                playlist_manager_get_group_track_count(
+                    MUSIC_GROUP_20S
+                );
+
+            uint16_t count_30 =
+                playlist_manager_get_group_track_count(
+                    MUSIC_GROUP_30S
+                );
+
+            uint16_t count_40 =
+                playlist_manager_get_group_track_count(
+                    MUSIC_GROUP_40S
+                );
+
+
+            payload[0] =
+                sd_manager_is_ready()
+                    ?
+                    1
+                    :
+                    0;
+
+
+            payload[1] =
+                (uint8_t)(
+                    version >> 24
+                );
+
+            payload[2] =
+                (uint8_t)(
+                    version >> 16
+                );
+
+            payload[3] =
+                (uint8_t)(
+                    version >> 8
+                );
+
+            payload[4] =
+                (uint8_t)(
+                    version
+                );
+
+
+#define PUT_U16(offset, value)         \
+            do                         \
+            {                          \
+                payload[offset] =      \
+                    (uint8_t)(         \
+                        (value) >> 8   \
+                    );                 \
+                                       \
+                payload[(offset)+1] =  \
+                    (uint8_t)(         \
+                        (value)        \
+                    );                 \
+            }                          \
+            while (0)
+
+
+            PUT_U16(
+                5,
+                total
+            );
+
+            PUT_U16(
+                7,
+                count_default
+            );
+
+            PUT_U16(
+                9,
+                count_10
+            );
+
+            PUT_U16(
+                11,
+                count_20
+            );
+
+            PUT_U16(
+                13,
+                count_30
+            );
+
+            PUT_U16(
+                15,
+                count_40
+            );
+
+
+#undef PUT_U16
+
+
+            send_reply(
+                frame,
+
+                CMD_STATUS_RESPONSE,
+
+                payload,
+
+                sizeof(payload)
+            );
+
+
+            ESP_LOGI(
+                TAG,
+                "SD STATUS version=0x%08lX total=%u",
+                (unsigned long)version,
+                (unsigned)total
+            );
+
+
+            break;
+        }
+
+
+        default:
+        {
+            ESP_LOGW(
+                TAG,
+                "Unknown SD command 0x%02X",
+                frame->cmd
+            );
+
+
+            break;
+        }
+    }
 }
 
 
