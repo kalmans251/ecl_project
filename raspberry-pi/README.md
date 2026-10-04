@@ -174,3 +174,135 @@ hangup 1
 ```
 
 P4 should report `CALL_ENDED`, after which `status 1` shows `call.active = false`.
+
+
+## Codec2 packet relay
+
+The Raspberry Pi does **not** encode or decode Codec2 audio.
+
+Codec responsibilities:
+
+```text
+FIELD_TX
+S3 microphone -> S3 Codec2 encode
+ -> WROOM relay -> P4 relay -> PLC
+ -> Raspberry Pi packet relay
+ -> control-center PC Codec2 decode
+
+CONTROL_TX
+control-center PC microphone -> PC Codec2 encode
+ -> Raspberry Pi packet relay -> PLC
+ -> P4 relay -> WROOM Codec2 decode -> speaker
+```
+
+### MCU/PLC audio payload
+
+`SERVICE_AUDIO + CMD_DATA` uses:
+
+```text
+[0]      AUDIO_DATA_CODEC2 = 0x02
+[1]      CODEC2_MODE_2400  = 0x01
+[2]      direction         = 0x01 FIELD_TX / 0x02 CONTROL_TX
+[3..4]   packet sequence   = uint16 big-endian
+[5]      frame count
+[6]      bytes per Codec2 frame
+[7..]    concatenated Codec2 data
+```
+
+For Codec2 2400:
+
+```text
+20 ms per frame
+48 bits = 6 bytes per frame
+recommended packet = 8 frames
+8 x 20 ms = 160 ms
+8 x 6 bytes = 48 bytes Codec2 data
+```
+
+This keeps one normal application-protocol voice packet small enough for the 9600-baud PLC path.
+
+### Pi <-> control-center TCP format
+
+The Pi listens on TCP port `9100` by default.
+
+Run:
+
+```bash
+python main.py \
+  --port /dev/ttyAMA2 \
+  --log-level DEBUG \
+  --voice-host 0.0.0.0 \
+  --voice-port 9100
+```
+
+The TCP stream uses a separate 12-byte binary envelope:
+
+```text
+2 bytes  magic       "RV"
+1 byte   version     1
+1 byte   railing_id
+1 byte   direction
+1 byte   codec mode
+2 bytes  sequence    big-endian
+1 byte   frame count
+1 byte   bytes/frame
+2 bytes  data length big-endian
+N bytes  Codec2 data
+```
+
+No PCM conversion occurs in the Pi.
+
+### Current relay validation
+
+The WROOM decoder is not implemented in this PR yet. WROOM validates and counts incoming CONTROL_TX Codec2 packets so the route can be tested before adding the decoder.
+
+After an emergency call is connected:
+
+```text
+ack 1
+ptt 1 on
+```
+
+Then from a PC that can reach the Pi:
+
+```bash
+python tools/voice_test_client.py <PI_IP> \
+  --railing 1 \
+  --send-control \
+  --count 10
+```
+
+The test client sends dummy 8-frame Codec2-sized packets, not actual audio.
+
+Expected Pi log:
+
+```text
+Voice client connected ...
+CONTROL Codec2 -> PLC rail=1 ...
+```
+
+Expected WROOM log:
+
+```text
+VOICE_SESSION: DIRECTION -> CONTROL_TX
+VOICE_SESSION: Codec2 RX seq=0 frames=8 bytes=48 packets=1
+```
+
+Check Pi relay counters with:
+
+```text
+voice-status
+```
+
+When S3 Codec2 encoding is implemented, running the test client without `--send-control` will print FIELD_TX packets received from the railing.
+
+### Direction enforcement
+
+The Pi only forwards:
+
+- S3 -> control center while the cached call direction is `FIELD_TX`
+- control center -> WROOM while the cached call direction is `CONTROL_TX`
+
+Packets that do not match the active half-duplex direction are dropped.
+
+The TCP relay currently has no authentication or encryption. Bind it only on a trusted LAN/VPN interface until the monitoring-server integration adds authenticated transport.
