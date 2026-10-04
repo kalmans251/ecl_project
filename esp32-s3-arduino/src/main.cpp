@@ -4,6 +4,7 @@
 #include "controller.h"
 #include "ble_link.h"
 #include "radar_manager.h"
+#include "emergency_button.h"
 
 void setup()
 {
@@ -61,6 +62,7 @@ void setup()
 
     controller_init();
     radar_manager_init();
+    emergency_button_init();
 
     // --------------------------------------------------------
     // BLE
@@ -85,6 +87,8 @@ void loop()
     ble_link_process();
 
     radar_manager_process();
+    
+    emergency_button_process();
 
     /*
      * 다른 Arduino / FreeRTOS 작업에

@@ -6,6 +6,7 @@
 #include "controller.h"
 #include "ble_link.h"
 #include "radar_manager.h"
+#include "emergency_button.h"
 
 void controller_init(void)
 {
@@ -14,6 +15,10 @@ void controller_init(void)
     );
 }
 static void handle_radar(
+    const protocol_frame_t *frame
+);
+
+static void handle_emergency(
     const protocol_frame_t *frame
 );
 
@@ -260,8 +265,8 @@ void controller_handle(
 
         case SERVICE_EMERGENCY:
         {
-            Serial.println(
-                "[CTRL] EMERGENCY"
+            handle_emergency(
+                frame
             );
 
             break;
@@ -400,6 +405,74 @@ static void handle_radar(
                 radar_manager_get_target_count(
                     2
                 );
+
+
+            ble_send_frame(
+                &response
+            );
+
+
+            break;
+        }
+
+
+        default:
+        {
+            break;
+        }
+    }
+}
+
+static void handle_emergency(
+    const protocol_frame_t *frame
+)
+{
+    switch (
+        frame->command
+    )
+    {
+        /*
+         * P4가 관제 ACK 처리 후
+         * S3 emergency latch 해제.
+         */
+        case CMD_STOP:
+        {
+            emergency_button_clear();
+
+            break;
+        }
+
+
+        case CMD_STATUS_REQUEST:
+        {
+            protocol_frame_t response =
+                {};
+
+
+            response.railing_id =
+                RAILING_ID;
+
+            response.src =
+                NODE_S3;
+
+            response.dst =
+                frame->src;
+
+            response.service =
+                SERVICE_EMERGENCY;
+
+            response.command =
+                CMD_STATUS_RESPONSE;
+
+            response.length =
+                1;
+
+            response.payload[0] =
+                emergency_button_is_active()
+                    ?
+                    1
+                    :
+                    0;
 
 
             ble_send_frame(

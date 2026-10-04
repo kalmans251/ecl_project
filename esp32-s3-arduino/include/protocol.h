@@ -158,3 +158,11 @@ int protocol_encode(
 // ============================================================
 
 #define RADAR_SET_POSITION_SOURCE       0x01
+
+// ============================================================
+// EMERGENCY
+// ============================================================
+
+#define EMERGENCY_SOURCE_BUTTON        0x01
+
+#define EMERGENCY_ACTION_ACK           0x01
