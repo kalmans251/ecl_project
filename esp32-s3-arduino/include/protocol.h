@@ -55,7 +55,10 @@
 #define SERVICE_RADAR        0x04
 #define SERVICE_AUDIO        0x05
 #define SERVICE_EMERGENCY    0x06
-
+#define SERVICE_POWER        0x07
+#define SERVICE_PROJECTOR    0x08
+#define SERVICE_DETECTION    0x09
+#define SERVICE_SLEEP        0x0A
 
 // ============================================================
 // COMMAND
@@ -74,7 +77,10 @@
 #define CMD_STOP              0x21
 #define CMD_SET               0x22
 #define CMD_DATA              0x23
-
+#define CMD_PAUSE             0x24
+#define CMD_RESUME            0x25
+#define CMD_NEXT              0x26
+#define CMD_PREVIOUS          0x27
 
 // ============================================================
 // FRAME STRUCTURE
@@ -123,3 +129,32 @@ int protocol_encode(
     uint8_t *output,
     size_t output_size
 );
+
+// ============================================================
+// AUDIO DIRECTION
+// ============================================================
+
+#define AUDIO_DIRECTION_FIELD_TX       0x01
+#define AUDIO_DIRECTION_CONTROL_TX     0x02
+
+// ============================================================
+// DETECTION EVENT
+// ============================================================
+
+#define DETECT_EVENT_CCTV_NEW_PERSON    0x01
+#define DETECT_EVENT_CCTV_AGE_RESULT    0x02
+#define DETECT_EVENT_RADAR_NEW_PERSON   0x03
+
+
+// ============================================================
+// RADAR DATA
+// ============================================================
+
+#define RADAR_DATA_TARGETS              0x01
+
+
+// ============================================================
+// RADAR SET
+// ============================================================
+
+#define RADAR_SET_POSITION_SOURCE       0x01

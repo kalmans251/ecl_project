@@ -5,7 +5,7 @@
 #include "protocol.h"
 #include "controller.h"
 #include "ble_link.h"
-
+#include "radar_manager.h"
 
 void controller_init(void)
 {
@@ -238,8 +238,8 @@ void controller_handle(
 
         case SERVICE_RADAR:
         {
-            Serial.println(
-                "[CTRL] RADAR"
+            handle_radar(
+                frame
             );
 
             break;
@@ -273,6 +273,144 @@ void controller_handle(
                 frame->service
             );
 
+            break;
+        }
+    }
+}
+
+// ============================================================
+// RADAR
+// ============================================================
+
+static void handle_radar(
+    const protocol_frame_t *frame
+)
+{
+    switch (
+        frame->command
+    )
+    {
+        /*
+         * 상세 좌표 송신 ON
+         */
+        case CMD_START:
+        {
+            radar_manager_set_detail_enabled(
+                true
+            );
+
+            break;
+        }
+
+
+        /*
+         * 상세 좌표 송신 OFF
+         *
+         * 사람 감지는 계속 동작한다.
+         */
+        case CMD_STOP:
+        {
+            radar_manager_set_detail_enabled(
+                false
+            );
+
+            break;
+        }
+
+
+        /*
+         * payload:
+         *
+         * [0] RADAR_SET_POSITION_SOURCE
+         * [1] 1 or 2
+         */
+        case CMD_SET:
+        {
+            if (
+                frame->length <
+                2
+            )
+            {
+                break;
+            }
+
+
+            if (
+                frame->payload[0]
+                ==
+                RADAR_SET_POSITION_SOURCE
+            )
+            {
+                radar_manager_set_position_source(
+                    frame->payload[1]
+                );
+            }
+
+
+            break;
+        }
+
+
+        case CMD_STATUS_REQUEST:
+        {
+            protocol_frame_t response =
+                {};
+
+
+            response.railing_id =
+                RAILING_ID;
+
+            response.src =
+                NODE_S3;
+
+            response.dst =
+                frame->src;
+
+            response.service =
+                SERVICE_RADAR;
+
+            response.command =
+                CMD_STATUS_RESPONSE;
+
+            response.length =
+                4;
+
+
+            response.payload[0] =
+                radar_manager_is_detail_enabled()
+                    ?
+                    1
+                    :
+                    0;
+
+
+            response.payload[1] =
+                radar_manager_get_position_source();
+
+
+            response.payload[2] =
+                radar_manager_get_target_count(
+                    1
+                );
+
+
+            response.payload[3] =
+                radar_manager_get_target_count(
+                    2
+                );
+
+
+            ble_send_frame(
+                &response
+            );
+
+
+            break;
+        }
+
+
+        default:
+        {
             break;
         }
     }

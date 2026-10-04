@@ -1,5 +1,5 @@
 #pragma once
-
+#include <Arduino.h>
 
 // ============================================================
 // RAILING
@@ -56,3 +56,51 @@
 // ============================================================
 
 #define BLE_PREFERRED_MTU      185
+
+
+// ============================================================
+// INMP441 MICROPHONE
+// ============================================================
+
+static constexpr int PIN_I2S_WS  = 7;
+static constexpr int PIN_I2S_SCK = 6;
+static constexpr int PIN_I2S_SD  = 5;
+
+
+// ============================================================
+// LD2450 RADAR
+//
+// RADAR1 / RADAR2 모두 사람 감지에 사용
+// 위치 좌표는 선택된 Radar 하나만 관제로 전송
+// ============================================================
+
+static constexpr int RADAR1_RX_IO = 17;
+static constexpr int RADAR1_TX_IO = 18;
+
+static constexpr int RADAR2_RX_IO = 15;
+static constexpr int RADAR2_TX_IO = 16;
+
+static constexpr uint32_t LD2450_BAUDRATE =
+    256000;
+
+
+// 1 = RADAR1 좌표 사용
+// 2 = RADAR2 좌표 사용
+static constexpr uint8_t RADAR_POSITION_SOURCE =
+    1;
+
+
+// ============================================================
+// EMERGENCY / VOICE CALL BUTTON
+//
+// 외부 10kΩ Pull-down
+// Active HIGH
+//
+// HIGH가 3초 연속 유지되면 비상 활성화.
+// ============================================================
+
+static constexpr int PIN_VOICE_CALL_BUTTON =
+    4;
+
+static constexpr uint32_t EMERGENCY_HOLD_MS =
+    3000;
