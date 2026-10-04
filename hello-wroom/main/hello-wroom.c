@@ -6,6 +6,7 @@
 
 #include "music_player.h"
 #include "emergency_alert.h"
+#include "voice_session.h"
 
 #include "p4_task.h"
 #include "p4_uart.h"
@@ -179,6 +180,9 @@ void app_main(void)
 
         return;
     }
+
+
+    voice_session_init();
 
 
     /* ========================================================
