@@ -688,6 +688,71 @@ static int16_t choose_shuffle_index(
     return next;
 }
 
+/* ============================================================
+ * RESCAN
+ * ============================================================ */
+
+bool playlist_manager_rescan(void)
+{
+    if (
+        !sd_card_is_mounted()
+    )
+    {
+        ESP_LOGW(
+            TAG,
+            "RESCAN failed: SD card not mounted"
+        );
+
+        return false;
+    }
+
+
+    ESP_LOGI(
+        TAG,
+        "Playlist RESCAN start"
+    );
+
+
+    /*
+     * 각 그룹을 새로 스캔한다.
+     *
+     * scan_group() 내부에서:
+     * - count = 0
+     * - current_index = -1
+     * 로 초기화된다.
+     */
+    for (
+        size_t i = 0;
+        i < PLAYLIST_GROUP_COUNT;
+        i++
+    )
+    {
+        scan_group(
+            &s_groups[i]
+        );
+    }
+
+
+    /*
+     * 재스캔에서는
+     * s_mode / s_age_group은 건드리지 않는다.
+     *
+     * 예:
+     * AGE + 20대 상태에서 SD 교체
+     * → 다시 20대 그룹을 계속 사용 가능.
+     */
+    s_initialized =
+        true;
+
+
+    ESP_LOGI(
+        TAG,
+        "Playlist RESCAN complete"
+    );
+
+
+    return true;
+}
 
 /* ============================================================
  * INIT
@@ -712,23 +777,16 @@ bool playlist_manager_init(void)
             "SD card not mounted"
         );
 
-
         return false;
     }
 
 
-    for (
-        size_t i = 0;
-        i < PLAYLIST_GROUP_COUNT;
-        i++
-    )
-    {
-        scan_group(
-            &s_groups[i]
-        );
-    }
-
-
+    /*
+     * 부팅 기본값.
+     *
+     * RESCAN에서는 이 값들을 유지하기 때문에
+     * 여기서만 초기화한다.
+     */
     s_mode =
         MUSIC_PLAY_MODE_SEQUENTIAL;
 
@@ -737,8 +795,12 @@ bool playlist_manager_init(void)
         MUSIC_GROUP_DEFAULT;
 
 
-    s_initialized =
-        true;
+    if (
+        !playlist_manager_rescan()
+    )
+    {
+        return false;
+    }
 
 
     ESP_LOGI(

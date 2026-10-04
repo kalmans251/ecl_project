@@ -319,6 +319,44 @@ sdmmc_card_t *sd_card_get(void)
     return s_card;
 }
 
+/* ============================================================
+ * HEALTH CHECK
+ * ============================================================ */
+
+bool sd_card_check_health(void)
+{
+    if (
+        !s_mounted ||
+        s_card == NULL
+    )
+    {
+        return false;
+    }
+
+
+    esp_err_t err =
+        sdmmc_get_status(
+            s_card
+        );
+
+
+    if (
+        err != ESP_OK
+    )
+    {
+        ESP_LOGW(
+            TAG,
+            "SD health check failed: %s",
+            esp_err_to_name(err)
+        );
+
+
+        return false;
+    }
+
+
+    return true;
+}
 
 /* ============================================================
  * PRINT INFO

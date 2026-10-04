@@ -21,7 +21,9 @@ idf_component_register(
         "music_player.c"
 
         "playlist_manager.c"
+        "sd_manager.c"
 
+        
     INCLUDE_DIRS
         "."
 

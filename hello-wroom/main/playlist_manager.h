@@ -63,3 +63,12 @@ bool playlist_manager_next(void);
 uint16_t playlist_manager_get_track_count(void);
 
 int16_t playlist_manager_get_current_index(void);
+
+/* ============================================================
+ * RESCAN
+ *
+ * SD 카드의 음악 목록을 다시 읽는다.
+ * 현재 play mode / age group 설정은 유지한다.
+ * ============================================================ */
+
+bool playlist_manager_rescan(void);

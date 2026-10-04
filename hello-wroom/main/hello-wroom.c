@@ -19,6 +19,7 @@
 #include "esp_log.h"
 
 #include "playlist_manager.h"
+#include "sd_manager.h"
 
 static const char *TAG =
     "MAIN";
@@ -146,26 +147,10 @@ void app_main(void)
 
 
     /* ========================================================
-     * SD
-     * ======================================================== */
-
-    if (
-        !sd_card_init()
-    )
-    {
-        ESP_LOGE(
-            TAG,
-            "SD init failed"
-        );
-
-
-        return;
-    }
-
-
-    /* ========================================================
-     * MUSIC PLAYER
-     * ======================================================== */
+    * MUSIC PLAYER
+    *
+    * SD가 없어도 player task 자체는 살아 있어야 한다.
+    * ======================================================== */
 
     if (
         !music_player_init()
@@ -180,43 +165,67 @@ void app_main(void)
         return;
     }
 
+
     /* ========================================================
-    * PLAYLIST
+    * SD
+    *
+    * SD가 없어도 WROOM 전체 부팅은 계속한다.
+    * sd_manager가 나중에 자동 재연결한다.
+    * ======================================================== */
+
+    bool sd_ready =
+        sd_card_init();
+
+
+    if (
+        sd_ready
+    )
+    {
+        ESP_LOGI(
+            TAG,
+            "Initial SD mount success"
+        );
+
+
+        if (
+            !playlist_manager_init()
+        )
+        {
+            ESP_LOGW(
+                TAG,
+                "Initial playlist scan failed"
+            );
+
+
+            sd_card_deinit();
+
+            sd_ready =
+                false;
+        }
+    }
+    else
+    {
+        ESP_LOGW(
+            TAG,
+            "No SD card at boot - waiting for insertion"
+        );
+    }
+
+
+    /* ========================================================
+    * SD MANAGER
     * ======================================================== */
 
     if (
-        !playlist_manager_init()
+        !sd_manager_init()
     )
     {
         ESP_LOGE(
             TAG,
-            "Playlist manager init failed"
+            "SD manager init failed"
         );
 
 
         return;
     }
-
-    ESP_LOGI(
-        TAG,
-        "================================"
-    );
-
-
-    ESP_LOGI(
-        TAG,
-        "WROOM SYSTEM READY"
-    );
-
-
-    ESP_LOGI(
-        TAG,
-        "Waiting MUSIC command from P4"
-    );
-
-
-    ESP_LOGI(
-        TAG,
-        "================================"
-    );
 }

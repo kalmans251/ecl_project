@@ -17,6 +17,8 @@
 
 #include "playlist_manager.h"
 
+#include "sd_manager.h"
+
 static const char *TAG =
     "CONTROLLER";
 
@@ -238,6 +240,18 @@ static void handle_music(
                 "MUSIC START"
             );
 
+            if (
+                !sd_manager_is_ready()
+            )
+            {
+                ESP_LOGW(
+                    TAG,
+                    "MUSIC START rejected: SD not ready"
+                );
+
+
+                break;
+            }
 
             if (
                 !playlist_manager_start()
@@ -265,6 +279,18 @@ static void handle_music(
                 "MUSIC NEXT"
             );
 
+            if (
+                !sd_manager_is_ready()
+            )
+            {
+                ESP_LOGW(
+                    TAG,
+                    "MUSIC NEXT rejected: SD not ready"
+                );
+
+
+                break;
+            }
 
             if (
                 !playlist_manager_next()
