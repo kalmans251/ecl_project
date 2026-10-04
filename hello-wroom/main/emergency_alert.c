@@ -422,8 +422,16 @@ static void emergency_alert_task(
         }
 
 
-        s_requested_active =
-            true;
+        /*
+         * START가 처리되기 전에 STOP이 들어온 경우
+         * stale START를 다시 활성화하지 않는다.
+         */
+        if (
+            !s_requested_active
+        )
+        {
+            continue;
+        }
 
 
         play_alert();
@@ -579,7 +587,41 @@ bool emergency_alert_stop(void)
     );
 
 
-    return true;
+    /*
+     * P4는 이 함수가 돌아온 직후 일반 음악 RESUME을
+     * 보낼 수 있다. alert가 I2S sample-rate/volume을
+     * 복구할 때까지 잠깐 기다려 두 출력이 겹치지 않게 한다.
+     */
+    for (
+        int i = 0;
+        i < 50;
+        i++
+    )
+    {
+        if (
+            !s_active
+        )
+        {
+            return true;
+        }
+
+
+        vTaskDelay(
+            pdMS_TO_TICKS(
+                10
+            )
+        );
+    }
+
+
+    ESP_LOGW(
+        TAG,
+        "Alert stop timeout"
+    );
+
+
+    return
+        !s_active;
 }
 
 
