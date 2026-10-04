@@ -1,0 +1,119 @@
+# Raspberry Pi PLC Controller
+
+Raspberry Pi side of the smart-railing communication stack.
+
+Current scope:
+
+- PLC UART: `/dev/ttyAMA2`, 9600 baud, 8N1
+- application protocol compatible with the P4 firmware
+- CRC-16/CCITT-FALSE
+- streaming frame parser with resynchronization
+- per-railing in-memory state cache
+- emergency START/STOP receive path
+- control-center emergency ACK transmit path
+- simple interactive test console
+
+## Architecture
+
+```text
+S3
+  <-> BLE
+WROOM
+  <-> UART
+P4
+  <-> PLC 9600
+Raspberry Pi
+```
+
+The Pi is intended to become the bus master, state cache, SQLite owner,
+telemetry scheduler and PTT gateway. Spring Boot will be connected after
+the Pi-side functions are stable.
+
+## Install
+
+```bash
+cd raspberry-pi
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+Make sure the Pi user can access the UART device.
+
+```bash
+sudo usermod -aG dialout $USER
+```
+
+Log out and back in after changing group membership.
+
+## Run
+
+```bash
+python main.py --port /dev/ttyAMA2
+```
+
+For verbose protocol logs:
+
+```bash
+python main.py --port /dev/ttyAMA2 --log-level DEBUG
+```
+
+## Interactive commands
+
+```text
+status
+status 1
+ping 1
+ack 1
+quit
+```
+
+### Emergency flow
+
+Field button long press:
+
+```text
+S3 -> P4 -> Pi
+SERVICE_EMERGENCY / CMD_START
+payload[0]    = source
+payload[1..4] = emergency_seq (big-endian)
+```
+
+Field-side cancel:
+
+```text
+S3 -> P4 -> Pi
+SERVICE_EMERGENCY / CMD_STOP
+payload[0]    = source
+payload[1..4] = same emergency_seq
+```
+
+Control-center ACK:
+
+```text
+Pi -> P4
+SERVICE_EMERGENCY / CMD_SET
+payload[0]    = EMERGENCY_ACTION_ACK
+payload[1..4] = active emergency_seq
+```
+
+The P4 then stops the WROOM emergency alert and starts the emergency call
+in FIELD_TX mode.
+
+## Protocol tests
+
+```bash
+cd raspberry-pi
+python -m unittest discover -s tests -v
+```
+
+No physical UART is required for these protocol tests.
+
+## Important PLC note
+
+The current Pi implementation serializes all Pi-originated writes.
+When multiple P4 nodes share the same half-duplex PLC bus, bus arbitration
+for spontaneous node-originated events must be finalized before scaling
+to many railings. The first target is one-railing end-to-end validation.
