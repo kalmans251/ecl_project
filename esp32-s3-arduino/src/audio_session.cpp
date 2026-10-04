@@ -2,6 +2,7 @@
 
 #include "protocol.h"
 #include "audio_session.h"
+#include "ble_link.h"
 
 
 static bool
@@ -113,4 +114,100 @@ bool audio_session_field_tx_enabled(void)
         &&
         s_direction ==
             AUDIO_DIRECTION_FIELD_TX;
+}
+
+
+
+bool audio_session_send_codec2(
+    const uint8_t *data,
+    uint8_t frame_count,
+    uint16_t sequence
+)
+{
+    if (
+        data ==
+        nullptr
+        ||
+        frame_count ==
+        0
+        ||
+        frame_count >
+        CODEC2_MAX_FRAMES_PER_PACKET
+        ||
+        !audio_session_field_tx_enabled()
+    )
+    {
+        return false;
+    }
+
+
+    uint8_t data_length =
+        frame_count
+        *
+        CODEC2_2400_BYTES_PER_FRAME;
+
+
+    protocol_frame_t frame = {};
+
+
+    frame.railing_id =
+        RAILING_ID;
+
+    frame.src =
+        NODE_S3;
+
+    frame.dst =
+        NODE_PI;
+
+    frame.service =
+        SERVICE_AUDIO;
+
+    frame.command =
+        CMD_DATA;
+
+    frame.length =
+        AUDIO_CODEC2_META_SIZE
+        +
+        data_length;
+
+
+    frame.payload[0] =
+        AUDIO_DATA_CODEC2;
+
+    frame.payload[1] =
+        CODEC2_MODE_2400;
+
+    frame.payload[2] =
+        AUDIO_DIRECTION_FIELD_TX;
+
+    frame.payload[3] =
+        (uint8_t)(
+            sequence >>
+            8
+        );
+
+    frame.payload[4] =
+        (uint8_t)
+        sequence;
+
+    frame.payload[5] =
+        frame_count;
+
+    frame.payload[6] =
+        CODEC2_2400_BYTES_PER_FRAME;
+
+
+    memcpy(
+        &frame.payload[
+            AUDIO_CODEC2_META_SIZE
+        ],
+        data,
+        data_length
+    );
+
+
+    return
+        ble_send_frame(
+            &frame
+        );
 }
