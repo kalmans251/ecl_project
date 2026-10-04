@@ -13,7 +13,9 @@ void controller_init(void)
         "[CTRL] Controller initialized"
     );
 }
-
+static void handle_radar(
+    const protocol_frame_t *frame
+);
 
 // ============================================================
 // SYSTEM
