@@ -17,6 +17,7 @@ from protocol import (
     Service,
 )
 from railing import RailingManager
+from voice import VoiceRelay
 
 
 LOG = logging.getLogger("railing-pi")
@@ -55,6 +56,25 @@ def parse_args() -> argparse.Namespace:
         "--no-console",
         action="store_true",
         help="Run without the interactive command prompt",
+    )
+
+    parser.add_argument(
+        "--voice-host",
+        default="0.0.0.0",
+        help="Codec2 relay TCP bind address (default: 0.0.0.0)",
+    )
+
+    parser.add_argument(
+        "--voice-port",
+        type=int,
+        default=9100,
+        help="Codec2 relay TCP port (default: 9100)",
+    )
+
+    parser.add_argument(
+        "--disable-voice-relay",
+        action="store_true",
+        help="Do not start the control-center Codec2 TCP relay",
     )
 
     return parser.parse_args()
@@ -104,6 +124,13 @@ def main() -> int:
         railings,
     )
 
+    voice = VoiceRelay(
+        bus,
+        railings,
+        host=args.voice_host,
+        port=args.voice_port,
+    )
+
     def on_frame(frame: Frame) -> None:
         if frame.railing_id == 0:
             LOG.warning(
@@ -131,6 +158,9 @@ def main() -> int:
         if audio.handle_frame(frame):
             return
 
+        if voice.handle_plc_frame(frame):
+            return
+
         LOG.info(
             "RX rail=%d src=%02X dst=%02X service=%02X "
             "cmd=%02X payload=%s",
@@ -153,6 +183,16 @@ def main() -> int:
             "Failed to open PLC serial port"
         )
         return 1
+
+    if not args.disable_voice_relay:
+        try:
+            voice.start()
+        except Exception:
+            bus.close()
+            LOG.exception(
+                "Failed to start voice relay"
+            )
+            return 1
 
     try:
         if args.no_console:
@@ -334,6 +374,7 @@ def main() -> int:
         print()
 
     finally:
+        voice.close()
         bus.close()
 
     return 0
