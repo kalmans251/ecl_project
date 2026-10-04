@@ -208,217 +208,7 @@ static void handle_system(
             break;
         }
 
-        case CMD_DATA:
-        {
-            if (
-                frame->payload_len <
-                1
-            )
-            {
-                break;
-            }
 
-
-            uint8_t type =
-                frame->payload[0];
-
-
-            /* ========================================================
-            * TRACK REQUEST
-            * ======================================================== */
-
-            if (
-                type ==
-                    SD_DATA_TRACK_REQUEST
-            )
-            {
-                if (
-                    frame->payload_len <
-                    4
-                )
-                {
-                    ESP_LOGW(
-                        TAG,
-                        "SD track request too short"
-                    );
-
-
-                    break;
-                }
-
-
-                if (
-                    !sd_manager_is_ready()
-                )
-                {
-                    ESP_LOGW(
-                        TAG,
-                        "SD track request rejected: SD not ready"
-                    );
-
-
-                    break;
-                }
-
-
-                music_group_t group =
-                    (music_group_t)
-                    frame->payload[1];
-
-
-                uint16_t index =
-                    (
-                        (uint16_t)
-                        frame->payload[2]
-                        <<
-                        8
-                    )
-                    |
-                    frame->payload[3];
-
-
-                char filename[
-                    96
-                ];
-
-
-                if (
-                    !playlist_manager_get_track_filename(
-                        group,
-                        index,
-                        filename,
-                        sizeof(filename)
-                    )
-                )
-                {
-                    ESP_LOGW(
-                        TAG,
-                        "Track not found group=%u index=%u",
-                        (unsigned)group,
-                        (unsigned)index
-                    );
-
-
-                    break;
-                }
-
-
-                size_t filename_len =
-                    strlen(
-                        filename
-                    );
-
-
-                /*
-                * response header 9 bytes +
-                * filename 최대 96 bytes.
-                *
-                * 전체 128 bytes 이하.
-                */
-                if (
-                    9 +
-                    filename_len >
-                        PROTOCOL_MAX_PAYLOAD
-                )
-                {
-                    ESP_LOGW(
-                        TAG,
-                        "Track filename too long"
-                    );
-
-
-                    break;
-                }
-
-
-                uint8_t payload[
-                    PROTOCOL_MAX_PAYLOAD
-                ];
-
-
-                uint32_t version =
-                    playlist_manager_get_catalog_version();
-
-
-                payload[0] =
-                    SD_DATA_TRACK_RESPONSE;
-
-
-                payload[1] =
-                    (uint8_t)group;
-
-
-                payload[2] =
-                    (uint8_t)(
-                        index >> 8
-                    );
-
-
-                payload[3] =
-                    (uint8_t)(
-                        index
-                    );
-
-
-                payload[4] =
-                    (uint8_t)(
-                        version >> 24
-                    );
-
-                payload[5] =
-                    (uint8_t)(
-                        version >> 16
-                    );
-
-                payload[6] =
-                    (uint8_t)(
-                        version >> 8
-                    );
-
-                payload[7] =
-                    (uint8_t)(
-                        version
-                    );
-
-
-                payload[8] =
-                    (uint8_t)
-                    filename_len;
-
-
-                memcpy(
-                    &payload[9],
-                    filename,
-                    filename_len
-                );
-
-
-                send_reply(
-                    frame,
-
-                    CMD_DATA,
-
-                    payload,
-
-                    (uint8_t)(
-                        9 +
-                        filename_len
-                    )
-                );
-
-
-                ESP_LOGI(
-                    TAG,
-                    "TRACK RESP group=%u index=%u file=%s",
-                    (unsigned)group,
-                    (unsigned)index,
-                    filename
-                );
-            }
-
-
-            break;
-        }
 
         default:
         {
@@ -667,6 +457,58 @@ static void handle_music(
 
 
 /* ============================================================
+ * WRITE U16 BE
+ * ============================================================ */
+
+static void write_u16_be(
+    uint8_t *dst,
+    uint16_t value
+)
+{
+    dst[0] =
+        (uint8_t)(
+            value >> 8
+        );
+
+    dst[1] =
+        (uint8_t)(
+            value
+        );
+}
+
+
+/* ============================================================
+ * WRITE U32 BE
+ * ============================================================ */
+
+static void write_u32_be(
+    uint8_t *dst,
+    uint32_t value
+)
+{
+    dst[0] =
+        (uint8_t)(
+            value >> 24
+        );
+
+    dst[1] =
+        (uint8_t)(
+            value >> 16
+        );
+
+    dst[2] =
+        (uint8_t)(
+            value >> 8
+        );
+
+    dst[3] =
+        (uint8_t)(
+            value
+        );
+}
+
+
+/* ============================================================
  * SD
  * ============================================================ */
 
@@ -679,18 +521,18 @@ static void handle_sd(
     )
     {
         /* ====================================================
-         * STATUS
+         * STATUS REQUEST
          *
-         * response payload
+         * RESPONSE:
          *
-         * [0]     SD READY
-         * [1..4]  catalog_version
-         * [5..6]  total
-         * [7..8]  default
-         * [9..10] 10s
-         * [11..12]20s
-         * [13..14]30s
-         * [15..16]40s
+         * [0]      SD READY
+         * [1..4]   catalog_version
+         * [5..6]   total
+         * [7..8]   default
+         * [9..10]  10s
+         * [11..12] 20s
+         * [13..14] 30s
+         * [15..16] 40s
          * ==================================================== */
 
         case CMD_STATUS_REQUEST:
@@ -698,6 +540,51 @@ static void handle_sd(
             uint8_t payload[
                 17
             ];
+
+
+            memset(
+                payload,
+                0,
+                sizeof(payload)
+            );
+
+
+            bool ready =
+                sd_manager_is_ready();
+
+
+            payload[0] =
+                ready
+                    ?
+                    1
+                    :
+                    0;
+
+
+            /*
+             * SD가 준비되지 않은 경우
+             * version/count는 모두 0으로 응답.
+             */
+            if (
+                !ready
+            )
+            {
+                send_reply(
+                    frame,
+                    CMD_STATUS_RESPONSE,
+                    payload,
+                    sizeof(payload)
+                );
+
+
+                ESP_LOGI(
+                    TAG,
+                    "SD STATUS ready=0"
+                );
+
+
+                break;
+            }
 
 
             uint32_t version =
@@ -713,20 +600,24 @@ static void handle_sd(
                     MUSIC_GROUP_DEFAULT
                 );
 
+
             uint16_t count_10 =
                 playlist_manager_get_group_track_count(
                     MUSIC_GROUP_10S
                 );
+
 
             uint16_t count_20 =
                 playlist_manager_get_group_track_count(
                     MUSIC_GROUP_20S
                 );
 
+
             uint16_t count_30 =
                 playlist_manager_get_group_track_count(
                     MUSIC_GROUP_30S
                 );
+
 
             uint16_t count_40 =
                 playlist_manager_get_group_track_count(
@@ -734,102 +625,272 @@ static void handle_sd(
                 );
 
 
-            payload[0] =
-                sd_manager_is_ready()
-                    ?
-                    1
-                    :
-                    0;
+            write_u32_be(
+                &payload[1],
+                version
+            );
 
 
-            payload[1] =
-                (uint8_t)(
-                    version >> 24
-                );
-
-            payload[2] =
-                (uint8_t)(
-                    version >> 16
-                );
-
-            payload[3] =
-                (uint8_t)(
-                    version >> 8
-                );
-
-            payload[4] =
-                (uint8_t)(
-                    version
-                );
-
-
-#define PUT_U16(offset, value)         \
-            do                         \
-            {                          \
-                payload[offset] =      \
-                    (uint8_t)(         \
-                        (value) >> 8   \
-                    );                 \
-                                       \
-                payload[(offset)+1] =  \
-                    (uint8_t)(         \
-                        (value)        \
-                    );                 \
-            }                          \
-            while (0)
-
-
-            PUT_U16(
-                5,
+            write_u16_be(
+                &payload[5],
                 total
             );
 
-            PUT_U16(
-                7,
+
+            write_u16_be(
+                &payload[7],
                 count_default
             );
 
-            PUT_U16(
-                9,
+
+            write_u16_be(
+                &payload[9],
                 count_10
             );
 
-            PUT_U16(
-                11,
+
+            write_u16_be(
+                &payload[11],
                 count_20
             );
 
-            PUT_U16(
-                13,
+
+            write_u16_be(
+                &payload[13],
                 count_30
             );
 
-            PUT_U16(
-                15,
+
+            write_u16_be(
+                &payload[15],
                 count_40
             );
 
 
-#undef PUT_U16
-
-
             send_reply(
                 frame,
-
                 CMD_STATUS_RESPONSE,
-
                 payload,
-
                 sizeof(payload)
             );
 
 
             ESP_LOGI(
                 TAG,
-                "SD STATUS version=0x%08lX total=%u",
+                "SD STATUS ready=1 version=0x%08lX total=%u",
                 (unsigned long)version,
                 (unsigned)total
             );
+
+
+            break;
+        }
+
+
+        /* ====================================================
+         * DATA
+         * ==================================================== */
+
+        case CMD_DATA:
+        {
+            if (
+                frame->payload_len <
+                1
+            )
+            {
+                ESP_LOGW(
+                    TAG,
+                    "SD DATA payload empty"
+                );
+
+
+                break;
+            }
+
+
+            uint8_t type =
+                frame->payload[0];
+
+
+            /* =================================================
+             * TRACK REQUEST
+             *
+             * REQUEST:
+             *
+             * [0]     SD_DATA_TRACK_REQUEST
+             * [1]     group
+             * [2..3]  index
+             * ================================================= */
+
+            if (
+                type ==
+                    SD_DATA_TRACK_REQUEST
+            )
+            {
+                if (
+                    frame->payload_len <
+                    4
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "SD track request too short"
+                    );
+
+
+                    break;
+                }
+
+
+                if (
+                    !sd_manager_is_ready()
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "SD track request rejected: SD not ready"
+                    );
+
+
+                    break;
+                }
+
+
+                music_group_t group =
+                    (music_group_t)
+                    frame->payload[1];
+
+
+                uint16_t index =
+                    (
+                        ((uint16_t)
+                        frame->payload[2])
+                        <<
+                        8
+                    )
+                    |
+                    frame->payload[3];
+
+
+                char filename[
+                    96
+                ];
+
+
+                if (
+                    !playlist_manager_get_track_filename(
+                        group,
+                        index,
+                        filename,
+                        sizeof(filename)
+                    )
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Track not found group=%u index=%u",
+                        (unsigned)group,
+                        (unsigned)index
+                    );
+
+
+                    break;
+                }
+
+
+                size_t filename_len =
+                    strlen(
+                        filename
+                    );
+
+
+                /*
+                 * 9 bytes metadata + filename
+                 */
+                if (
+                    9 +
+                    filename_len >
+                        PROTOCOL_MAX_PAYLOAD
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Track filename too long"
+                    );
+
+
+                    break;
+                }
+
+
+                uint8_t payload[
+                    PROTOCOL_MAX_PAYLOAD
+                ];
+
+
+                uint32_t version =
+                    playlist_manager_get_catalog_version();
+
+
+                payload[0] =
+                    SD_DATA_TRACK_RESPONSE;
+
+
+                payload[1] =
+                    (uint8_t)group;
+
+
+                write_u16_be(
+                    &payload[2],
+                    index
+                );
+
+
+                write_u32_be(
+                    &payload[4],
+                    version
+                );
+
+
+                payload[8] =
+                    (uint8_t)
+                    filename_len;
+
+
+                memcpy(
+                    &payload[9],
+                    filename,
+                    filename_len
+                );
+
+
+                send_reply(
+                    frame,
+                    CMD_DATA,
+                    payload,
+                    (uint8_t)(
+                        9 +
+                        filename_len
+                    )
+                );
+
+
+                ESP_LOGI(
+                    TAG,
+                    "TRACK RESP group=%u index=%u file=%s",
+                    (unsigned)group,
+                    (unsigned)index,
+                    filename
+                );
+            }
+            else
+            {
+                ESP_LOGW(
+                    TAG,
+                    "Unknown SD DATA type=0x%02X",
+                    type
+                );
+            }
 
 
             break;

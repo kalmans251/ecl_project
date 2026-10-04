@@ -98,3 +98,13 @@
  * LOW  = OFF
  */
 #define PROJECTOR_GPIO         GPIO_NUM_11
+
+/* ============================================================
+ * INA219 / I2C
+ * ============================================================ */
+
+#define I2C_SDA_PIN          GPIO_NUM_8
+#define I2C_SCL_PIN          GPIO_NUM_9
+
+#define INA219_ADDR_LEFT     0x40
+#define INA219_ADDR_RIGHT    0x41
