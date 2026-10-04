@@ -82,3 +82,13 @@ class CallOrigin(IntEnum):
 
 class EmergencyEvent(IntEnum):
     ACKED = 0x01
+
+
+
+class Codec2Mode(IntEnum):
+    MODE_2400 = 0x01
+
+
+CODEC2_2400_BYTES_PER_FRAME = 6
+CODEC2_MAX_FRAMES_PER_PACKET = 8
+AUDIO_CODEC2_META_SIZE = 7
