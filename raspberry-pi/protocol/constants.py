@@ -57,3 +57,28 @@ class EmergencySource(IntEnum):
 
 class EmergencyAction(IntEnum):
     ACK = 0x01
+
+
+class AudioDirection(IntEnum):
+    FIELD_TX = 0x01
+    CONTROL_TX = 0x02
+
+
+class AudioDataType(IntEnum):
+    EVENT = 0x01
+    CODEC2 = 0x02
+
+
+class AudioEvent(IntEnum):
+    CALL_STARTED = 0x01
+    CALL_ENDED = 0x02
+    DIRECTION_CHANGED = 0x03
+
+
+class CallOrigin(IntEnum):
+    NORMAL = 0x00
+    EMERGENCY = 0x01
+
+
+class EmergencyEvent(IntEnum):
+    ACKED = 0x01

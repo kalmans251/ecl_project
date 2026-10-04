@@ -14,12 +14,23 @@ class EmergencyState:
 
 
 @dataclass(slots=True)
+class CallState:
+    active: bool = False
+    origin: int | None = None
+    direction: int | None = None
+    started_monotonic: float | None = None
+
+
+@dataclass(slots=True)
 class RailingState:
     railing_id: int
     online: bool = False
     last_seen_monotonic: float | None = None
     emergency: EmergencyState = field(
         default_factory=EmergencyState
+    )
+    call: CallState = field(
+        default_factory=CallState
     )
 
     def mark_seen(self) -> None:

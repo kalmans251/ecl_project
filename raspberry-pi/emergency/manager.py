@@ -6,6 +6,7 @@ from plc import PlcBus
 from protocol import (
     Command,
     EmergencyAction,
+    EmergencyEvent,
     EmergencySource,
     Frame,
     Node,
@@ -36,6 +37,48 @@ class EmergencyManager:
             or int(frame.dst) != int(Node.PI)
             or int(frame.src) != int(Node.P4)
         ):
+            return False
+
+        if frame.command == int(Command.DATA):
+            if (
+                len(frame.payload) >= 5
+                and frame.payload[0]
+                == int(EmergencyEvent.ACKED)
+            ):
+                seq = read_u32_be(
+                    frame.payload[1:5]
+                )
+
+                matched = (
+                    self._railings.emergency_ack_confirmed(
+                        frame.railing_id,
+                        seq,
+                    )
+                )
+
+                if not matched:
+                    LOG.warning(
+                        "Ignoring emergency ACKED with mismatched seq "
+                        "rail=%d seq=%d",
+                        frame.railing_id,
+                        seq,
+                    )
+                    return True
+
+                LOG.info(
+                    "EMERGENCY ACK CONFIRMED rail=%d seq=%d",
+                    frame.railing_id,
+                    seq,
+                )
+
+                print(
+                    f"\n[EMERGENCY] ACK CONFIRMED "
+                    f"rail={frame.railing_id} "
+                    f"seq={seq}"
+                )
+
+                return True
+
             return False
 
         if frame.command not in (

@@ -6,9 +6,16 @@ import logging
 import sys
 import time
 
+from audio import AudioManager
 from emergency import EmergencyManager
 from plc import PlcBus
-from protocol import Command, Frame, Node, Service
+from protocol import (
+    AudioDirection,
+    Command,
+    Frame,
+    Node,
+    Service,
+)
 from railing import RailingManager
 
 
@@ -59,6 +66,8 @@ def print_help() -> None:
         "  status [railing_id]  show cached railing state\n"
         "  ack <railing_id>     acknowledge active emergency\n"
         "  ping <railing_id>    send SYSTEM/PING to P4\n"
+        "  ptt <id> on|off      switch CONTROL_TX / FIELD_TX\n"
+        "  hangup <id>          end active call\n"
         "  help                 show this help\n"
         "  quit                 exit\n"
     )
@@ -90,6 +99,11 @@ def main() -> int:
         railings,
     )
 
+    audio = AudioManager(
+        bus,
+        railings,
+    )
+
     def on_frame(frame: Frame) -> None:
         if frame.railing_id == 0:
             LOG.warning(
@@ -112,6 +126,9 @@ def main() -> int:
         )
 
         if emergency.handle_frame(frame):
+            return
+
+        if audio.handle_frame(frame):
             return
 
         LOG.info(
@@ -212,6 +229,73 @@ def main() -> int:
 
                 print(
                     f"ACK sent rail={railing_id} seq={seq}"
+                )
+                continue
+
+
+            if command == "ptt":
+                if (
+                    len(parts) != 3
+                    or parts[2].lower()
+                    not in ("on", "off")
+                ):
+                    print(
+                        "usage: ptt <railing_id> on|off"
+                    )
+                    continue
+
+                railing_id = int(
+                    parts[1],
+                    0,
+                )
+
+                direction = (
+                    AudioDirection.CONTROL_TX
+                    if parts[2].lower() == "on"
+                    else AudioDirection.FIELD_TX
+                )
+
+                try:
+                    audio.set_direction(
+                        railing_id,
+                        direction,
+                    )
+                except Exception as exc:
+                    print(
+                        f"PTT failed: {exc}"
+                    )
+                    continue
+
+                print(
+                    f"PTT {'ON' if direction == AudioDirection.CONTROL_TX else 'OFF'} "
+                    f"rail={railing_id}"
+                )
+                continue
+
+            if command == "hangup":
+                if len(parts) != 2:
+                    print(
+                        "usage: hangup <railing_id>"
+                    )
+                    continue
+
+                railing_id = int(
+                    parts[1],
+                    0,
+                )
+
+                try:
+                    audio.end_call(
+                        railing_id
+                    )
+                except Exception as exc:
+                    print(
+                        f"hangup failed: {exc}"
+                    )
+                    continue
+
+                print(
+                    f"CALL end requested rail={railing_id}"
                 )
                 continue
 

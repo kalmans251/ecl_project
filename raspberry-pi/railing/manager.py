@@ -106,6 +106,95 @@ class RailingManager:
             state.emergency.ack_sent = True
             return True
 
+    def emergency_ack_confirmed(
+        self,
+        railing_id: int,
+        seq: int,
+    ) -> bool:
+        with self._lock:
+            state = self._states.get(
+                railing_id
+            )
+
+            if (
+                state is None
+                or not state.emergency.active
+                or state.emergency.seq != seq
+            ):
+                return False
+
+            state.emergency.active = False
+            state.emergency.seq = None
+            state.emergency.source = None
+            state.emergency.ack_sent = False
+            state.emergency.started_monotonic = None
+
+            state.mark_seen()
+
+            return True
+
+    def call_started(
+        self,
+        railing_id: int,
+        origin: int,
+        direction: int,
+    ) -> None:
+        from time import monotonic
+
+        with self._lock:
+            state = self._get_or_create_locked(
+                railing_id
+            )
+
+            state.mark_seen()
+
+            state.call.active = True
+            state.call.origin = origin
+            state.call.direction = direction
+            state.call.started_monotonic = monotonic()
+
+    def call_direction_changed(
+        self,
+        railing_id: int,
+        direction: int,
+    ) -> bool:
+        with self._lock:
+            state = self._states.get(
+                railing_id
+            )
+
+            if (
+                state is None
+                or not state.call.active
+            ):
+                return False
+
+            state.mark_seen()
+            state.call.direction = direction
+
+            return True
+
+    def call_ended(
+        self,
+        railing_id: int,
+    ) -> bool:
+        with self._lock:
+            state = self._states.get(
+                railing_id
+            )
+
+            if state is None:
+                return False
+
+            state.mark_seen()
+
+            state.call.active = False
+            state.call.origin = None
+            state.call.direction = None
+            state.call.started_monotonic = None
+
+            return True
+
     def get_active_emergency(
         self,
         railing_id: int,
