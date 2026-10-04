@@ -526,6 +526,34 @@ bool emergency_manager_ack(
 
 
     /*
+     * Pi에 ACK 처리 완료를 확정 통지.
+     *
+     * payload:
+     * [0]    EMERGENCY_EVENT_ACKED
+     * [1..4] seq
+     */
+    uint8_t acked_payload[5];
+
+
+    acked_payload[0] =
+        EMERGENCY_EVENT_ACKED;
+
+
+    write_u32_be(
+        &acked_payload[1],
+        seq
+    );
+
+
+    send_frame(
+        NODE_PI,
+        CMD_DATA,
+        acked_payload,
+        sizeof(acked_payload)
+    );
+
+
+    /*
      * CALL reason이 이미 걸렸으므로
      * EMERGENCY reason 제거.
      */
