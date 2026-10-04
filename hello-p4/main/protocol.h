@@ -132,6 +132,48 @@ typedef enum
 
 } audio_direction_t;
 
+
+/* ============================================================
+ * AUDIO DATA TYPE
+ *
+ * SERVICE_AUDIO + CMD_DATA
+ *
+ * EVENT:
+ *   P4 -> Pi call state synchronization
+ *
+ * CODEC2:
+ *   reserved for the next voice-data step
+ * ============================================================ */
+
+typedef enum
+{
+    AUDIO_DATA_EVENT  = 0x01,
+
+    AUDIO_DATA_CODEC2 = 0x02
+
+} audio_data_type_t;
+
+
+/* ============================================================
+ * AUDIO EVENT
+ *
+ * payload:
+ * [0] AUDIO_DATA_EVENT
+ * [1] audio_event_t
+ * [2] call origin
+ * [3] direction (0 when call ended)
+ * ============================================================ */
+
+typedef enum
+{
+    AUDIO_EVENT_CALL_STARTED      = 0x01,
+
+    AUDIO_EVENT_CALL_ENDED        = 0x02,
+
+    AUDIO_EVENT_DIRECTION_CHANGED = 0x03
+
+} audio_event_t;
+
 /* ============================================================
  * MUSIC EVENT
  *
