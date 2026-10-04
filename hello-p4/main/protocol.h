@@ -348,3 +348,18 @@ typedef enum
         0x01
 
 } emergency_action_t;
+
+
+/* ============================================================
+ * EMERGENCY EVENT
+ *
+ * P4 -> Pi
+ * SERVICE_EMERGENCY + CMD_DATA
+ * ============================================================ */
+
+typedef enum
+{
+    EMERGENCY_EVENT_ACKED =
+        0x01
+
+} emergency_event_t;
