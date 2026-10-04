@@ -17,6 +17,7 @@ from protocol import (
     Service,
 )
 from railing import RailingManager
+from voice import VoiceRelay
 
 
 LOG = logging.getLogger("railing-pi")
@@ -57,6 +58,25 @@ def parse_args() -> argparse.Namespace:
         help="Run without the interactive command prompt",
     )
 
+    parser.add_argument(
+        "--voice-host",
+        default="0.0.0.0",
+        help="Codec2 relay TCP bind address (default: 0.0.0.0)",
+    )
+
+    parser.add_argument(
+        "--voice-port",
+        type=int,
+        default=9100,
+        help="Codec2 relay TCP port (default: 9100)",
+    )
+
+    parser.add_argument(
+        "--disable-voice-relay",
+        action="store_true",
+        help="Do not start the control-center Codec2 TCP relay",
+    )
+
     return parser.parse_args()
 
 
@@ -68,6 +88,7 @@ def print_help() -> None:
         "  ping <railing_id>    send SYSTEM/PING to P4\n"
         "  ptt <id> on|off      switch CONTROL_TX / FIELD_TX\n"
         "  hangup <id>          end active call\n"
+        "  voice-status         show Codec2 relay counters\n"
         "  help                 show this help\n"
         "  quit                 exit\n"
     )
@@ -104,6 +125,13 @@ def main() -> int:
         railings,
     )
 
+    voice = VoiceRelay(
+        bus,
+        railings,
+        host=args.voice_host,
+        port=args.voice_port,
+    )
+
     def on_frame(frame: Frame) -> None:
         if frame.railing_id == 0:
             LOG.warning(
@@ -131,6 +159,9 @@ def main() -> int:
         if audio.handle_frame(frame):
             return
 
+        if voice.handle_plc_frame(frame):
+            return
+
         LOG.info(
             "RX rail=%d src=%02X dst=%02X service=%02X "
             "cmd=%02X payload=%s",
@@ -153,6 +184,16 @@ def main() -> int:
             "Failed to open PLC serial port"
         )
         return 1
+
+    if not args.disable_voice_relay:
+        try:
+            voice.start()
+        except Exception:
+            bus.close()
+            LOG.exception(
+                "Failed to start voice relay"
+            )
+            return 1
 
     try:
         if args.no_console:
@@ -299,6 +340,25 @@ def main() -> int:
                 )
                 continue
 
+            if command == "voice-status":
+                print(
+                    json.dumps(
+                        {
+                            "clients": voice.client_count(),
+                            "field_packets": voice.field_packets,
+                            "control_packets": voice.control_packets,
+                            "dropped_packets": voice.dropped_packets,
+                            "listen": (
+                                None
+                                if args.disable_voice_relay
+                                else f"{args.voice_host}:{args.voice_port}"
+                            ),
+                        },
+                        indent=2,
+                    )
+                )
+                continue
+
             if command == "ping":
                 if len(parts) != 2:
                     print(
@@ -334,6 +394,7 @@ def main() -> int:
         print()
 
     finally:
+        voice.close()
         bus.close()
 
     return 0

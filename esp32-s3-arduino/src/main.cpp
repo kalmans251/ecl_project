@@ -5,6 +5,7 @@
 #include "ble_link.h"
 #include "radar_manager.h"
 #include "emergency_button.h"
+#include "audio_session.h"
 
 void setup()
 {
@@ -63,6 +64,7 @@ void setup()
     controller_init();
     radar_manager_init();
     emergency_button_init();
+    audio_session_init();
 
     // --------------------------------------------------------
     // BLE

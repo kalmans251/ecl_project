@@ -258,6 +258,34 @@ typedef enum
 
 
 /* ============================================================
+ * AUDIO DATA / CODEC2
+ * ============================================================ */
+
+typedef enum
+{
+    AUDIO_DATA_EVENT =
+        0x01,
+
+    AUDIO_DATA_CODEC2 =
+        0x02
+
+} audio_data_type_t;
+
+
+typedef enum
+{
+    CODEC2_MODE_2400 =
+        0x01
+
+} codec2_mode_t;
+
+
+#define CODEC2_2400_BYTES_PER_FRAME      6
+#define CODEC2_MAX_FRAMES_PER_PACKET     8
+#define AUDIO_CODEC2_META_SIZE           7
+
+
+/* ============================================================
  * FRAME STRUCT
  * ============================================================ */
 
