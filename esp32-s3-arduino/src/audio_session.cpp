@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <string.h>
 
+#include "board_config.h"
 #include "protocol.h"
 #include "audio_session.h"
 #include "ble_link.h"
