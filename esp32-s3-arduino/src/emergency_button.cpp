@@ -7,6 +7,15 @@
 #include "ble_link.h"
 #include "emergency_button.h"
 
+// ============================================================
+// PRIVATE FUNCTION PROTOTYPES
+// ============================================================
+
+static void send_emergency_start(void);
+
+static void send_emergency_cancel(void);
+
+static void handle_long_press(void);
 
 // ============================================================
 // STATE
@@ -65,79 +74,6 @@ static void write_u32_be(
 
     dst[3] =
         (uint8_t)value;
-}
-
-
-// ============================================================
-// SEND EMERGENCY
-// ============================================================
-
-static void send_emergency_event(void)
-{
-    protocol_frame_t frame =
-        {};
-
-
-    frame.railing_id =
-        RAILING_ID;
-
-    frame.src =
-        NODE_S3;
-
-    frame.dst =
-        NODE_P4;
-
-    frame.service =
-        SERVICE_EMERGENCY;
-
-    frame.command =
-        CMD_START;
-
-    frame.length =
-        5;
-
-
-    frame.payload[0] =
-        EMERGENCY_SOURCE_BUTTON;
-
-
-    write_u32_be(
-        &frame.payload[1],
-        s_emergency_seq
-    );
-
-
-    Serial.printf(
-        "[EMERGENCY] BUTTON ACTIVE seq=%lu\n",
-        (unsigned long)
-            s_emergency_seq
-    );
-
-
-    if (
-        ble_send_frame(
-            &frame
-        )
-    )
-    {
-        s_emergency_seq++;
-
-
-        if (
-            s_emergency_seq ==
-            0
-        )
-        {
-            s_emergency_seq =
-                1;
-        }
-    }
-    else
-    {
-        Serial.println(
-            "[EMERGENCY] BLE send failed"
-        );
-    }
 }
 
 
@@ -281,9 +217,6 @@ void emergency_button_process(void)
     s_long_press_consumed =
         false;
         
-    s_active_emergency_seq =
-        0;
-        
     s_button_down_ms =
         0;
 }
@@ -309,8 +242,6 @@ void emergency_button_clear(void)
     s_emergency_active =
         false;
 
-    s_button_down =
-        false;
 
     s_button_down_ms =
         0;
