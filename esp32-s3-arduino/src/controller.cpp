@@ -7,6 +7,7 @@
 #include "ble_link.h"
 #include "radar_manager.h"
 #include "emergency_button.h"
+#include "audio_session.h"
 
 void controller_init(void)
 {
@@ -19,6 +20,10 @@ static void handle_radar(
 );
 
 static void handle_emergency(
+    const protocol_frame_t *frame
+);
+
+static void handle_audio(
     const protocol_frame_t *frame
 );
 
@@ -255,8 +260,8 @@ void controller_handle(
 
         case SERVICE_AUDIO:
         {
-            Serial.println(
-                "[CTRL] AUDIO"
+            handle_audio(
+                frame
             );
 
             break;
@@ -284,6 +289,110 @@ void controller_handle(
         }
     }
 }
+
+// ============================================================
+// AUDIO
+// ============================================================
+
+static void handle_audio(
+    const protocol_frame_t *frame
+)
+{
+    switch (
+        frame->command
+    )
+    {
+        case CMD_START:
+        {
+            audio_session_start();
+            break;
+        }
+
+
+        case CMD_STOP:
+        {
+            audio_session_stop();
+            break;
+        }
+
+
+        case CMD_SET:
+        {
+            if (
+                frame->length <
+                1
+            )
+            {
+                break;
+            }
+
+
+            if (
+                !audio_session_set_direction(
+                    frame->payload[0]
+                )
+            )
+            {
+                Serial.printf(
+                    "[AUDIO] Invalid direction=%u\n",
+                    frame->payload[0]
+                );
+            }
+
+
+            break;
+        }
+
+
+        case CMD_STATUS_REQUEST:
+        {
+            protocol_frame_t response = {};
+
+            response.railing_id =
+                RAILING_ID;
+
+            response.src =
+                NODE_S3;
+
+            response.dst =
+                frame->src;
+
+            response.service =
+                SERVICE_AUDIO;
+
+            response.command =
+                CMD_STATUS_RESPONSE;
+
+            response.length =
+                2;
+
+            response.payload[0] =
+                audio_session_is_active()
+                    ?
+                    1
+                    :
+                    0;
+
+            response.payload[1] =
+                audio_session_get_direction();
+
+
+            ble_send_frame(
+                &response
+            );
+
+
+            break;
+        }
+
+
+        default:
+        {
+            break;
+        }
+    }
+}
+
 
 // ============================================================
 // RADAR
