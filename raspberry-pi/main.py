@@ -6,6 +6,7 @@ import logging
 import sys
 import time
 
+from audio import AudioManager
 from emergency import EmergencyManager
 from plc import PlcBus
 from protocol import Command, Frame, Node, Service
@@ -90,6 +91,10 @@ def main() -> int:
         railings,
     )
 
+    audio = AudioManager(
+        railings
+    )
+
     def on_frame(frame: Frame) -> None:
         if frame.railing_id == 0:
             LOG.warning(
@@ -112,6 +117,9 @@ def main() -> int:
         )
 
         if emergency.handle_frame(frame):
+            return
+
+        if audio.handle_frame(frame):
             return
 
         LOG.info(
