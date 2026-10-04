@@ -48,6 +48,16 @@ static bool
 static uint32_t
     s_active_emergency_seq =
         0;
+
+
+static bool
+    s_raw_pressed =
+        false;
+
+
+static uint32_t
+    s_raw_changed_ms =
+        0;
 // ============================================================
 // WRITE U32 BE
 // ============================================================
@@ -101,6 +111,12 @@ void emergency_button_init(void)
     s_button_down_ms =
         0;
 
+    s_raw_pressed =
+        false;
+
+    s_raw_changed_ms =
+        millis();
+
 
     s_emergency_seq =
         esp_random();
@@ -131,7 +147,7 @@ void emergency_button_init(void)
 
 void emergency_button_process(void)
 {
-    bool pressed =
+    bool raw_pressed =
         digitalRead(
             PIN_VOICE_CALL_BUTTON
         )
@@ -141,6 +157,43 @@ void emergency_button_process(void)
 
     uint32_t now =
         millis();
+
+
+    /*
+     * 50 ms debounce.
+     *
+     * Long wiring / noise previously produced repeated
+     * 1 ms press/release events. Only a level that remains
+     * stable for EMERGENCY_DEBOUNCE_MS is accepted.
+     */
+    if (
+        raw_pressed !=
+        s_raw_pressed
+    )
+    {
+        s_raw_pressed =
+            raw_pressed;
+
+        s_raw_changed_ms =
+            now;
+
+        return;
+    }
+
+
+    if (
+        now -
+        s_raw_changed_ms
+        <
+        EMERGENCY_DEBOUNCE_MS
+    )
+    {
+        return;
+    }
+
+
+    bool pressed =
+        s_raw_pressed;
 
 
     if (
