@@ -338,3 +338,58 @@ Pi 검사: raspberry-pi 디렉터리에서 `python -m unittest discover -s tests
 P4 호스트 검사: 저장소 루트에서 `python -m unittest discover -s hello-p4/tests -v`.
 호스트 검사는 실제 C 스케줄을 모의 UART로 검사하며 ESP-IDF 전체 빌드와
 물리 PLC 시험은 별도로 필요합니다.
+
+## Pi에서 현장 음성 직접 듣기 (PC 서버 불필요)
+
+`tools/voice_listen.py`는 같은 Pi의 기존 TCP 릴레이(127.0.0.1:9100)를
+수신해 libcodec2로 디코딩합니다. PLC UART는 main.py만 열며, 재생은 별도
+프로세스에서 수행하므로 PLC 수신 스레드에 디코딩/사운드 출력을 추가하지 않습니다.
+Pi에 USB 스피커 또는 USB 사운드카드와 스피커를 연결하세요.
+
+설치 (raspberry-pi 디렉터리):
+```bash
+sudo apt update
+sudo apt install libcodec2-dev libportaudio2 python3-venv
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-playback.txt
+python tools/voice_listen.py --list-devices
+```
+
+터미널 1 (기존 main.py가 실행 중이면 중복 실행하지 말고 그 콘솔 사용):
+```bash
+source .venv/bin/activate
+python main.py --port /dev/ttyAMA2 --voice-host 127.0.0.1
+```
+현장 비상 호출을 연결한 뒤 Pi 콘솔에서 `ptt 1 off`로 FIELD_TX를 확인합니다.
+`--disable-voice-relay`는 사용하지 않습니다. 외부 PC 접속도 필요하면 기존
+`--voice-host` 설정을 유지할 수 있습니다.
+
+터미널 2 (동일 raspberry-pi 디렉터리):
+```bash
+source .venv/bin/activate
+python tools/voice_listen.py --railing 1
+```
+출력 장치가 틀리면 장치 목록의 출력 가능한 번호를 선택하세요. 예:
+```bash
+python tools/voice_listen.py --railing 1 --device 2 --buffer-ms 600
+```
+
+첫 소리는 최소 600ms 분량을 모은 뒤 나옵니다(8프레임 패킷 4개는 640ms).
+원본 PCM은 8kHz·모노·16비트입니다. 기본 출력은 USB 장치 호환성을 위해
+샘플 반복으로 48kHz로 변환하며 음질을 높이는 처리는 아닙니다.
+장치가 지원하면 `--rate 8000` 또는 `--rate 16000`을 사용할 수 있습니다.
+
+5초마다 통계를 출력합니다:
+- `packets`: 선택 레일의 수신 패킷 수
+- `missing_packets`: 16비트 시퀀스 기준 누락 추정(PTT 전환/송신 재시작과 구분해 해석)
+- `buffer_underflows`: 재생 시작 후 PCM이 부족해 무음 출력·재버퍼링한 횟수
+- `device_underflows`: PortAudio가 보고한 출력 부족 횟수
+- `overflow_samples`: 지연이 2초를 넘지 않도록 버린 출력 샘플 수
+- `buffer_ms`: 현재 대기 PCM 분량, `resets`: 긴 공백/큰 시퀀스 차이로 재초기화한 횟수
+
+누락은 제한된 무음으로 채우며 원래 음성을 복원하지는 않습니다. 버퍼 부족이면
+`--buffer-ms 800`으로 비교해볼 수 있지만 전송 누락 자체를 해결하지는 못합니다.
+5분 연속 FIELD_TX에서 누락/부족/넘침 수치가 증가하는지와 실제 소리를 함께
+확인한 뒤 PTT on/off도 시험하세요. 통화가 끝나면 남은 버퍼가 짧게 재생될 수
+있습니다. Ctrl+C로 종료합니다. Pi 실물의 출력 장치와 음질은 현장 검증이 필요합니다.
