@@ -71,6 +71,11 @@ int plc_uart_send(
     );
 }
 
+bool plc_uart_wait_tx_done(uint32_t timeout_ms)
+{
+    return uart_wait_tx_done(PLC_UART_NUM, pdMS_TO_TICKS(timeout_ms)) == ESP_OK;
+}
+
 
 int plc_uart_receive(
     uint8_t *buffer,

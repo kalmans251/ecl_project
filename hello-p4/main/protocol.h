@@ -149,7 +149,10 @@ typedef enum
 {
     AUDIO_DATA_EVENT  = 0x01,
 
-    AUDIO_DATA_CODEC2 = 0x02
+    AUDIO_DATA_CODEC2 = 0x02,
+
+    // P4 -> Pi: [type, receive-window-ms high, receive-window-ms low].
+    AUDIO_DATA_CONTROL_WINDOW = 0x03
 
 } audio_data_type_t;
 

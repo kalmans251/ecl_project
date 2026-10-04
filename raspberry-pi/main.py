@@ -348,6 +348,7 @@ def main() -> int:
                             "field_packets": voice.field_packets,
                             "control_packets": voice.control_packets,
                             "dropped_packets": voice.dropped_packets,
+                            "network_dropped_packets": voice.network_dropped_packets,
                             "listen": (
                                 None
                                 if args.disable_voice_relay

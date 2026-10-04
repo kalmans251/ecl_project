@@ -306,3 +306,34 @@ The Pi only forwards:
 Packets that do not match the active half-duplex direction are dropped.
 
 The TCP relay currently has no authentication or encryption. Bind it only on a trusted LAN/VPN interface until the monitoring-server integration adds authenticated transport.
+# PLC 제어 창과 PTT 확인
+
+현장 송신 중 P4는 음성 2패킷마다 제어 창 프레임을 보내고 100ms 동안
+PLC 송신을 멈춥니다. Pi는 새 창에서 해당 레일의 PTT/통화 종료 명령을
+보냅니다. 음성이 없는 FIELD_TX 상태에서도 주기적으로 창을 제공합니다.
+PTT는 P4의 새 방향 변경 응답을 확인해야 성공으로 표시하며 최대 3회 시도합니다.
+TCP 음성 전송은 별도 스레드와 최대 2패킷 큐를 사용해 PLC 수신 지연을 줄입니다.
+
+P4와 Pi를 함께 업데이트해야 합니다. 구형 P4에서는 창을 받지 못해 시간
+초과됩니다. S3/WROOM은 이번 변경으로 다시 플래시할 필요가 없습니다.
+
+현장 시험:
+1. P4를 빌드/플래시하고 Pi 프로그램을 새 코드로 재시작합니다.
+2. 레일 1 통화에서 현장 음성이 들어오는 동안 `ptt 1 on`을 입력합니다.
+3. `PLC control TX in granted window rail=1 window=100ms`,
+   `[CALL] DIRECTION rail=1 CONTROL_TX`, `PTT ON rail=1`을 확인합니다.
+4. FIELD 음성 전달이 멈추는지 확인하고 `ptt 1 off`로 현장 송신을 재개합니다.
+   20회 반복하고 통화 종료도 시험합니다.
+5. 시간 초과/재시도 발생 시 Pi와 P4 로그를 함께 보관합니다.
+
+100ms는 초기값이며 실제 모뎀의 지연으로 검증해야 합니다. P4
+`main/board_config.h`의 `PLC_CONTROL_WINDOW_MS`(20~200ms)와
+`PLC_VOICE_PACKETS_PER_GRANT`로 조정합니다. 창을 늘리면 음성 처리량도
+점검해야 합니다. 여러 P4의 동시 송신을 조정하는 전체 버스 중재는 구현하지
+않습니다. 방향 응답 자체가 유실되면 실제 P4 방향과 Pi 상태가 달라질 수
+있으며, 확인되지 않은 요청은 성공으로 표시하지 않습니다.
+
+Pi 검사: raspberry-pi 디렉터리에서 `python -m unittest discover -s tests -v`.
+P4 호스트 검사: 저장소 루트에서 `python -m unittest discover -s hello-p4/tests -v`.
+호스트 검사는 실제 C 스케줄을 모의 UART로 검사하며 ESP-IDF 전체 빌드와
+물리 PLC 시험은 별도로 필요합니다.

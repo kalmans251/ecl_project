@@ -20,9 +20,15 @@ from railing import RailingManager
 class FakeBus:
     def __init__(self) -> None:
         self.sent = []
+        self.on_control = None
 
     def send_frame(self, frame: Frame) -> None:
         self.sent.append(frame)
+
+    def send_control_frame(self, frame, **kwargs):
+        self.sent.append(frame)
+        if self.on_control:
+            self.on_control(frame)
 
 
 class StateSyncTests(unittest.TestCase):
@@ -213,6 +219,14 @@ class StateSyncTests(unittest.TestCase):
             bus,
             railings,
         )
+        railings.call_started(1, CallOrigin.EMERGENCY, AudioDirection.FIELD_TX)
+        def acknowledge(frame):
+            if frame.command == Command.SET:
+                audio.handle_frame(Frame(1, Node.P4, Node.PI, Service.AUDIO,
+                    Command.DATA, bytes([AudioDataType.EVENT,
+                    AudioEvent.DIRECTION_CHANGED, CallOrigin.EMERGENCY,
+                    frame.payload[0]])))
+        bus.on_control = acknowledge
 
         audio.set_direction(
             1,

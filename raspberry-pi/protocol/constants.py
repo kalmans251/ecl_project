@@ -67,6 +67,7 @@ class AudioDirection(IntEnum):
 class AudioDataType(IntEnum):
     EVENT = 0x01
     CODEC2 = 0x02
+    CONTROL_WINDOW = 0x03
 
 
 class AudioEvent(IntEnum):
