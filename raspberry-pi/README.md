@@ -67,6 +67,9 @@ status
 status 1
 ping 1
 ack 1
+ptt 1 on
+ptt 1 off
+hangup 1
 quit
 ```
 
@@ -142,3 +145,32 @@ The exact order of the last two lines can be close together because both are que
 - `call.direction = 1` (FIELD_TX)
 
 P4 also sends call direction-change and call-ended events so the Pi cache can remain authoritative for the later Spring Boot monitoring layer.
+
+
+### PTT control-plane test
+
+The Codec2 audio payload is not implemented yet, but the half-duplex direction control can already be tested.
+
+After an emergency ACK starts a call:
+
+```text
+ptt 1 on
+```
+
+requests `CONTROL_TX` (control center -> field).
+
+```text
+ptt 1 off
+```
+
+returns to `FIELD_TX` (field -> control center).
+
+P4 confirms each direction change back to the Pi, so the cached `call.direction` value should change in `status 1`.
+
+To end the call:
+
+```text
+hangup 1
+```
+
+P4 should report `CALL_ENDED`, after which `status 1` shows `call.active = false`.
