@@ -28,8 +28,8 @@
 #define PLC_BAUD_RATE           9600
 
 // After granting Pi the bus, do not transmit any P4 frames for this interval.
-#define PLC_CONTROL_WINDOW_MS   100
-#define PLC_VOICE_PACKETS_PER_GRANT 2
+#define PLC_CONTROL_WINDOW_MS   200
+#define PLC_VOICE_PACKETS_PER_GRANT 4
 #define PLC_IDLE_GRANT_MS       200
 
 #define PLC_RX_BUF_SIZE         256

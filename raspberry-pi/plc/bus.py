@@ -153,16 +153,16 @@ class PlcBus:
                             and r.deadline > time.monotonic()), None)
             if request is None:
                 return
-            # Reserve 5 ms turnaround + 20 ms propagation/scheduling margin.
+            # Reserve 20 ms turnaround + 20 ms propagation/scheduling margin.
             duration_ms = len(request.frame.encode()) * 10 * 1000 / self.baudrate
-            if duration_ms + 25 > window_ms:
+            if duration_ms + 40 > window_ms:
                 return
             if not self._tx_lock.acquire(blocking=False):
                 return
             self._pending.remove(request)
         try:
             # Use a fixed short turnaround rather than the general TX guard.
-            time.sleep(0.005)
+            time.sleep(0.020)
             raw = request.frame.encode()
             written = serial_port.write(raw)
             serial_port.flush()
