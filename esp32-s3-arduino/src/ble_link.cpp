@@ -13,6 +13,7 @@
 #include "protocol_parser.h"
 #include "controller.h"
 #include "ble_link.h"
+#include "audio_session.h"
 
 
 // ============================================================
@@ -38,6 +39,10 @@ static BLECharacteristic *tx_characteristic =
 
 static volatile bool ble_connected =
     false;
+
+static volatile uint16_t ble_peer_mtu = 23;
+static volatile bool ble_disconnect_pending = false;
+static bool ble_notify_submitted = false;
 
 
 // ============================================================
@@ -77,6 +82,7 @@ class ServerCallbacks :
         BLEServer *server
     ) override
     {
+        ble_peer_mtu = 23;
         ble_connected =
             true;
 
@@ -114,6 +120,8 @@ class ServerCallbacks :
         BLEServer *server
     ) override
     {
+        ble_disconnect_pending = true;
+        ble_peer_mtu = 23;
         ble_connected =
             false;
 
@@ -149,6 +157,10 @@ class ServerCallbacks :
         Serial.println(
             "[BLE] Advertising restarted"
         );
+    }
+    void onMtuChanged(BLEServer *, esp_ble_gatts_cb_param_t *param) override
+    {
+        if (param != nullptr) ble_peer_mtu = param->mtu.mtu;
     }
 };
 
@@ -266,6 +278,15 @@ class RxCallbacks :
     }
 };
 
+class TxCallbacks : public BLECharacteristicCallbacks
+{
+    void onStatus(BLECharacteristic *, Status status, uint32_t) override
+    {
+        // Arduino 2.0.17 reports notification submission synchronously.
+        ble_notify_submitted = status == Status::SUCCESS_NOTIFY;
+    }
+};
+
 
 // ============================================================
 // BLE INIT
@@ -376,6 +397,7 @@ void ble_link_init(void)
     tx_characteristic->addDescriptor(
         new BLE2902()
     );
+    tx_characteristic->setCallbacks(new TxCallbacks());
 
 
     // --------------------------------------------------------
@@ -514,21 +536,26 @@ bool ble_send_frame(
     }
 
 
-    /*
-     * 현재는 MTU 185이므로
-     * 최대 frame 138B를 그대로 전송한다.
-     *
-     * 이번 테스트에서 여전히 64/128B가 끊긴다면
-     * 다음 단계에서 여기만 chunking 하면 된다.
-     */
+    // Preferred MTU is a request. Use the negotiated peer MTU, with
+    // 20-byte chunks at the default MTU of 23. WROOM parses a byte stream.
+    uint16_t mtu = ble_peer_mtu;
+    size_t chunk_size = mtu >= 23 ? mtu - 3 : 20;
+    for (size_t offset = 0; offset < (size_t)length; offset += chunk_size) {
+        if (!ble_connected) return false;
+        size_t count = (size_t)length - offset;
+        if (count > chunk_size) count = chunk_size;
+        tx_characteristic->setValue(buffer + offset, count);
+        ble_notify_submitted = false;
+        tx_characteristic->notify();
+        if (!ble_notify_submitted) return false;
+    }
 
-    tx_characteristic->setValue(
-        buffer,
-        length
-    );
-
-
-    tx_characteristic->notify();
+    // Per-packet UART logging competes with continuous voice transmission.
+    static uint32_t voice_packets = 0;
+    if (frame->service == SERVICE_AUDIO && frame->command == CMD_DATA
+        && frame->length > 0 && frame->payload[0] == AUDIO_DATA_CODEC2) {
+        if (++voice_packets != 1 && voice_packets % 25 != 0) return true;
+    }
 
 
     Serial.printf(
@@ -566,6 +593,12 @@ bool ble_send_frame(
 
 void ble_link_process(void)
 {
+    // Consume disconnect in loop context, including a fast reconnect
+    // that occurred between two loop iterations.
+    if (ble_disconnect_pending) {
+        ble_disconnect_pending = false;
+        audio_session_stop();
+    }
     if (
         ble_rx_stream ==
         nullptr

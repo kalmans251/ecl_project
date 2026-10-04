@@ -145,7 +145,7 @@ int protocol_encode(
 #define AUDIO_DATA_EVENT                0x01
 #define AUDIO_DATA_CODEC2               0x02
 
-#define CODEC2_MODE_2400                0x01
+#define AUDIO_CODEC2_MODE_2400          0x01
 
 #define CODEC2_2400_BYTES_PER_FRAME     6
 #define CODEC2_MAX_FRAMES_PER_PACKET    8

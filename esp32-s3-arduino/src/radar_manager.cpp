@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include "audio_session.h"
 #include <HardwareSerial.h>
 
 #include "esp_system.h"
@@ -409,6 +410,7 @@ static void send_new_person(
     uint8_t radar_id
 )
 {
+    if (audio_session_is_active()) return;
     protocol_frame_t frame =
         {};
 
@@ -591,6 +593,7 @@ static void send_radar_detail(
     const radar_state_t *state
 )
 {
+    if (audio_session_is_active()) return;
     if (
         !s_detail_enabled
     )
