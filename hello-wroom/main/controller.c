@@ -6,6 +6,7 @@
 
 #include "music_player.h"
 #include "emergency_alert.h"
+#include "voice_session.h"
 
 #include "router.h"
 #include "sd_card.h"
@@ -451,6 +452,123 @@ static void handle_music(
             );
 
 
+            break;
+        }
+    }
+}
+
+
+/* ============================================================
+ * AUDIO / CALL SESSION
+ * ============================================================ */
+
+static void handle_audio(
+    const protocol_frame_t *frame
+)
+{
+    switch (
+        frame->cmd
+    )
+    {
+        case CMD_START:
+        {
+            voice_session_start();
+            break;
+        }
+
+
+        case CMD_STOP:
+        {
+            voice_session_stop();
+            break;
+        }
+
+
+        case CMD_SET:
+        {
+            if (
+                frame->payload_len <
+                1
+            )
+            {
+                break;
+            }
+
+
+            if (
+                !voice_session_set_direction(
+                    (audio_direction_t)
+                    frame->payload[0]
+                )
+            )
+            {
+                ESP_LOGW(
+                    TAG,
+                    "Invalid audio direction=%u",
+                    (unsigned)
+                    frame->payload[0]
+                );
+            }
+
+
+            break;
+        }
+
+
+        case CMD_DATA:
+        {
+            if (
+                !voice_session_handle_codec2(
+                    frame->payload,
+                    frame->payload_len
+                )
+            )
+            {
+                ESP_LOGW(
+                    TAG,
+                    "Rejected AUDIO DATA len=%u",
+                    (unsigned)
+                    frame->payload_len
+                );
+            }
+
+
+            break;
+        }
+
+
+        case CMD_STATUS_REQUEST:
+        {
+            uint8_t payload[2];
+
+
+            payload[0] =
+                voice_session_is_active()
+                    ?
+                    1
+                    :
+                    0;
+
+
+            payload[1] =
+                (uint8_t)
+                voice_session_get_direction();
+
+
+            send_reply(
+                frame,
+                CMD_STATUS_RESPONSE,
+                payload,
+                sizeof(payload)
+            );
+
+
+            break;
+        }
+
+
+        default:
+        {
             break;
         }
     }
@@ -1054,6 +1172,17 @@ static void controller_task(
             case SERVICE_MUSIC:
             {
                 handle_music(
+                    &frame
+                );
+
+
+                break;
+            }
+
+
+            case SERVICE_AUDIO:
+            {
+                handle_audio(
                     &frame
                 );
 
