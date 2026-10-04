@@ -1308,3 +1308,77 @@ playlist_manager_get_group_track_count(
     return
         catalog->count;
 }
+
+/* ============================================================
+ * GET TRACK FILENAME
+ * ============================================================ */
+
+bool playlist_manager_get_track_filename(
+    music_group_t group,
+    uint16_t index,
+    char *out,
+    size_t out_size
+)
+{
+    if (
+        out == NULL ||
+        out_size == 0
+    )
+    {
+        return false;
+    }
+
+
+    playlist_group_catalog_t *catalog =
+        find_group(
+            group
+        );
+
+
+    if (
+        catalog == NULL
+    )
+    {
+        return false;
+    }
+
+
+    if (
+        index >=
+            catalog->count
+    )
+    {
+        return false;
+    }
+
+
+    const char *filename =
+        catalog->tracks[
+            index
+        ].filename;
+
+
+    size_t length =
+        strlen(
+            filename
+        );
+
+
+    if (
+        length + 1 >
+            out_size
+    )
+    {
+        return false;
+    }
+
+
+    memcpy(
+        out,
+        filename,
+        length + 1
+    );
+
+
+    return true;
+}

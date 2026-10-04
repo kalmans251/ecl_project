@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 #include "protocol.h"
 
@@ -83,4 +84,11 @@ uint16_t playlist_manager_get_total_track_count(void);
 
 uint16_t playlist_manager_get_group_track_count(
     music_group_t group
+);
+
+bool playlist_manager_get_track_filename(
+    music_group_t group,
+    uint16_t index,
+    char *out,
+    size_t out_size
 );

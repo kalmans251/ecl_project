@@ -208,6 +208,217 @@ static void handle_system(
             break;
         }
 
+        case CMD_DATA:
+        {
+            if (
+                frame->payload_len <
+                1
+            )
+            {
+                break;
+            }
+
+
+            uint8_t type =
+                frame->payload[0];
+
+
+            /* ========================================================
+            * TRACK REQUEST
+            * ======================================================== */
+
+            if (
+                type ==
+                    SD_DATA_TRACK_REQUEST
+            )
+            {
+                if (
+                    frame->payload_len <
+                    4
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "SD track request too short"
+                    );
+
+
+                    break;
+                }
+
+
+                if (
+                    !sd_manager_is_ready()
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "SD track request rejected: SD not ready"
+                    );
+
+
+                    break;
+                }
+
+
+                music_group_t group =
+                    (music_group_t)
+                    frame->payload[1];
+
+
+                uint16_t index =
+                    (
+                        (uint16_t)
+                        frame->payload[2]
+                        <<
+                        8
+                    )
+                    |
+                    frame->payload[3];
+
+
+                char filename[
+                    96
+                ];
+
+
+                if (
+                    !playlist_manager_get_track_filename(
+                        group,
+                        index,
+                        filename,
+                        sizeof(filename)
+                    )
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Track not found group=%u index=%u",
+                        (unsigned)group,
+                        (unsigned)index
+                    );
+
+
+                    break;
+                }
+
+
+                size_t filename_len =
+                    strlen(
+                        filename
+                    );
+
+
+                /*
+                * response header 9 bytes +
+                * filename 최대 96 bytes.
+                *
+                * 전체 128 bytes 이하.
+                */
+                if (
+                    9 +
+                    filename_len >
+                        PROTOCOL_MAX_PAYLOAD
+                )
+                {
+                    ESP_LOGW(
+                        TAG,
+                        "Track filename too long"
+                    );
+
+
+                    break;
+                }
+
+
+                uint8_t payload[
+                    PROTOCOL_MAX_PAYLOAD
+                ];
+
+
+                uint32_t version =
+                    playlist_manager_get_catalog_version();
+
+
+                payload[0] =
+                    SD_DATA_TRACK_RESPONSE;
+
+
+                payload[1] =
+                    (uint8_t)group;
+
+
+                payload[2] =
+                    (uint8_t)(
+                        index >> 8
+                    );
+
+
+                payload[3] =
+                    (uint8_t)(
+                        index
+                    );
+
+
+                payload[4] =
+                    (uint8_t)(
+                        version >> 24
+                    );
+
+                payload[5] =
+                    (uint8_t)(
+                        version >> 16
+                    );
+
+                payload[6] =
+                    (uint8_t)(
+                        version >> 8
+                    );
+
+                payload[7] =
+                    (uint8_t)(
+                        version
+                    );
+
+
+                payload[8] =
+                    (uint8_t)
+                    filename_len;
+
+
+                memcpy(
+                    &payload[9],
+                    filename,
+                    filename_len
+                );
+
+
+                send_reply(
+                    frame,
+
+                    CMD_DATA,
+
+                    payload,
+
+                    (uint8_t)(
+                        9 +
+                        filename_len
+                    )
+                );
+
+
+                ESP_LOGI(
+                    TAG,
+                    "TRACK RESP group=%u index=%u file=%s",
+                    (unsigned)group,
+                    (unsigned)index,
+                    filename
+                );
+            }
+
+
+            break;
+        }
 
         default:
         {

@@ -268,3 +268,22 @@ int protocol_decode(
     size_t buffer_len,
     protocol_frame_t *frame
 );
+
+/* ============================================================
+ * SD DATA TYPE
+ *
+ * SERVICE_SD + CMD_DATA
+ * ============================================================ */
+
+typedef enum
+{
+    SD_DATA_TRACK_REQUEST =
+        0x01,
+
+    SD_DATA_TRACK_RESPONSE =
+        0x02,
+
+    SD_DATA_CATALOG_CHANGED =
+        0x03
+
+} sd_data_type_t;
