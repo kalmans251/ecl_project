@@ -21,6 +21,7 @@ idf_component_register(
         "music_player.c"
         "emergency_alert.c"
         "voice_session.c"
+        "voice_decoder.c"
 
         "playlist_manager.c"
         "sd_manager.c"

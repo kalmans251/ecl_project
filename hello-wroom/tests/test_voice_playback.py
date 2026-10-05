@@ -6,9 +6,13 @@ import unittest
 import ctypes.util
 import os
 
+CODEC2_SRC = os.environ.get('ECL_TEST_CODEC2_SRC')
 CODEC2_LIB = os.environ.get('ECL_TEST_CODEC2_LIB') or ctypes.util.find_library('codec2')
 MAIN = Path(__file__).resolve().parents[1] / 'main'
 HEADERS = {
+'esp_heap_caps.h': '''#pragma once
+#define MALLOC_CAP_8BIT 1
+''',
 'freertos/FreeRTOS.h': '''#pragma once
 #include <stdint.h>
 typedef void *QueueHandle_t;
@@ -128,16 +132,17 @@ int main(void) {
 '''
 
 class VoicePlaybackTests(unittest.TestCase):
-    @unittest.skipUnless(CODEC2_LIB, 'requires libcodec2')
+    @unittest.skipUnless(CODEC2_LIB and CODEC2_SRC, 'requires libcodec2')
     def test_worker(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             for name, text in HEADERS.items():
+                if name == 'codec2.h': continue
                 p=root/name
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(text)
             source=root/'harness.c'
             source.write_text(HARNESS)
             binary=root/'test'
-            subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-I',str(root),'-I',str(MAIN),str(source),CODEC2_LIB if '/' in CODEC2_LIB else '-l:'+CODEC2_LIB,'-o',str(binary)],check=True)
+            subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-I',str(root),'-I',str(MAIN),'-I',CODEC2_SRC,str(source),str(MAIN/'voice_decoder.c'),CODEC2_LIB if '/' in CODEC2_LIB else '-l:'+CODEC2_LIB,'-o',str(binary)],check=True)
             subprocess.run([str(binary)],check=True,timeout=5)
