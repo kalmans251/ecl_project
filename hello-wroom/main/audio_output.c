@@ -106,6 +106,12 @@ bool audio_output_init(
         );
 
 
+    /* Music PAUSE stops feeding PCM while I2S remains enabled. Clear each
+     * completed TX buffer so DMA underrun emits silence, not stale music.
+     * This also silences gaps between tracks without changing resume position.
+     */
+    chan_config.auto_clear_after_cb = true;
+
     esp_err_t err =
         i2s_new_channel(
             &chan_config,

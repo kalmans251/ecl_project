@@ -59,3 +59,7 @@ The attached field trace showed queue spinlocks with corrupted values followed
 by an interrupt watchdog panic; stack overflow is a concrete defect consistent
 with this trace. Hardware retesting must confirm that the panic is resolved and
 that adequate heap and stack headroom remain. Do not disable the watchdog.
+
+## Silence when PCM supply pauses
+
+I2S TX uses auto_clear_after_cb so completed DMA buffers are cleared when no new PCM arrives. MUSIC -> BASIC/WEATHER pauses the MP3 worker; I2S may remain enabled, but old music samples must not repeat. Test transitions in both directions, user pause/resume, and call start/end. Already queued audio may briefly drain; this change prevents continuous stale-buffer looping.
