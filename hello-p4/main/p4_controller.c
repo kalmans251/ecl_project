@@ -596,6 +596,13 @@ void p4_controller_task(
         }
 
 
+        /* Pi general controls must not reconfigure hardware during a call. */
+        if (frame.src == NODE_PI && call_manager_is_active()
+                && frame.service != SERVICE_AUDIO && frame.service != SERVICE_EMERGENCY) {
+            ESP_LOGW(TAG, "General Pi command blocked during call service=%u", frame.service);
+            continue;
+        }
+
         switch (frame.service)
         {
             case SERVICE_SYSTEM:
@@ -1664,6 +1671,19 @@ static void handle_music(
                 }
             }
 
+
+            else if (type == MUSIC_SET_VOLUME) {
+                if (value > 100) {
+                    ESP_LOGW(TAG, "Volume rejected=%u", value);
+                    break;
+                }
+                protocol_frame_t volume = *frame;
+                volume.src = NODE_P4;
+                volume.dst = NODE_WROOM;
+                volume.length = 2;
+                xQueueSend(router_queue, &volume, portMAX_DELAY);
+                ESP_LOGI(TAG, "WROOM volume request=%u%%", value);
+            }
 
             /*
              * MUSIC_SET_GROUP는 Pi에서 직접 사용하지 않는다.

@@ -286,7 +286,10 @@ typedef enum
         0x01,
 
     MUSIC_SET_GROUP =
-        0x02
+        0x02,
+
+    MUSIC_SET_VOLUME =
+        0x03
 
 } music_set_type_t;
 

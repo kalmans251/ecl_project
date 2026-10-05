@@ -191,10 +191,14 @@ class LocalAudioTests(unittest.TestCase):
                 '--disable-voice-relay']
         with patch.object(sys, 'argv', argv), patch.dict(sys.modules, {'sounddevice': SD}), \
                 patch('main.PlcBus', return_value=bus), \
-                patch('builtins.input', side_effect=['ptt 1 on', 'ptt 1 off', 'hangup 1', 'quit']), \
+                patch('builtins.input', side_effect=['led 1 basic', 'ptt 1 on', 'ptt 1 off', 'hangup 1',
+                    'volume 1 101', 'volume 1 10', 'led 1 basic', 'query 1 wroom', 'quit']), \
                 redirect_stdout(io.StringIO()):
             self.assertEqual(main.main(), 0)
-        self.assertEqual([f.command for f in bus.sent], [Command.SET, Command.SET, Command.STOP])
+        self.assertEqual([f.command for f in bus.sent],
+            [Command.SET, Command.SET, Command.STOP, Command.SET, Command.SET, Command.STATUS_REQUEST])
+        self.assertEqual(bus.sent[3].payload, b'\x03\x0a')
+        self.assertEqual(bus.sent[-1].dst, Node.WROOM)
         self.assertTrue(bus.closed)
 
     def test_start_failure_closes_partial_resources(self):

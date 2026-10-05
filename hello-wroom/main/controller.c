@@ -5,6 +5,7 @@
 #include "board_config.h"
 
 #include "music_player.h"
+#include "audio_output.h"
 #include "emergency_alert.h"
 #include "voice_session.h"
 
@@ -443,6 +444,15 @@ static void handle_music(
                     );
                 }
             }
+            else if (type == MUSIC_SET_VOLUME) {
+                if (value > 100 || emergency_alert_is_active()) {
+                    ESP_LOGW(TAG, "Volume rejected value=%u alert=%u", value,
+                             emergency_alert_is_active());
+                    break;
+                }
+                audio_output_set_volume(value);
+            }
+
 
 
             break;

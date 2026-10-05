@@ -496,3 +496,72 @@ remains responsive, no old audio resumes after switching, AUX is silent during
 CONTROL_TX, and `voice-status` counters agree with audible playback. Host tests
 exercise real Codec2 with fake audio devices and a fake PLC, not physical audio
 or modem timing.
+
+
+## Device controls before monitoring integration
+
+These commands use the same `main.py` console, including `--local-audio` mode.
+Update Pi and flash P4 + WROOM from this change for the new volume protocol.
+No S3 firmware change is needed. Existing local default volumes are not edited.
+
+```text
+query 1 p4
+query 1 wroom
+query 1 s3
+power 1 ac
+power 1 battery
+power 1 on
+power 1 off
+projector 1 on
+projector 1 off
+led 1 on
+led 1 basic
+led 1 weather rain
+led 1 music
+led 1 off
+music 1 mode sequential
+music 1 mode shuffle
+music 1 mode age
+music 1 start
+music 1 pause
+music 1 resume
+music 1 next
+music 1 stop
+volume 1 10
+sleep 1 on
+sleep 1 off
+detection 1 radar
+detection 1 cctv
+```
+
+`power ac|battery` sends SET then START. `power on|off` applies/stops the
+currently configured mode; P4 AUTO power control is not implemented, so select
+AC or battery first. Weather choices are clear/cloudy/rain/snow. LED MUSIC mode
+and `music start` are distinct controls; choose LED MUSIC for music playback
+policy. Age playback and CCTV detection need their existing analysis input;
+selecting them does not provide a Pi-local CCTV/age implementation.
+Sleep uses the existing firmware policy/timeout (currently 10 seconds); this
+change does not alter wake logic or finish-at-track-end behavior.
+
+`volume 1 10` sets shared WROOM music/voice output gain to 10% via P4 using
+MUSIC/SET payload `[0x03, percent]`. Valid range is 0..100, held in RAM until
+reboot. Emergency alert gain still uses its existing separate configuration.
+The new setting does not alter source-code volume defaults. Test requests while
+idle: all general commands, including UART ping/status queries, are rejected
+while any cached call/emergency is active on the shared PLC bus or PTT
+confirmation is unresolved. They are discarded rather than saved for later.
+P4 also rejects general Pi commands during its own active call.
+
+`status` reads the existing Pi cache without UART traffic. `query` requests a
+live SYSTEM response, printed as `[DEVICE STATUS]`. P4's existing SYSTEM reply
+is only an alive byte; WROOM reports alive/SD mounted/music state/railing ID;
+other payloads are shown raw. These are not a full settings snapshot.
+General setters have no firmware ACK: `Request sent` confirms serial transmission,
+not physical application. Verify corresponding device logs and actual outputs.
+
+Suggested hardware test, outside a call: query the devices; set `volume 1 10`,
+`led 1 music`, sequential mode and start/pause/resume/next/stop music; test LED
+weather/basic and projector; test sleep/radar wake. During a call, try `led 1
+basic` and verify rejection while PTT still responds. Test configured power
+selection as a separate step. EQ data generation remains the next integration
+work item.

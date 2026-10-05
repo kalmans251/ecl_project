@@ -7,6 +7,7 @@ import sys
 import time
 
 from audio import AudioManager
+from device_control import DeviceControls, HELP as DEVICE_HELP, device_status
 from emergency import EmergencyManager
 from plc import PlcBus
 from protocol import (
@@ -93,6 +94,7 @@ def parse_args() -> argparse.Namespace:
 def print_help() -> None:
     print(
         "\nCommands:\n"
+        + DEVICE_HELP +
         "  status [railing_id]  show cached railing state\n"
         "  ack <railing_id>     acknowledge active emergency\n"
         "  ping <railing_id>    send SYSTEM/PING to P4\n"
@@ -147,6 +149,7 @@ def main() -> int:
         port=args.voice_port,
     )
 
+    controls = DeviceControls(bus, railings, voice)
     local_audio = None
 
     def on_frame(frame: Frame) -> None:
@@ -179,6 +182,11 @@ def main() -> int:
             return
 
         if voice.handle_plc_frame(frame):
+            return
+
+        status_message = device_status(frame)
+        if status_message is not None:
+            print("\n" + status_message)
             return
 
         LOG.info(
@@ -389,31 +397,13 @@ def main() -> int:
                 )
                 continue
 
-            if command == "ping":
-                if len(parts) != 2:
-                    print(
-                        "usage: ping <railing_id>"
-                    )
-                    continue
-
-                railing_id = int(
-                    parts[1],
-                    0,
-                )
-
-                bus.send_frame(
-                    Frame(
-                        railing_id=railing_id,
-                        src=Node.PI,
-                        dst=Node.P4,
-                        service=Service.SYSTEM,
-                        command=Command.PING,
-                    )
-                )
-
-                print(
-                    f"PING sent rail={railing_id}"
-                )
+            try:
+                result = controls.execute(parts)
+            except (ValueError, RuntimeError, OSError) as exc:
+                print(f"Control failed: {exc}")
+                continue
+            if result is not None:
+                print(result)
                 continue
 
             print(
