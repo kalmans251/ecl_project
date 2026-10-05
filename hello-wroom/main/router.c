@@ -50,6 +50,11 @@ bool router_enqueue(
 }
 
 
+bool router_try_enqueue(const protocol_frame_t *frame)
+{
+    return s_router_queue && frame && xQueueSend(s_router_queue, frame, 0) == pdTRUE;
+}
+
 /* ============================================================
  * ROUTER TASK
  * ============================================================ */

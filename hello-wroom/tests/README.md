@@ -13,3 +13,5 @@ Hardware: rebuild and flash WROOM, establish the call, run `ptt 1 on`, then `pyt
 Voice PCM remains Codec2 8kHz; I2S is 16kHz stereo using two copies per mono sample (zero-order hold). The worker test checks exact ramp samples, stereo duplication, silence, and 20ms frame size. `pcm_peak` is the decoded packet peak before volume scaling (0 means silent PCM; range 0..32768). It does not verify the physical DAC output.
 
 The audio-output test compiles actual audio_output.c with driver substitutes and models the ESP-IDF TX auto-clear contract: after music stops supplying PCM, completed DMA descriptors must emit zero rather than repeat old samples. It also checks resume, zero volume, rate change and channel reinitialization. Hardware pause/underrun timing still needs board testing.
+
+The music EQ tests compile the actual analyzer and forwarding wrapper. They check tone-band selection, input sample rates, volume scaling, reporting cadence, eight-byte protocol framing, queue-full behavior, call suppression, clearing, and P4 expiry including timer wraparound. Physical LED output and playback timing require the hardware procedure in MUSIC_EQ_TEST.md.

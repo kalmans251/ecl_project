@@ -19,6 +19,8 @@ idf_component_register(
 
         "audio_output.c"
         "music_player.c"
+        "music_eq.c"
+        "music_eq_analyzer.c"
         "emergency_alert.c"
         "voice_session.c"
         "voice_decoder.c"
