@@ -21,13 +21,7 @@ bool voice_session_is_active(void);
 
 audio_direction_t voice_session_get_direction(void);
 
-/*
- * Accepts one SERVICE_AUDIO/CMD_DATA payload.
- *
- * The Codec2 decoder is intentionally not implemented yet.
- * For now this validates/counts CONTROL_TX Codec2 packets so
- * the Pi -> PLC -> P4 -> WROOM relay can be tested end-to-end.
- */
+/* Validate and enqueue CONTROL_TX packets for the dedicated playback task. */
 bool voice_session_handle_codec2(
     const uint8_t *payload,
     size_t length

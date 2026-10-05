@@ -8,7 +8,32 @@
 #include "esp_log.h"
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
+
+static portMUX_TYPE s_owner_lock = portMUX_INITIALIZER_UNLOCKED;
+static TaskHandle_t s_owner;
+static bool output_allowed(void)
+{
+    portENTER_CRITICAL(&s_owner_lock);
+    bool allowed = !s_owner || s_owner == xTaskGetCurrentTaskHandle();
+    portEXIT_CRITICAL(&s_owner_lock);
+    return allowed;
+}
+bool audio_output_claim(void)
+{
+    portENTER_CRITICAL(&s_owner_lock);
+    bool allowed = !s_owner || s_owner == xTaskGetCurrentTaskHandle();
+    if (allowed) s_owner = xTaskGetCurrentTaskHandle();
+    portEXIT_CRITICAL(&s_owner_lock);
+    return allowed;
+}
+void audio_output_release(void)
+{
+    portENTER_CRITICAL(&s_owner_lock);
+    if (s_owner == xTaskGetCurrentTaskHandle()) s_owner = NULL;
+    portEXIT_CRITICAL(&s_owner_lock);
+}
 
 #define AUDIO_MAX_SAMPLES \
     2304
@@ -52,6 +77,8 @@ bool audio_output_init(
     uint32_t sample_rate
 )
 {
+    if (!output_allowed()) return false;
+
     if (
         sample_rate ==
         0
@@ -228,6 +255,8 @@ bool audio_output_set_sample_rate(
     uint32_t sample_rate
 )
 {
+    if (!output_allowed()) return false;
+
     if (
         !s_initialized ||
         s_tx_handle == NULL
@@ -309,6 +338,8 @@ bool audio_output_write(
     size_t sample_count
 )
 {
+    if (!output_allowed()) return false;
+
     if (
         !s_initialized ||
         s_tx_handle == NULL ||
@@ -393,6 +424,8 @@ void audio_output_set_volume(
     uint8_t volume_percent
 )
 {
+    if (!output_allowed()) return;
+
     if (
         volume_percent >
         100
@@ -433,6 +466,8 @@ uint32_t audio_output_get_sample_rate(void)
 
 void audio_output_deinit(void)
 {
+    if (!output_allowed()) return;
+
     if (
         s_tx_handle !=
         NULL

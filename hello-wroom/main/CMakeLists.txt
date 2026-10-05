@@ -30,6 +30,7 @@ idf_component_register(
         "."
 
     REQUIRES
+        codec2
         esp_driver_uart
 
         esp_driver_spi

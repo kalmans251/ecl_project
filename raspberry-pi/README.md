@@ -393,3 +393,49 @@ python tools/voice_listen.py --railing 1 --device 2 --buffer-ms 600
 5분 연속 FIELD_TX에서 누락/부족/넘침 수치가 증가하는지와 실제 소리를 함께
 확인한 뒤 PTT on/off도 시험하세요. 통화가 끝나면 남은 버퍼가 짧게 재생될 수
 있습니다. Ctrl+C로 종료합니다. Pi 실물의 출력 장치와 음질은 현장 검증이 필요합니다.
+
+## Pi → WROOM 스피커 (마이크 또는 테스트 톤)
+
+Pi의 3.5mm 잭은 출력 전용입니다. 마이크 송신에는 USB 마이크/USB 사운드카드
+입력 등이 필요합니다. 마이크가 없어도 테스트 톤으로 역방향 경로를 시험할 수 있습니다.
+
+먼저 새 WROOM 펌웨어를 빌드/플래시하세요. P4/S3 펌웨어 변경은 없습니다.
+WROOM I2S 출력은 기존 설정 BCLK=GPIO32, LRCK=GPIO33, DOUT=GPIO27이며
+기존 I2S DAC/앰프와 스피커가 필요합니다. 일반 아날로그 앰프에는 I2S DAC를
+거쳐 연결해야 합니다. 이 코드는 WROOM GPIO에서 스피커를 직접 구동하지 않습니다.
+
+Pi에서 기존 venv를 활성화하고 `requirements-playback.txt`를 설치합니다.
+기존 main.py 한 개만 실행하고 현장 호출을 연결합니다. Pi 콘솔에서:
+```text
+ptt 1 on
+```
+`[CALL] DIRECTION rail=1 CONTROL_TX`와 `PTT ON`을 확인한 뒤 다른 터미널에서:
+```bash
+source .venv/bin/activate
+python tools/voice_send.py --railing 1 --tone --seconds 10
+```
+440Hz 테스트 톤을 Codec2로 인코딩합니다. Codec2는 음성 코덱이므로 톤이 원음과
+똑같이 들리지는 않습니다. Pi의 `CONTROL Codec2 -> PLC` 로그와 WROOM의
+`Codec2 PLAY` 로그, 실제 스피커 출력을 함께 확인하세요. 처음 약 480ms의
+패킷을 모읍니다. 큐 부족/누락/가득 참/I2S 실패는 WROOM 로그에 표시합니다.
+
+마이크 장치 확인과 송신:
+```bash
+python tools/voice_send.py --list-devices
+python tools/voice_send.py --railing 1 --device 2 --seconds 30
+```
+`--device 2`는 예시이며 반드시 입력 채널이 있는 실제 장치 번호로 바꿉니다.
+기본 캡처는 48kHz·모노이며 20ms 단위의 간단한 평균 다운샘플링으로 8kHz를
+만듭니다. 입력 장치가 지원하면 `--rate 8000`으로 원래 샘플률을 사용할 수
+있습니다. 8프레임/160ms마다 전송합니다. `sent_packets`는 TCP 전달 수이며
+WROOM 수신·재생 성공을 보장하는 수치가 아닙니다. 캡처 부족/큐 버림도 표시합니다.
+
+Ctrl+C 또는 `--seconds` 종료는 송신만 중지하며 PTT를 바꾸지 않습니다.
+송신 종료 뒤 main.py 콘솔에서 `ptt 1 off`로 현장 마이크 방향에 복귀하세요.
+송신 프로그램을 다시 실행할 때는 `ptt off`→`ptt on`으로 WROOM 세션 시퀀스를
+초기화하세요. 한 레일에는 송신 클라이언트를 하나만 사용합니다.
+
+WROOM은 통화 중 음악/비상음 제어를 거절하며, CONTROL_TX 재생 시 기존 음악을
+일시 정지하고 I2S 출력을 전용 태스크가 사용합니다. 방향 변경/통화 종료 시
+대기 음성을 폐기하고 출력을 반환합니다. 음악 재개는 기존 P4 제어 흐름을 따릅니다.
+Pi 마이크 소리·WROOM 출력·반복 PTT 전환은 실물에서 검증해야 합니다.
