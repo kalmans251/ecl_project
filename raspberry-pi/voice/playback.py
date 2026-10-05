@@ -112,3 +112,20 @@ class PlaybackBuffer:
                         playing=self.playing, buffer_underflows=self.underflows,
                         device_underflows=self.portaudio_underflows,
                         overflow_samples=self.overflow_samples)
+
+
+class Codec2Encoder(Codec2Decoder):
+    def __init__(self):
+        super().__init__()
+        self.lib.codec2_encode.argtypes = [C.c_void_p, C.POINTER(C.c_ubyte), C.POINTER(C.c_short)]
+        self.lib.codec2_encode.restype = None
+
+    def encode(self, pcm: bytes) -> bytes:
+        if len(pcm) != 320:
+            raise ValueError('Codec2 2400 requires 160 int16 samples per frame')
+        if not self.state:
+            raise RuntimeError('Encoder is closed')
+        samples = (C.c_short * 160).from_buffer_copy(pcm)
+        bits = (C.c_ubyte * 6)()
+        self.lib.codec2_encode(self.state, bits, samples)
+        return bytes(bits)

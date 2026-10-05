@@ -228,6 +228,12 @@ static void handle_music(
     const protocol_frame_t *frame
 )
 {
+    if (voice_session_is_active() && frame->cmd != CMD_STOP
+            && frame->cmd != CMD_PAUSE && frame->cmd != CMD_STATUS_REQUEST) {
+        ESP_LOGW(TAG, "Music command rejected during voice session");
+        return;
+    }
+
     switch (
         frame->cmd
     )
@@ -583,6 +589,11 @@ static void handle_emergency(
     const protocol_frame_t *frame
 )
 {
+    if (voice_session_is_active() && frame->cmd == CMD_START) {
+        ESP_LOGW(TAG, "Alert start rejected during voice session");
+        return;
+    }
+
     switch (
         frame->cmd
     )

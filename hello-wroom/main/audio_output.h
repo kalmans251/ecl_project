@@ -36,3 +36,6 @@ void audio_output_deinit(void);
 
 
 bool audio_output_is_initialized(void);
+/* Exclusive task ownership during voice playback. */
+bool audio_output_claim(void);
+void audio_output_release(void);
