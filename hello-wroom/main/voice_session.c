@@ -45,16 +45,17 @@ static void output_busy(bool busy)
     portEXIT_CRITICAL(&s_lock);
 }
 
-/* Stereo I2S: duplicate each of the 160 mono samples into L/R. */
+/* 8kHz Codec2 -> 16kHz I2S: hold each sample twice, duplicate L/R.
+ * 160 input samples become 320 stereo frames, still exactly 20ms. */
 static bool write_frame(const int16_t *mono, uint32_t generation)
 {
     if (!control_active(generation)) return false;
-    int16_t stereo[320];
+    int16_t stereo[640];
     for (unsigned i = 0; i < 160; ++i) {
-        stereo[2*i] = mono ? mono[i] : 0;
-        stereo[2*i+1] = mono ? mono[i] : 0;
+        int16_t sample = mono ? mono[i] : 0;
+        for (unsigned j = 0; j < 4; ++j) stereo[4*i+j] = sample;
     }
-    bool ok = audio_output_write(stereo, 320);
+    bool ok = audio_output_write(stereo, 640);
     if (!ok) vTaskDelay(pdMS_TO_TICKS(20));
     return ok;
 }
@@ -112,7 +113,7 @@ static void playback_task(void *arg)
                      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
             decoder = voice_decoder_create();
             if (!decoder || codec2_samples_per_frame(decoder) != 160
-                    || codec2_bits_per_frame(decoder) != 48 || !audio_output_init(8000)) {
+                    || codec2_bits_per_frame(decoder) != 48 || !audio_output_init(16000)) {
                 if (decoder) voice_decoder_destroy(decoder);
                 decoder = NULL;
                 if (restore_rate) audio_output_set_sample_rate(restore_rate);
@@ -130,7 +131,7 @@ static void playback_task(void *arg)
             for (unsigned i = 0; i < 60 && uxQueueMessagesWaiting(s_packets) < 2
                     && control_active(generation); ++i)
                 vTaskDelay(pdMS_TO_TICKS(10));
-            ESP_LOGI(TAG, "Codec2 playback 8000Hz stereo I2S ready");
+            ESP_LOGI(TAG, "Codec2 playback decode=8000Hz output=16000Hz stereo I2S ready");
         }
         uint16_t delta = (uint16_t)(packet.sequence - previous);
         if (have_sequence && (delta == 0 || delta >= 0x8000)) continue;
@@ -145,8 +146,14 @@ static void playback_task(void *arg)
         previous = packet.sequence;
         have_sequence = true;
         int16_t mono[160];
+        unsigned pcm_peak = 0;
         for (unsigned i = 0; i < packet.frames && control_active(generation); ++i) {
             codec2_decode(decoder, mono, packet.data + i * 6);
+            for (unsigned j = 0; j < 160; ++j) {
+                int32_t sample = mono[j];
+                unsigned magnitude = (unsigned)(sample < 0 ? -sample : sample);
+                if (magnitude > pcm_peak) pcm_peak = magnitude;
+            }
             if (!write_frame(mono, generation)) {
                 ESP_LOGW(TAG, "Voice I2S write failed/interrupted");
                 break;
@@ -154,9 +161,9 @@ static void playback_task(void *arg)
         }
         ++packets;
         if (packets == 1 || packets % 25 == 0)
-            ESP_LOGI(TAG, "Codec2 PLAY seq=%u packets=%u missing=%u empty=%u queued=%u stack_free_bytes=%u",
+            ESP_LOGI(TAG, "Codec2 PLAY seq=%u packets=%u missing=%u empty=%u queued=%u pcm_peak=%u stack_free_bytes=%u",
                      packet.sequence, packets, missing, underflows,
-                     (unsigned)uxQueueMessagesWaiting(s_packets),
+                     (unsigned)uxQueueMessagesWaiting(s_packets), pcm_peak,
                      (unsigned)uxTaskGetStackHighWaterMark(NULL));
     }
 }

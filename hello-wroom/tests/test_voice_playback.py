@@ -60,7 +60,7 @@ HARNESS = r'''
 static jmp_buf finished;
 static voice_packet_t queued[12];
 static unsigned count, index_, writes, released;
-static bool music_playing, music_paused;
+static bool music_playing, music_paused, worker_started;
 static uint32_t restored_rate;
 static void (*worker)(void *);
 QueueHandle_t xQueueCreate(unsigned n, unsigned size) { assert(n==12 && size==sizeof(voice_packet_t)); return (void *)1; }
@@ -91,10 +91,15 @@ bool emergency_alert_is_active(void) { return false; }
 bool audio_output_claim(void) { return true; }
 void audio_output_release(void) { ++released; }
 void audio_output_deinit(void) {}
-bool audio_output_init(uint32_t rate) { assert(rate==8000); return true; }
+bool audio_output_init(uint32_t rate) { assert(rate==16000); return true; }
 bool audio_output_write(const int16_t *pcm, size_t n) {
-    assert(n==320);
-    for (unsigned i=0; i<160; ++i) assert(pcm[2*i]==pcm[2*i+1]);
+    assert(n==640);
+    for (unsigned i=0; i<160; ++i)
+        for (unsigned j=1; j<4; ++j) assert(pcm[4*i]==pcm[4*i+j]);
+    if (writes==0 && !worker_started)
+        for (unsigned i=0; i<160; ++i) assert(pcm[4*i]==(int16_t)(i*200-16000));
+    if (writes==1 && !worker_started)
+        for (unsigned i=0; i<640; ++i) assert(pcm[i]==0);
     ++writes;
     if (writes==8) voice_session_stop();
     return true;
@@ -102,6 +107,13 @@ bool audio_output_write(const int16_t *pcm, size_t n) {
 int main(void) {
     uint8_t payload[55]={AUDIO_DATA_CODEC2, 1, AUDIO_DIR_CONTROL_TX, 0, 1, 8, 6};
     voice_session_init();
+    s_active=true; s_direction=AUDIO_DIR_CONTROL_TX;
+    int16_t ramp[160];
+    for (unsigned i=0; i<160; ++i) ramp[i]=(int16_t)(i*200-16000);
+    assert(write_frame(ramp, s_generation));
+    assert(write_frame(NULL, s_generation));
+    writes=0;
+    s_active=false;
     assert(!voice_session_handle_codec2(payload, sizeof(payload)));
     assert(!voice_session_set_direction(AUDIO_DIR_CONTROL_TX)); // data/non-P4 SET cannot start call
     assert(!voice_session_sync_direction((audio_direction_t)99));
@@ -116,6 +128,7 @@ int main(void) {
     assert(old==s_generation && count==1); // retries must not flush audio
     for (unsigned i=1; i<12; ++i) assert(voice_session_handle_codec2(payload, 55));
     assert(!voice_session_handle_codec2(payload, 55));
+    worker_started=true;
     if (setjmp(finished)==0) worker(NULL);
     assert(writes==8 && released==1 && !voice_session_is_active());
     assert(!voice_session_handle_codec2(payload, 55));
@@ -124,6 +137,7 @@ int main(void) {
     voice_session_start();
     assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
     assert(voice_session_handle_codec2(payload, 55));
+    worker_started=true;
     if (setjmp(finished)==0) worker(NULL);
     assert(writes==8 && released==1 && music_paused && restored_rate==44100);
     puts("WROOM validation, queue bounds, real Codec2 decode, stereo PCM and stop: PASS");

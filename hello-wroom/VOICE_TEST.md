@@ -15,8 +15,11 @@ The dependency retains its source/license in the build directory; distribution
 must retain the applicable Codec2 license/source obligations.
 
 Stereo I2S uses the existing GPIO32 BCLK / GPIO33 LRCK / GPIO27 DOUT pins.
-Codec2 2400 mono PCM is duplicated to both channels at 8kHz with existing volume
-settings. Connect the existing I2S DAC/amplifier and powered speaker circuit.
+Codec2 2400 is decoded at 8kHz, then each sample is held twice and duplicated
+to both channels for 16kHz I2S output with existing volume settings.
+The 160-sample decoded frame becomes 320 stereo frames, preserving its 20ms duration.
+`pcm_peak` reports the decoded packet peak before volume scaling; zero indicates
+silent decoded PCM. A nonzero peak does not confirm physical DAC/speaker output. Connect the existing I2S DAC/amplifier and powered speaker circuit.
 
 The controller only validates/enqueues packets. A dedicated task prebuffers
 three packets (normally 480ms), decodes six-byte frames and writes 20ms PCM blocks.
@@ -27,8 +30,8 @@ voice owns it. Missing packets are reported and bounded silence may be inserted;
 original missing speech cannot be recovered. Queue/I2S errors are logged.
 
 See raspberry-pi/README.md for local Pi microphone and no-microphone tone tests.
-Host check (with libcodec2 installed), from repository root:
-`python -m unittest discover -s hello-wroom/tests -v`.
+Host checks use the pinned Codec2 source and library; see `tests/README.md` for
+the command and required environment variables.
 This compiles the actual session/worker C with RTOS/audio substitutes; hardware
 I2S output and real-time behavior still require board testing.
 
