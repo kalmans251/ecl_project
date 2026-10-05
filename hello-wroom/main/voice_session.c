@@ -10,6 +10,9 @@
 #include <string.h>
 
 static const char *TAG = "VOICE_SESSION";
+/* decode_2400 -> aks_to_M2 -> lpc_post_filter alone needs 15,344 bytes
+ * with the ESP32 compiler; leave room for FFT, worker and runtime calls. */
+#define VOICE_TASK_STACK_BYTES (32 * 1024)
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool s_active, s_output_busy;
 static audio_direction_t s_direction = AUDIO_DIR_FIELD_TX;
@@ -144,17 +147,20 @@ static void playback_task(void *arg)
         }
         ++packets;
         if (packets == 1 || packets % 25 == 0)
-            ESP_LOGI(TAG, "Codec2 PLAY seq=%u packets=%u missing=%u empty=%u queued=%u",
+            ESP_LOGI(TAG, "Codec2 PLAY seq=%u packets=%u missing=%u empty=%u queued=%u stack_free_bytes=%u",
                      packet.sequence, packets, missing, underflows,
-                     (unsigned)uxQueueMessagesWaiting(s_packets));
+                     (unsigned)uxQueueMessagesWaiting(s_packets),
+                     (unsigned)uxTaskGetStackHighWaterMark(NULL));
     }
 }
 
 void voice_session_init(void)
 {
     s_packets = xQueueCreate(12, sizeof(voice_packet_t));
-    if (!s_packets || xTaskCreate(playback_task, "codec2_play", 12288, NULL, 5, &s_task) != pdPASS)
-        ESP_LOGE(TAG, "Voice playback task allocation failed");
+    if (!s_packets || xTaskCreate(playback_task, "codec2_play", VOICE_TASK_STACK_BYTES, NULL, 5, &s_task) != pdPASS)
+        ESP_LOGE(TAG, "Voice playback task allocation failed stack=%u", (unsigned)VOICE_TASK_STACK_BYTES);
+    else
+        ESP_LOGI(TAG, "Voice playback task ready stack=%u", (unsigned)VOICE_TASK_STACK_BYTES);
 }
 
 static void change_session(bool active, audio_direction_t direction)

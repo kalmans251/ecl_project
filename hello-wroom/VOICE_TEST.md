@@ -43,3 +43,16 @@ P4 itself checks that a call is active before generating direction commands.
 Repeat `ptt on` after reboot to synchronize; repeated same-direction commands
 keep an already active audio queue intact. Initialization/allocation failures
 still require inspecting the full WROOM startup log.
+
+
+## Decoder stack size
+
+ESP32 compiler `-fstack-usage` for the pinned Codec2 source reports these nested
+frames: codec2_decode_2400 7008 bytes, aks_to_M2 3152 bytes, lpc_post_filter 5184
+bytes. Their sum is 15344 bytes before the worker, FFT and runtime call frames.
+The old 12288-byte task stack was insufficient. Playback now allocates 32768
+bytes and logs allocation success and `stack_free_bytes` after decoding.
+The attached field trace showed queue spinlocks with corrupted values followed
+by an interrupt watchdog panic; stack overflow is a concrete defect consistent
+with this trace. Hardware retesting must confirm that the panic is resolved and
+that adequate heap and stack headroom remain. Do not disable the watchdog.

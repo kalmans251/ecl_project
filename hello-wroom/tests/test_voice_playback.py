@@ -61,7 +61,7 @@ static uint32_t restored_rate;
 static void (*worker)(void *);
 QueueHandle_t xQueueCreate(unsigned n, unsigned size) { assert(n==12 && size==sizeof(voice_packet_t)); return (void *)1; }
 int xTaskCreate(void (*fn)(void *), const char *name, unsigned stack, void *arg, unsigned priority, TaskHandle_t *handle) {
-    (void)name; (void)stack; (void)arg; (void)priority; worker=fn; *handle=(void *)1; return pdPASS;
+    (void)name; assert(stack==32768); (void)arg; (void)priority; worker=fn; *handle=(void *)1; return pdPASS;
 }
 void vTaskDelay(unsigned ticks) { (void)ticks; }
 int xQueueSend(QueueHandle_t q, const void *p, unsigned ticks) {
