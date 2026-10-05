@@ -1278,7 +1278,7 @@ static play_result_t play_mp3_file(
             }
 
 
-            music_eq_feed(output, output_samples, info.hz, audio_output_get_volume());
+            music_eq_feed(output, output_samples, info.hz);
 
             /* ================================================
              * POSITION
@@ -1695,6 +1695,9 @@ bool music_player_init(void)
         return false;
     }
 
+
+    /* EQ is optional: a failed worker allocation must not stop music. */
+    music_eq_init();
 
     BaseType_t result =
         xTaskCreate(
