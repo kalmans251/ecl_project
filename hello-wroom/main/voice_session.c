@@ -3,7 +3,9 @@
 #include "music_player.h"
 #include "emergency_alert.h"
 #include "codec2.h"
+#include "voice_decoder.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
@@ -71,7 +73,7 @@ static void playback_task(void *arg)
         if (decoder && !control_active(generation)) {
             if (restore_rate) audio_output_set_sample_rate(restore_rate);
             else audio_output_deinit();
-            codec2_destroy(decoder);
+            voice_decoder_destroy(decoder);
             decoder = NULL;
             audio_output_release();
             output_busy(false);
@@ -105,16 +107,21 @@ static void playback_task(void *arg)
                 output_busy(false);
                 continue;
             }
-            decoder = codec2_create(CODEC2_MODE_2400);
+            ESP_LOGI(TAG, "Decoder heap before free=%u largest=%u",
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+            decoder = voice_decoder_create();
             if (!decoder || codec2_samples_per_frame(decoder) != 160
                     || codec2_bits_per_frame(decoder) != 48 || !audio_output_init(8000)) {
-                if (decoder) codec2_destroy(decoder);
+                if (decoder) voice_decoder_destroy(decoder);
                 decoder = NULL;
                 if (restore_rate) audio_output_set_sample_rate(restore_rate);
                 else audio_output_deinit();
                 audio_output_release();
                 output_busy(false);
-                ESP_LOGE(TAG, "Codec2/I2S initialization failed");
+                ESP_LOGE(TAG, "Codec2/I2S initialization failed heap_free=%u largest=%u",
+                         (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
+                         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
                 continue;
             }
             have_sequence = false;
