@@ -61,7 +61,7 @@ static uint32_t restored_rate;
 static void (*worker)(void *);
 QueueHandle_t xQueueCreate(unsigned n, unsigned size) { assert(n==12 && size==sizeof(voice_packet_t)); return (void *)1; }
 int xTaskCreate(void (*fn)(void *), const char *name, unsigned stack, void *arg, unsigned priority, TaskHandle_t *handle) {
-    (void)name; (void)stack; (void)arg; (void)priority; worker=fn; *handle=(void *)1; return pdPASS;
+    (void)name; assert(stack==32768); (void)arg; (void)priority; worker=fn; *handle=(void *)1; return pdPASS;
 }
 void vTaskDelay(unsigned ticks) { (void)ticks; }
 int xQueueSend(QueueHandle_t q, const void *p, unsigned ticks) {
@@ -99,13 +99,16 @@ int main(void) {
     uint8_t payload[55]={AUDIO_DATA_CODEC2, 1, AUDIO_DIR_CONTROL_TX, 0, 1, 8, 6};
     voice_session_init();
     assert(!voice_session_handle_codec2(payload, sizeof(payload)));
-    voice_session_start();
+    assert(!voice_session_set_direction(AUDIO_DIR_CONTROL_TX)); // data/non-P4 SET cannot start call
+    assert(!voice_session_sync_direction((audio_direction_t)99));
+    assert(!voice_session_is_active());
+    assert(voice_session_sync_direction(AUDIO_DIR_FIELD_TX));
     assert(!voice_session_handle_codec2(payload, sizeof(payload)));
-    assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
+    assert(voice_session_sync_direction(AUDIO_DIR_CONTROL_TX));
     assert(!voice_session_handle_codec2(payload, 54));
     assert(voice_session_handle_codec2(payload, 55));
     uint32_t old=s_generation;
-    assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
+    assert(voice_session_sync_direction(AUDIO_DIR_CONTROL_TX));
     assert(old==s_generation && count==1); // retries must not flush audio
     for (unsigned i=1; i<12; ++i) assert(voice_session_handle_codec2(payload, 55));
     assert(!voice_session_handle_codec2(payload, 55));

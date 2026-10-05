@@ -31,3 +31,28 @@ Host check (with libcodec2 installed), from repository root:
 `python -m unittest discover -s hello-wroom/tests -v`.
 This compiles the actual session/worker C with RTOS/audio substitutes; hardware
 I2S output and real-time behavior still require board testing.
+
+## Packets arrive but are rejected
+
+`Rejected AUDIO DATA len=55` alone does not identify the cause. New diagnostics
+print metadata, session active/direction, or missing playback task/queue.
+After WROOM reboot, its call state is lost while P4/Pi may still consider the
+call active. A valid AUDIO direction command from P4 now restores that local
+session. Ordinary data packets and non-P4 direction commands do not start calls.
+P4 itself checks that a call is active before generating direction commands.
+Repeat `ptt on` after reboot to synchronize; repeated same-direction commands
+keep an already active audio queue intact. Initialization/allocation failures
+still require inspecting the full WROOM startup log.
+
+
+## Decoder stack size
+
+ESP32 compiler `-fstack-usage` for the pinned Codec2 source reports these nested
+frames: codec2_decode_2400 7008 bytes, aks_to_M2 3152 bytes, lpc_post_filter 5184
+bytes. Their sum is 15344 bytes before the worker, FFT and runtime call frames.
+The old 12288-byte task stack was insufficient. Playback now allocates 32768
+bytes and logs allocation success and `stack_free_bytes` after decoding.
+The attached field trace showed queue spinlocks with corrupted values followed
+by an interrupt watchdog panic; stack overflow is a concrete defect consistent
+with this trace. Hardware retesting must confirm that the panic is resolved and
+that adequate heap and stack headroom remain. Do not disable the watchdog.

@@ -26,3 +26,6 @@ bool voice_session_handle_codec2(
     const uint8_t *payload,
     size_t length
 );
+
+/* Only for a direction command from P4, which validates the active call. */
+bool voice_session_sync_direction(audio_direction_t direction);

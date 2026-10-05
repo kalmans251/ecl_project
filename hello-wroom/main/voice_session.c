@@ -10,6 +10,9 @@
 #include <string.h>
 
 static const char *TAG = "VOICE_SESSION";
+/* decode_2400 -> aks_to_M2 -> lpc_post_filter alone needs 15,344 bytes
+ * with the ESP32 compiler; leave room for FFT, worker and runtime calls. */
+#define VOICE_TASK_STACK_BYTES (32 * 1024)
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool s_active, s_output_busy;
 static audio_direction_t s_direction = AUDIO_DIR_FIELD_TX;
@@ -144,17 +147,20 @@ static void playback_task(void *arg)
         }
         ++packets;
         if (packets == 1 || packets % 25 == 0)
-            ESP_LOGI(TAG, "Codec2 PLAY seq=%u packets=%u missing=%u empty=%u queued=%u",
+            ESP_LOGI(TAG, "Codec2 PLAY seq=%u packets=%u missing=%u empty=%u queued=%u stack_free_bytes=%u",
                      packet.sequence, packets, missing, underflows,
-                     (unsigned)uxQueueMessagesWaiting(s_packets));
+                     (unsigned)uxQueueMessagesWaiting(s_packets),
+                     (unsigned)uxTaskGetStackHighWaterMark(NULL));
     }
 }
 
 void voice_session_init(void)
 {
     s_packets = xQueueCreate(12, sizeof(voice_packet_t));
-    if (!s_packets || xTaskCreate(playback_task, "codec2_play", 12288, NULL, 5, &s_task) != pdPASS)
-        ESP_LOGE(TAG, "Voice playback task allocation failed");
+    if (!s_packets || xTaskCreate(playback_task, "codec2_play", VOICE_TASK_STACK_BYTES, NULL, 5, &s_task) != pdPASS)
+        ESP_LOGE(TAG, "Voice playback task allocation failed stack=%u", (unsigned)VOICE_TASK_STACK_BYTES);
+    else
+        ESP_LOGI(TAG, "Voice playback task ready stack=%u", (unsigned)VOICE_TASK_STACK_BYTES);
 }
 
 static void change_session(bool active, audio_direction_t direction)
@@ -178,8 +184,14 @@ static void change_session(bool active, audio_direction_t direction)
     }
 }
 
-void voice_session_start(void) { change_session(true, AUDIO_DIR_FIELD_TX); }
-void voice_session_stop(void) { change_session(false, AUDIO_DIR_FIELD_TX); }
+void voice_session_start(void) {
+    change_session(true, AUDIO_DIR_FIELD_TX);
+    ESP_LOGI(TAG, "CALL START -> FIELD_TX");
+}
+void voice_session_stop(void) {
+    change_session(false, AUDIO_DIR_FIELD_TX);
+    ESP_LOGI(TAG, "CALL STOP");
+}
 bool voice_session_set_direction(audio_direction_t direction)
 {
     if (direction != AUDIO_DIR_FIELD_TX && direction != AUDIO_DIR_CONTROL_TX) return false;
@@ -191,6 +203,22 @@ bool voice_session_set_direction(audio_direction_t direction)
     change_session(active, direction);
     ESP_LOGI(TAG, "DIRECTION -> %s", direction == AUDIO_DIR_CONTROL_TX ? "CONTROL_TX" : "FIELD_TX");
     return true;
+}
+bool voice_session_sync_direction(audio_direction_t direction)
+{
+    if (direction != AUDIO_DIR_FIELD_TX && direction != AUDIO_DIR_CONTROL_TX) return false;
+    if (direction == AUDIO_DIR_CONTROL_TX && (!s_task || !s_packets)) {
+        ESP_LOGW(TAG, "Reject P4 direction: playback task/queue unavailable");
+        return false;
+    }
+    portENTER_CRITICAL(&s_lock);
+    bool active = s_active;
+    portEXIT_CRITICAL(&s_lock);
+    if (!active) {
+        ESP_LOGW(TAG, "Restore call from P4 direction command after missing START/reboot");
+        voice_session_start();
+    }
+    return voice_session_set_direction(direction);
 }
 bool voice_session_is_active(void)
 {
@@ -212,14 +240,30 @@ bool voice_session_handle_codec2(const uint8_t *payload, size_t length)
         || payload[1] != CODEC2_MODE_2400 || payload[2] != AUDIO_DIR_CONTROL_TX
         || payload[5] == 0 || payload[5] > CODEC2_MAX_FRAMES_PER_PACKET
         || payload[6] != CODEC2_2400_BYTES_PER_FRAME
-        || length != AUDIO_CODEC2_META_SIZE + (size_t)payload[5] * 6 || !s_packets || !s_task)
+        || length != AUDIO_CODEC2_META_SIZE + (size_t)payload[5] * 6) {
+        if (payload && length >= AUDIO_CODEC2_META_SIZE)
+            ESP_LOGW(TAG, "Reject Codec2 metadata type=%u mode=%u direction=%u frames=%u bpf=%u len=%u",
+                     payload[0], payload[1], payload[2], payload[5], payload[6], (unsigned)length);
+        else
+            ESP_LOGW(TAG, "Reject Codec2 short/null payload len=%u", (unsigned)length);
         return false;
+    }
+    if (!s_packets || !s_task) {
+        ESP_LOGW(TAG, "Reject Codec2: playback task/queue unavailable");
+        return false;
+    }
     portENTER_CRITICAL(&s_lock);
     voice_packet_t packet = {.generation=s_generation,
         .sequence=((uint16_t)payload[3] << 8) | payload[4], .frames=payload[5]};
-    bool active = s_active && s_direction == AUDIO_DIR_CONTROL_TX;
+    bool session_active = s_active;
+    audio_direction_t session_direction = s_direction;
+    bool active = session_active && session_direction == AUDIO_DIR_CONTROL_TX;
     portEXIT_CRITICAL(&s_lock);
-    if (!active) return false;
+    if (!active) {
+        ESP_LOGW(TAG, "Reject Codec2 session active=%d session_dir=%u packet_dir=%u seq=%u",
+                 session_active, (unsigned)session_direction, payload[2], packet.sequence);
+        return false;
+    }
     memcpy(packet.data, payload + AUDIO_CODEC2_META_SIZE, packet.frames * 6);
     if (xQueueSend(s_packets, &packet, 0) != pdTRUE) {
         ESP_LOGW(TAG, "Voice queue full; packet dropped seq=%u", packet.sequence);
