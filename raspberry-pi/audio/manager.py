@@ -228,22 +228,32 @@ class AudioManager:
         self,
         railing_id: int,
     ) -> None:
-        self._bus.send_control_frame(
-            Frame(
-                railing_id=railing_id,
-                src=Node.PI,
-                dst=Node.P4,
-                service=Service.AUDIO,
-                command=Command.STOP,
-            ),
-            wait_for_window=(self._railings.get_call_direction(railing_id)
-                             == int(AudioDirection.FIELD_TX)),
-        )
-
-        LOG.info(
-            "CALL end request rail=%d",
-            railing_id,
-        )
+        with self._control_lock:
+            for attempt in range(1, self._attempts + 1):
+                current = self._railings.get_call_direction(railing_id)
+                if current is None:
+                    return
+                try:
+                    self._bus.send_control_frame(
+                        Frame(railing_id=railing_id, src=Node.PI, dst=Node.P4,
+                              service=Service.AUDIO, command=Command.STOP),
+                        wait_for_window=(current == int(AudioDirection.FIELD_TX)))
+                except TimeoutError:
+                    if attempt == self._attempts:
+                        raise
+                    continue
+                deadline = time.monotonic() + self._ack_timeout
+                with self._condition:
+                    while self._railings.get_call_direction(railing_id) is not None:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            break
+                        self._condition.wait(remaining)
+                    if self._railings.get_call_direction(railing_id) is None:
+                        LOG.info("CALL end confirmed rail=%d", railing_id)
+                        return
+                LOG.warning("No P4 hangup confirmation rail=%d attempt=%d", railing_id, attempt)
+            raise TimeoutError("Hangup was not confirmed by P4")
 
     @staticmethod
     def _direction_name(

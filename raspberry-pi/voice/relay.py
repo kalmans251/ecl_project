@@ -4,6 +4,8 @@ import logging
 import queue
 import socket
 import threading
+import time
+from contextlib import contextmanager
 
 from plc import PlcBus
 from protocol import (
@@ -30,8 +32,8 @@ class VoiceRelay:
     """
     Codec2 packet relay only.
 
-    No PCM processing and no Codec2 encode/decode happens
-    on the Raspberry Pi.
+    This relay never encodes/decodes PCM. Optional local audio is a separate
+    endpoint; network Codec2 bytes retain their original representation.
     """
 
     def __init__(
@@ -41,6 +43,13 @@ class VoiceRelay:
         host: str = "0.0.0.0",
         port: int = 9100,
     ) -> None:
+        self._state_lock = threading.Lock()
+        self._send_lock = threading.Lock()
+        self._transition_lock = threading.Lock()
+        self._transitioning = False
+        self._epoch = 0
+        self._field_handler = None
+        self._local_source = None
         self._bus = bus
         self._railings = railings
         self.host = host
@@ -59,6 +68,55 @@ class VoiceRelay:
         self.field_packets = 0
         self.control_packets = 0
         self.dropped_packets = 0
+
+    def set_local_source(self, railing_id) -> None:
+        self._local_source = railing_id
+
+    def set_field_handler(self, handler) -> None:
+        """Handler must only enqueue: invoked from the PLC reader."""
+        self._field_handler = handler
+
+    def control_paused(self) -> bool:
+        with self._state_lock:
+            return self._transitioning
+
+    def state_changed(self) -> None:
+        with self._state_lock:
+            self._epoch += 1
+
+    def audio_token(self, railing_id: int, direction: AudioDirection):
+        with self._state_lock:
+            if self._transitioning:
+                return None
+            epoch = self._epoch
+        if self._railings.get_call_direction(railing_id) != int(direction):
+            return None
+        return epoch
+
+    @contextmanager
+    def control_transition(self):
+        """Quiesce all voice sources before changing the shared PLC direction.
+
+        P4 may reply immediately to a command. Keep voice paused throughout
+        confirmation, not just during the serial write. Never use from RX.
+        """
+        with self._transition_lock:
+            with self._state_lock:
+                self._transitioning = True
+                self._epoch += 1
+            confirmed = False
+            try:
+                with self._send_lock:
+                    # Finish the current voice write, then allow modem turnaround.
+                    time.sleep(0.100)
+                yield
+                confirmed = True
+            finally:
+                with self._state_lock:
+                    self._epoch += 1
+                    self._transitioning = not confirmed
+                if not confirmed:
+                    LOG.warning("Voice paused after failed control request; retry PTT/hangup")
 
     def start(self) -> None:
         if self._server is not None:
@@ -229,6 +287,12 @@ class VoiceRelay:
             return True
 
         self.field_packets += 1
+        handler = self._field_handler
+        if handler is not None:
+            try:
+                handler(packet)
+            except Exception:
+                LOG.exception("Local FIELD sink failed; continuing compressed broadcast")
 
         self._broadcast(
             packet.encode_network()
@@ -249,7 +313,18 @@ class VoiceRelay:
 
         return True
 
-    def forward_control_packet(
+    def forward_control_packet(self, packet: VoicePacket, *, token=None) -> bool:
+        with self._send_lock:
+            if packet.railing_id == self._local_source and token is None:
+                self.dropped_packets += 1
+                return False
+            current = self.audio_token(packet.railing_id, AudioDirection.CONTROL_TX)
+            if current is None or (token is not None and token != current):
+                self.dropped_packets += 1
+                return False
+            return self._forward_control_packet(packet)
+
+    def _forward_control_packet(
         self,
         packet: VoicePacket,
     ) -> bool:

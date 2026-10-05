@@ -439,3 +439,60 @@ WROOM은 통화 중 음악/비상음 제어를 거절하며, CONTROL_TX 재생 �
 일시 정지하고 I2S 출력을 전용 태스크가 사용합니다. 방향 변경/통화 종료 시
 대기 음성을 폐기하고 출력을 반환합니다. 음악 재개는 기존 P4 제어 흐름을 따릅니다.
 Pi 마이크 소리·WROOM 출력·반복 PTT 전환은 실물에서 검증해야 합니다.
+
+
+## Integrated Pi USB microphone and AUX test
+
+Use one `main.py` process for serial ownership, PTT and local audio. Stop older
+`voice_send.py` / `voice_listen.py` processes first. Install the same optional
+playback dependencies used by those tools:
+
+```bash
+sudo apt install libcodec2-dev libportaudio2
+python -m pip install -r requirements-playback.txt
+python main.py --list-audio-devices
+python main.py --local-audio --audio-railing 1 --mic-device 1 --speaker-device 0
+```
+
+Device indices are examples: choose the current **GM20U USB Audio input** and
+**bcm2835 Headphones output** from the list. Output 0 was the headphones device
+in the Pi test; indices may change after USB reconnection. An output name can
+also be used: `--speaker-device "bcm2835 Headphones"` (the local-mode default).
+Connect the AUX powered speaker/amp as in the earlier Pi listening test.
+Use the project's active virtual environment for pip and main.py.
+
+After emergency ACK establishes a call:
+
+- `ptt 1 on`: after P4 confirmation, USB microphone PCM is encoded as Codec2 and
+  sent to WROOM. AUX playback is muted and its stale buffer cleared.
+- `ptt 1 off`: stop outbound voice before transmitting the command; after P4
+  confirmation, FIELD Codec2 is decoded locally and played through Pi AUX.
+- `hangup 1`: pause voice, request STOP and wait/retry for P4 CALL_ENDED.
+- `voice-status`: inspect local sent/received counts, input/queue drops, missing
+  packets, buffer/device underflows, local audio error and `control_paused`.
+- `quit`: close both PortAudio streams, join workers and close relay/UART.
+
+Only the selected railing uses the local mic/AUX endpoint. Calls and PTT state
+still come from the existing P4 protocol. Local capture callbacks never write
+PLC; FIELD decoding never runs in the PLC reader. Buffers are bounded and old
+samples are invalidated by PTT/state tokens. All CONTROL sources are paused
+through direction/hangup confirmation, with 100ms modem turnaround after the
+last voice write. This margin needs validation on the actual PLC modem.
+If confirmation fails, voice remains paused; retry `ptt` or `hangup` and inspect
+P4/grant logs. The local endpoint reserves the selected rail's CONTROL source,
+so a forgotten external mic sender cannot mix with it. Do not run separate voice
+tools in local mode.
+
+For a later server/monitoring deployment, omit `--local-audio`. The TCP relay
+continues accepting **already encoded Codec2 CONTROL packets**, forwarding their
+compressed data to PLC without PCM conversion. FIELD packets are always offered
+to TCP listeners in the original Codec2 network format even when local AUX
+playback is enabled. Server session/PTT orchestration must invoke the same
+pause/confirmation flow; a remote PTT command API is not introduced here.
+
+Hardware validation: talk in each direction for 2–3 minutes, switch PTT on/off
+10 times while speaking, and hang up during transmission. Check that control
+remains responsive, no old audio resumes after switching, AUX is silent during
+CONTROL_TX, and `voice-status` counters agree with audible playback. Host tests
+exercise real Codec2 with fake audio devices and a fake PLC, not physical audio
+or modem timing.

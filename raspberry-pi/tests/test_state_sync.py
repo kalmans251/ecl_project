@@ -226,6 +226,10 @@ class StateSyncTests(unittest.TestCase):
                     Command.DATA, bytes([AudioDataType.EVENT,
                     AudioEvent.DIRECTION_CHANGED, CallOrigin.EMERGENCY,
                     frame.payload[0]])))
+            elif frame.command == Command.STOP:
+                audio.handle_frame(Frame(1, Node.P4, Node.PI, Service.AUDIO,
+                    Command.DATA, bytes([AudioDataType.EVENT,
+                    AudioEvent.CALL_ENDED, CallOrigin.EMERGENCY, 0])))
         bus.on_control = acknowledge
 
         audio.set_direction(

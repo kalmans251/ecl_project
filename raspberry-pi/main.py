@@ -77,7 +77,17 @@ def parse_args() -> argparse.Namespace:
         help="Do not start the control-center Codec2 TCP relay",
     )
 
-    return parser.parse_args()
+    parser.add_argument('--local-audio', action='store_true',
+                        help='Enable PTT-gated Pi USB microphone and AUX playback')
+    parser.add_argument('--audio-railing', type=int, default=1)
+    parser.add_argument('--mic-device', help='USB microphone index or name')
+    parser.add_argument('--speaker-device', default='bcm2835 Headphones',
+                        help='AUX output index/name (default: bcm2835 Headphones)')
+    parser.add_argument('--list-audio-devices', action='store_true')
+    args = parser.parse_args()
+    if not 1 <= args.audio_railing <= 255:
+        parser.error('--audio-railing must be 1..255')
+    return args
 
 
 def print_help() -> None:
@@ -108,6 +118,11 @@ def main() -> int:
         ),
     )
 
+    if args.list_audio_devices:
+        import sounddevice as sd
+        print(sd.query_devices())
+        return 0
+
     railings = RailingManager()
 
     bus = PlcBus(
@@ -132,6 +147,8 @@ def main() -> int:
         port=args.voice_port,
     )
 
+    local_audio = None
+
     def on_frame(frame: Frame) -> None:
         if frame.railing_id == 0:
             LOG.warning(
@@ -154,9 +171,11 @@ def main() -> int:
         )
 
         if emergency.handle_frame(frame):
+            voice.state_changed()
             return
 
         if audio.handle_frame(frame):
+            voice.state_changed()
             return
 
         if voice.handle_plc_frame(frame):
@@ -193,6 +212,17 @@ def main() -> int:
             LOG.exception(
                 "Failed to start voice relay"
             )
+            return 1
+
+    if args.local_audio:
+        from voice.local_audio import LocalAudio
+        local_audio = LocalAudio(voice, args.audio_railing, args.mic_device, args.speaker_device)
+        try:
+            local_audio.start()
+        except Exception:
+            voice.close()
+            bus.close()
+            LOG.exception('Failed to start local audio; check devices and requirements-playback.txt')
             return 1
 
     try:
@@ -297,10 +327,8 @@ def main() -> int:
                 )
 
                 try:
-                    audio.set_direction(
-                        railing_id,
-                        direction,
-                    )
+                    with voice.control_transition():
+                        audio.set_direction(railing_id, direction)
                 except Exception as exc:
                     print(
                         f"PTT failed: {exc}"
@@ -326,9 +354,8 @@ def main() -> int:
                 )
 
                 try:
-                    audio.end_call(
-                        railing_id
-                    )
+                    with voice.control_transition():
+                        audio.end_call(railing_id)
                 except Exception as exc:
                     print(
                         f"hangup failed: {exc}"
@@ -336,7 +363,7 @@ def main() -> int:
                     continue
 
                 print(
-                    f"CALL end requested rail={railing_id}"
+                    f"CALL ended rail={railing_id}"
                 )
                 continue
 
@@ -344,6 +371,8 @@ def main() -> int:
                 print(
                     json.dumps(
                         {
+                            "local_audio": local_audio.status() if local_audio else None,
+                            "control_paused": voice.control_paused(),
                             "clients": voice.client_count(),
                             "field_packets": voice.field_packets,
                             "control_packets": voice.control_packets,
@@ -395,6 +424,8 @@ def main() -> int:
         print()
 
     finally:
+        if local_audio:
+            local_audio.close()
         voice.close()
         bus.close()
 

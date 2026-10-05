@@ -15,16 +15,7 @@ from voice import VoicePacket
 from voice.playback import Codec2Encoder
 
 
-def downsample(pcm, rate):
-    samples = array('h')
-    samples.frombytes(bytes(pcm))
-    factor = rate // 8000
-    if len(samples) != 160 * factor:
-        raise ValueError('Expected one 20ms capture frame')
-    # Basic box averaging for diagnostic 48/16kHz capture; 8kHz passes unchanged.
-    return array('h', (sum(samples[i:i+factor]) // factor
-                       for i in range(0, len(samples), factor))).tobytes()
-
+from voice.local_audio import downsample
 
 def main():
     parser = argparse.ArgumentParser(description='Pi mic/test tone -> WROOM speaker (requires confirmed PTT ON)')
