@@ -31,3 +31,15 @@ Host check (with libcodec2 installed), from repository root:
 `python -m unittest discover -s hello-wroom/tests -v`.
 This compiles the actual session/worker C with RTOS/audio substitutes; hardware
 I2S output and real-time behavior still require board testing.
+
+## Packets arrive but are rejected
+
+`Rejected AUDIO DATA len=55` alone does not identify the cause. New diagnostics
+print metadata, session active/direction, or missing playback task/queue.
+After WROOM reboot, its call state is lost while P4/Pi may still consider the
+call active. A valid AUDIO direction command from P4 now restores that local
+session. Ordinary data packets and non-P4 direction commands do not start calls.
+P4 itself checks that a call is active before generating direction commands.
+Repeat `ptt on` after reboot to synchronize; repeated same-direction commands
+keep an already active audio queue intact. Initialization/allocation failures
+still require inspecting the full WROOM startup log.

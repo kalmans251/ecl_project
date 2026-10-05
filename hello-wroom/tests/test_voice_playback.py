@@ -99,13 +99,16 @@ int main(void) {
     uint8_t payload[55]={AUDIO_DATA_CODEC2, 1, AUDIO_DIR_CONTROL_TX, 0, 1, 8, 6};
     voice_session_init();
     assert(!voice_session_handle_codec2(payload, sizeof(payload)));
-    voice_session_start();
+    assert(!voice_session_set_direction(AUDIO_DIR_CONTROL_TX)); // data/non-P4 SET cannot start call
+    assert(!voice_session_sync_direction((audio_direction_t)99));
+    assert(!voice_session_is_active());
+    assert(voice_session_sync_direction(AUDIO_DIR_FIELD_TX));
     assert(!voice_session_handle_codec2(payload, sizeof(payload)));
-    assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
+    assert(voice_session_sync_direction(AUDIO_DIR_CONTROL_TX));
     assert(!voice_session_handle_codec2(payload, 54));
     assert(voice_session_handle_codec2(payload, 55));
     uint32_t old=s_generation;
-    assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
+    assert(voice_session_sync_direction(AUDIO_DIR_CONTROL_TX));
     assert(old==s_generation && count==1); // retries must not flush audio
     for (unsigned i=1; i<12; ++i) assert(voice_session_handle_codec2(payload, 55));
     assert(!voice_session_handle_codec2(payload, 55));

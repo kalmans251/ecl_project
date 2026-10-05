@@ -501,12 +501,11 @@ static void handle_audio(
             }
 
 
-            if (
-                !voice_session_set_direction(
-                    (audio_direction_t)
-                    frame->payload[0]
-                )
-            )
+            audio_direction_t direction = (audio_direction_t)frame->payload[0];
+            bool accepted = frame->src == NODE_P4
+                ? voice_session_sync_direction(direction)
+                : voice_session_set_direction(direction);
+            if (!accepted)
             {
                 ESP_LOGW(
                     TAG,
