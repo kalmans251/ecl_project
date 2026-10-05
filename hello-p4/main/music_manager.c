@@ -1079,6 +1079,16 @@ void music_manager_on_wake(void)
             0
         );
     }
+    else if (!state.sleep_active && !state.call_active && !music_policy_is_blocked())
+    {
+        /* LED mode may have removed its pause reason while still sleeping.
+         * No reason transition occurs at wake, so explicitly resume that track.
+         * Do not rely on music_playing: WROOM's PAUSED event may still be in
+         * transit. RESUME is idempotent and follows PAUSE on the same UART.
+         */
+        ESP_LOGI(TAG, "WAKE -> RESUME existing track");
+        send_music_command(CMD_RESUME, NULL, 0);
+    }
 }
 
 
