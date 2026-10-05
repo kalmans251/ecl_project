@@ -9,3 +9,5 @@ The decoder test compares 200 frames of PCM byte for byte against codec2_create(
 WROOM uses decoder-only state because the full Codec2 constructor allocates unused encoder FFT, pitch analysis and input filters. Its internal layout is tied to the pinned Codec2 source: rerun equivalence tests and audit constructor fields when updating that dependency. Always pair voice_decoder_create with voice_decoder_destroy.
 
 Hardware: rebuild and flash WROOM, establish the call, run `ptt 1 on`, then `python tools/voice_send.py --railing 1 --tone --seconds 10` on Pi. Expect `Codec2 PLAY` with no reset. Record the decoder heap diagnostic and playback stack-free diagnostic. Allocation failure should log an error and keep the firmware running. Actual heap availability and audible continuity require hardware verification.
+
+Voice PCM remains Codec2 8kHz; I2S is 16kHz stereo using two copies per mono sample (zero-order hold). The worker test checks exact ramp samples, stereo duplication, silence, and 20ms frame size. `pcm_peak` is the decoded packet peak before volume scaling (0 means silent PCM; range 0..32768). It does not verify the physical DAC output.
