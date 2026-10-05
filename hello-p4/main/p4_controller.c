@@ -18,6 +18,7 @@
 #include "router.h"
 
 #include "led_task.h"
+#include "led_eq_fresh.h"
 #include "projector_control.h"
 
 #include "detection_manager.h"
@@ -514,10 +515,7 @@ static void handle_led(
             }
 
 
-            if (
-                frame->length ==
-                0
-            )
+            if (frame->length != LED_EQ_BANDS || call_manager_is_active())
             {
                 break;
             }

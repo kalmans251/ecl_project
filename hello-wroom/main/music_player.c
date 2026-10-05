@@ -1,4 +1,5 @@
 #include "music_player.h"
+#include "music_eq.h"
 
 #include <fcntl.h>
 #include <stdbool.h>
@@ -218,6 +219,12 @@ static void send_music_event(
     music_event_t event
 )
 {
+    if (event == MUSIC_EVENT_PAUSED || event == MUSIC_EVENT_STOPPED
+            || event == MUSIC_EVENT_FINISHED || event == MUSIC_EVENT_ERROR)
+        music_eq_clear();
+    else if (event == MUSIC_EVENT_STARTED || event == MUSIC_EVENT_RESUMED)
+        music_eq_reset();
+
     protocol_frame_t frame;
 
 
@@ -691,6 +698,8 @@ static play_result_t play_mp3_file(
         return PLAY_RESULT_ERROR;
     }
 
+
+    music_eq_reset();
 
     mp3dec_init(
         &s_decoder
@@ -1269,6 +1278,8 @@ static play_result_t play_mp3_file(
             }
 
 
+            music_eq_feed(output, output_samples, info.hz, audio_output_get_volume());
+
             /* ================================================
              * POSITION
              * ================================================ */
@@ -1379,6 +1390,7 @@ static play_result_t play_mp3_file(
     }
 
 
+    music_eq_clear();
     audio_output_deinit();
 
 

@@ -9,6 +9,7 @@
 #include "board_config.h"
 #include "system_state.h"
 #include "led_task.h"
+#include "led_eq_fresh.h"
 
 
 static const char *TAG =
@@ -106,6 +107,8 @@ static bool
 
 static led_eq_data_t
     s_latest_eq;
+static uint32_t s_last_eq_ms;
+static bool s_have_eq;
 
 
 /* ============================================================
@@ -643,8 +646,8 @@ static bool effect_music(
 
 
     if (
-        s_latest_eq.length ==
-        0
+        s_latest_eq.length != LED_EQ_BANDS
+        || !led_eq_is_fresh(s_have_eq, s_last_eq_ms, now_ms)
     )
     {
         return true;
@@ -1096,6 +1099,8 @@ void led_task(
                 &eq,
                 sizeof(eq)
             );
+            s_last_eq_ms = (uint32_t)(esp_timer_get_time()/1000);
+            s_have_eq = true;
         }
 
 
@@ -1109,6 +1114,10 @@ void led_task(
         system_state_get(
             &state
         );
+        if (state.call_active || !state.music_playing) {
+            s_latest_eq.length = 0;
+            s_have_eq = false;
+        }
 
 
         /*
