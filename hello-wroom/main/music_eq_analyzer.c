@@ -44,13 +44,24 @@ static void spectrum(music_eq_analyzer_t *s)
      * Exclude DC. Normalize Hann-window energy to RMS relative to full scale.
      */
     const unsigned edges[9]={0,2,4,8,16,32,64,96,128};
+    float amplitudes[MUSIC_EQ_BANDS], peak=0;
     for (unsigned band=0; band<MUSIC_EQ_BANDS; ++band) {
         float power=0;
         unsigned start=edges[band] ? edges[band] : 1;
         for (unsigned k=start; k<edges[band+1]; ++k)
             power+=s->real[k]*s->real[k]+s->imag[k]*s->imag[k];
-        float rms=sqrtf(2 * power / (0.375f*n*n));
-        float level=rms>0.00316227766f ? (20*log10f(rms)+50)*(255.0f/44) : 0;
+        amplitudes[band]=sqrtf(2 * power / (0.375f*n*n));
+        if (amplitudes[band]>peak) peak=amplitudes[band];
+    }
+    /* Follow the recent peak quickly upward and slowly downward (~2 s).
+     * Keep a silence floor so background noise is not expanded to full height.
+     */
+    if (peak>s->reference) s->reference=peak;
+    else s->reference+=0.008f*(peak-s->reference);
+    float reference=fmaxf(s->reference,0.002f);
+    for (unsigned band=0; band<MUSIC_EQ_BANDS; ++band) {
+        float rms=amplitudes[band];
+        float level=rms>0.0005f ? 255.0f*sqrtf(rms/reference) : 0;
         if (level>255) level=255;
         float mix=level>s->smoothed[band] ? 0.7f : 0.15f;
         s->smoothed[band]+=mix*(level-s->smoothed[band]);
@@ -59,21 +70,20 @@ static void spectrum(music_eq_analyzer_t *s)
 }
 
 bool music_eq_analyze(music_eq_analyzer_t *s, const int16_t *pcm,
-                      size_t frames, unsigned rate, unsigned volume, uint8_t levels[8])
+                      size_t frames, unsigned rate, uint8_t levels[8])
 {
-    if (!pcm || !frames || rate<8000 || rate>48000 || volume>100) return false;
-    if (rate!=s->input_rate || volume!=s->input_volume) {
+    if (!pcm || !frames || rate<8000 || rate>48000) return false;
+    if (rate!=s->input_rate) {
         music_eq_analyzer_reset(s);
         s->input_rate=rate;
-        s->input_volume=volume;
     }
     bool report=false;
     for (size_t i=0; i<frames; ++i) {
-        /* Average L/R and the source samples contributing to a 16kHz sample.
+        /* Average the source samples contributing to a 16kHz sample.
          * At 8/12kHz repeat samples. At 44.1/48kHz use a fractional box decimator.
          * This is display analysis, not the speaker's playback path.
          */
-        s->average_sum+=((float)pcm[2*i]+pcm[2*i+1])*(volume/(100.0f*65536));
+        s->average_sum+=pcm[i]/32768.0f;
         ++s->average_count;
         s->phase+=ANALYSIS_RATE;
         if (s->phase>=rate) {
