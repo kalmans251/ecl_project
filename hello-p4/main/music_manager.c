@@ -574,7 +574,7 @@ bool music_manager_start(void)
  * STOP SESSION
  * ============================================================ */
 
-bool music_manager_stop(void)
+void music_manager_disable_session(void)
 {
     lock_manager();
 
@@ -595,6 +595,11 @@ bool music_manager_stop(void)
     );
 
 
+}
+
+bool music_manager_stop(void)
+{
+    music_manager_disable_session();
     return
         send_music_command(
             CMD_STOP,

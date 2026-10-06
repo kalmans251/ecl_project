@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
 
 
 typedef enum
@@ -31,6 +32,7 @@ bool music_player_start(
 
 
 bool music_player_stop(void);
+bool music_player_stop_confirmed(uint8_t rail, const uint8_t request_id[4]);
 
 
 bool music_player_pause(void);

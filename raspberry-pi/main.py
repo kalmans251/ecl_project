@@ -174,6 +174,9 @@ def main() -> int:
             frame.railing_id
         )
 
+        if controls.handle_frame(frame):
+            return
+
         if emergency.handle_frame(frame):
             voice.state_changed()
             return

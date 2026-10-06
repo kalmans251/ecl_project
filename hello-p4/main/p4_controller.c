@@ -1414,6 +1414,37 @@ static void handle_music(
     const protocol_frame_t *frame
 )
 {
+    // APPLY: request_id[4], original command, original payload.
+    // RESULT: request_id[4], original command, status, applied detail.
+    if (frame->src == NODE_WROOM && frame->command == CMD_APPLY_RESULT) {
+        if (frame->length != 7) return;
+        if (frame->payload[4] == CMD_STOP && frame->payload[5] == 0 &&
+            frame->payload[6] == 0) music_policy_on_stopped();
+        protocol_frame_t result = *frame;
+        result.dst = NODE_PI; // Preserve WROOM source: this is the device result.
+        xQueueSend(router_queue, &result, portMAX_DELAY);
+        return;
+    }
+    if (frame->src == NODE_PI && frame->command == CMD_APPLY) {
+        if (frame->length < 5) return;
+        uint8_t op = frame->payload[4];
+        bool valid = (op == CMD_STOP && frame->length == 5) ||
+            (op == CMD_SET && frame->length == 7 &&
+             frame->payload[5] == MUSIC_SET_VOLUME && frame->payload[6] <= 100);
+        if (!valid || call_manager_is_active() || emergency_manager_is_active()) {
+            protocol_frame_t result = *frame;
+            result.src = NODE_P4; result.dst = NODE_PI;
+            result.command = CMD_APPLY_RESULT; result.length = 7;
+            result.payload[5] = 1; result.payload[6] = 0;
+            xQueueSend(router_queue, &result, portMAX_DELAY);
+            return;
+        }
+        if (op == CMD_STOP) music_manager_disable_session();
+        protocol_frame_t request = *frame;
+        request.src = NODE_P4; request.dst = NODE_WROOM;
+        xQueueSend(router_queue, &request, portMAX_DELAY);
+        return;
+    }
     /* ========================================================
      * WROOM -> P4 EVENT
      * ======================================================== */

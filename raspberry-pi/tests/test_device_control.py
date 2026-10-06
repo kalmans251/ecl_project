@@ -6,14 +6,20 @@ from voice import VoiceRelay
 
 class Bus:
     def __init__(self): self.sent = []
-    def send_frame(self, frame): self.sent.append(frame)
+    def send_frame(self, frame):
+        self.sent.append(frame)
+        if frame.command == Command.APPLY:
+            self.controls.handle_frame(Frame(frame.railing_id, Node.WROOM, Node.PI,
+                Service.MUSIC, Command.APPLY_RESULT,
+                frame.payload[:5] + bytes([0, frame.payload[-1] if len(frame.payload) == 7 else 0])))
 
 class ControlsTests(unittest.TestCase):
     def setUp(self):
         self.bus = Bus()
         self.states = RailingManager()
         self.voice = VoiceRelay(self.bus, self.states)
-        self.controls = DeviceControls(self.bus, self.states, self.voice)
+        self.controls = DeviceControls(self.bus, self.states, self.voice, ack_timeout=0.02)
+        self.bus.controls = self.controls
 
     def test_exact_wire_contracts(self):
         cases = [
@@ -52,11 +58,75 @@ class ControlsTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.bus.sent.clear()
                 result = self.controls.execute(command.split())
-                self.assertIn('not confirmed', result)
-                self.assertEqual(self.bus.sent, [Frame(1, Node.PI, destination, service, op, payload)])
+                confirmed = command.startswith('volume') or command == 'music 1 stop'
+                if confirmed:
+                    self.assertIn('WROOM confirmed', result)
+                    token = self.controls.request_id.to_bytes(4, 'big')
+                    self.assertEqual(self.bus.sent, [Frame(1, Node.PI, destination, service,
+                        Command.APPLY, token + bytes([op]) + payload)])
+                else:
+                    self.assertIn('not confirmed', result)
+                    self.assertEqual(self.bus.sent, [Frame(1, Node.PI, destination, service, op, payload)])
                 # Must be accepted by the existing parser including the CRC.
                 from protocol import FrameParser
                 self.assertEqual(FrameParser().feed(self.bus.sent[0].encode()), self.bus.sent)
+
+    def test_application_timeout_is_unknown_and_not_retried(self):
+        self.bus.send_frame = self.bus.sent.append
+        with self.assertRaisesRegex(TimeoutError, 'unknown'):
+            self.controls.execute('music 1 stop'.split())
+        self.assertEqual(len(self.bus.sent), 1)
+        self.assertIsNone(self.controls.pending)
+
+    def test_rejection_and_execution_failure_are_distinct(self):
+        for status, text in ((1, 'rejected'), (2, 'execution failed')):
+            def send(frame):
+                self.controls.handle_frame(Frame(1, Node.WROOM, Node.PI, Service.MUSIC,
+                    Command.APPLY_RESULT, frame.payload[:5] + bytes([status, 0])))
+            self.bus.send_frame = send
+            with self.assertRaisesRegex(RuntimeError, text):
+                self.controls.execute('volume 1 20'.split())
+
+    def test_wrong_token_source_rail_command_or_value_cannot_confirm(self):
+        def send(frame):
+            payload = frame.payload[:5] + bytes([0, 20])
+            variants = [Frame(1, Node.P4, Node.PI, Service.MUSIC, Command.APPLY_RESULT, payload),
+                Frame(2, Node.WROOM, Node.PI, Service.MUSIC, Command.APPLY_RESULT, payload),
+                Frame(1, Node.WROOM, Node.PI, Service.MUSIC, Command.APPLY_RESULT,
+                      bytes([payload[0] ^ 1]) + payload[1:]),
+                Frame(1, Node.WROOM, Node.PI, Service.MUSIC, Command.APPLY_RESULT,
+                      payload[:4] + bytes([Command.STOP, 0, 20])),
+                Frame(1, Node.WROOM, Node.PI, Service.MUSIC, Command.APPLY_RESULT,
+                      payload[:6] + bytes([21]))]
+            for response in variants:
+                self.controls.handle_frame(response)
+        self.bus.send_frame = send
+        with self.assertRaises(TimeoutError):
+            self.controls.execute('volume 1 20'.split())
+
+    def test_p4_can_reject_but_cannot_claim_device_success(self):
+        def send(frame):
+            self.controls.handle_frame(Frame(1, Node.P4, Node.PI, Service.MUSIC,
+                Command.APPLY_RESULT, frame.payload[:5] + bytes([1, 0])))
+        self.bus.send_frame = send
+        with self.assertRaisesRegex(RuntimeError, 'rejected'):
+            self.controls.execute('music 1 stop'.split())
+
+    def test_async_ack_and_old_ack_do_not_complete_new_request(self):
+        import threading
+        previous = []
+        def send(frame):
+            payload = frame.payload[:5] + bytes([0, 0])
+            if previous:
+                self.controls.handle_frame(previous[0])
+            response = Frame(1, Node.WROOM, Node.PI, Service.MUSIC, Command.APPLY_RESULT, payload)
+            previous[:] = [response]
+            self.worker = threading.Timer(0.005, lambda: self.controls.handle_frame(response))
+            self.worker.start()
+        self.bus.send_frame = send
+        for _ in range(2):
+            self.assertIn('Applied', self.controls.execute('music 1 stop'.split()))
+            self.worker.join()
 
     def test_power_selection_precedes_start(self):
         for mode, value in [('ac', 1), ('battery', 2)]:

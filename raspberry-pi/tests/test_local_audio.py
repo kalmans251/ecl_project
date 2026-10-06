@@ -180,6 +180,11 @@ class LocalAudioTests(unittest.TestCase):
             def set_frame_handler(self, handler): self.handler = handler
             def open(self): self.handler(event(AudioEvent.CALL_STARTED, AudioDirection.FIELD_TX))
             def close(self): self.closed = True
+            def send_frame(self, frame):
+                self.sent.append(frame)
+                if frame.command == Command.APPLY:
+                    self.handler(Frame(frame.railing_id, Node.WROOM, Node.PI, Service.MUSIC,
+                        Command.APPLY_RESULT, frame.payload[:5] + bytes([0, frame.payload[-1]])))
             def send_control_frame(self, frame, **kwargs):
                 self.sent.append(frame)
                 if frame.command == Command.SET:
@@ -196,8 +201,8 @@ class LocalAudioTests(unittest.TestCase):
                 redirect_stdout(io.StringIO()):
             self.assertEqual(main.main(), 0)
         self.assertEqual([f.command for f in bus.sent],
-            [Command.SET, Command.SET, Command.STOP, Command.SET, Command.SET, Command.STATUS_REQUEST])
-        self.assertEqual(bus.sent[3].payload, b'\x03\x0a')
+            [Command.SET, Command.SET, Command.STOP, Command.APPLY, Command.SET, Command.STATUS_REQUEST])
+        self.assertEqual(bus.sent[3].payload[4:], bytes([Command.SET, 3, 10]))
         self.assertEqual(bus.sent[-1].dst, Node.WROOM)
         self.assertTrue(bus.closed)
 

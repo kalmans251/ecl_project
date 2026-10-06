@@ -84,6 +84,9 @@ typedef enum
 typedef struct
 {
     player_command_type_t type;
+    bool confirm_stop;
+    uint8_t confirm_rail;
+    uint8_t request_id[4];
 
     char path[
         MUSIC_PATH_MAX
@@ -91,6 +94,22 @@ typedef struct
 
 } player_command_t;
 
+
+static player_command_t s_stop_confirmation;
+
+static void confirm_stopped(const player_command_t *command)
+{
+    if (!command->confirm_stop) return;
+    protocol_frame_t result;
+    protocol_frame_init(&result, command->confirm_rail, NODE_WROOM, NODE_P4,
+                        SERVICE_MUSIC, CMD_APPLY_RESULT);
+    result.payload_len = 7;
+    memcpy(result.payload, command->request_id, 4);
+    result.payload[4] = CMD_STOP;
+    result.payload[5] = 0; // applied after cleanup, or already idle
+    result.payload[6] = MUSIC_PLAYER_IDLE;
+    router_enqueue(&result);
+}
 
 /* ============================================================
  * PLAY RESULT
@@ -401,6 +420,7 @@ static void process_control_commands(
 
             case PLAYER_CMD_STOP:
             {
+                s_stop_confirmation = command;
                 *stop_requested =
                     true;
 
@@ -579,11 +599,12 @@ static void wait_while_paused(
 
             case PLAYER_CMD_STOP:
             {
+                s_stop_confirmation = command;
                 *stop_requested =
                     true;
 
 
-                break;
+                return;
             }
 
 
@@ -1396,6 +1417,8 @@ static play_result_t play_mp3_file(
 
     s_state =
         MUSIC_PLAYER_IDLE;
+    confirm_stopped(&s_stop_confirmation);
+    memset(&s_stop_confirmation, 0, sizeof(s_stop_confirmation));
 
 
     /* ========================================================
@@ -1528,6 +1551,11 @@ static void music_task(
             continue;
         }
 
+
+        if (command.type == PLAYER_CMD_STOP) {
+            confirm_stopped(&command);
+            continue;
+        }
 
         if (
             command.type !=
@@ -1777,6 +1805,15 @@ bool music_player_start(
 /* ============================================================
  * STOP
  * ============================================================ */
+
+bool music_player_stop_confirmed(uint8_t rail, const uint8_t request_id[4])
+{
+    if (s_command_queue == NULL) return false;
+    player_command_t command = {.type = PLAYER_CMD_STOP, .confirm_stop = true,
+                                .confirm_rail = rail};
+    memcpy(command.request_id, request_id, 4);
+    return xQueueSend(s_command_queue, &command, pdMS_TO_TICKS(100)) == pdTRUE;
+}
 
 bool music_player_stop(void)
 {

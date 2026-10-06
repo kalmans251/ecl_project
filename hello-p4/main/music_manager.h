@@ -33,6 +33,7 @@ music_manager_get_mode(void);
 bool music_manager_start(void);
 
 bool music_manager_stop(void);
+void music_manager_disable_session(void);
 
 bool music_manager_next(void);
 
