@@ -39,3 +39,6 @@ bool audio_output_is_initialized(void);
 /* Exclusive task ownership during voice playback. */
 bool audio_output_claim(void);
 void audio_output_release(void);
+
+/* Low-memory 16kHz stereo DMA profile, reserved for Codec2 playback. */
+bool audio_output_init_voice(void);
