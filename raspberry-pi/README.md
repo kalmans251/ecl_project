@@ -624,3 +624,17 @@ while idle. PTT from FIELD_TX still uses the existing granted-window scheduling.
 `CALL end confirmed rail=1` 및 `[CALL] ENDED`를 확인하고 통화가 비활성인지 확인하세요.
 다시 `call 1`을 실행해 양방향 전환 및 종료를 반복하세요.
 실제 통신 실패로 음성 릴레이가 일시정지되었다면, 연결 확인 후 `hangup 1`을 다시 실행하세요.
+
+#### 종료 이벤트 진단
+
+P4는 CALL_ENDED 프레임의 UART 전송 완료 후 100ms 동안 다음 PLC 전송을 보류합니다.
+종료 이벤트와 다음 복구 제어 창이 연속 UART 버스트가 되는 것을 피하기 위한 간격입니다.
+이 간격은 종료 이벤트에만 적용하며 음악/LED 작업을 대기시키지 않습니다.
+모뎀 구간에서 유실된다는 가설을 검증하는 변경으로, 실제 수신 여부는 로그로 확인해야 합니다.
+
+P4의 `PLC: CALL END UART sent rail=1 bytes=14; quiet=100ms`는
+로컬 UART 송신 완료를 의미하며 원격 수신 확인은 아닙니다.
+파이를 `--log-level DEBUG`로 실행하면 수신 원시 바이트 및 CRC 오류 프레임이 출력됩니다.
+난간 1의 일반 통화 종료 프레임은 `a5 5a 04 01 02 01 05 23 01 02 00 00 2d 5b`입니다.
+수신 로그는 여러 조각으로 나뉠 수 있습니다. P4 송신 로그, Pi `PLC RX raw=`,
+`PLC frame rejected` 로그 및 `CALL ENDED`를 비교해 누락 구간을 확인하세요.

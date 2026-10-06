@@ -37,6 +37,19 @@ class ProtocolTests(unittest.TestCase):
             frame,
         )
 
+    def test_zero_direction_hangup_event_and_crc_diagnostic(self) -> None:
+        raw = bytes.fromhex('a5 5a 04 01 02 01 05 23 01 02 00 00 2d 5b')
+        parser = FrameParser()
+        self.assertEqual(parser.feed(raw[:10]), [])
+        frames = parser.feed(raw[10:])
+        self.assertEqual(frames[0].payload, bytes([1, 2, 0, 0]))
+        damaged = bytearray(raw)
+        damaged[-1] ^= 1
+        with self.assertLogs('protocol.parser', level='DEBUG') as output:
+            frames = parser.feed(bytes(damaged) + raw)
+        self.assertEqual(len(frames), 1)
+        self.assertIn('CRC mismatch', output.output[0])
+
     def test_stream_parser_handles_noise_and_chunks(self) -> None:
         first = Frame(
             railing_id=1,

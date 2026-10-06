@@ -229,6 +229,7 @@ class PlcBus:
 
                 if not data:
                     continue
+                LOG.debug("PLC RX raw=%s", data.hex(" "))
                 frames = self._parser.feed(data)
                 # Dispatch a fresh trailing grant before potentially slower
                 # state/network callbacks. Earlier grants in a burst expired.
