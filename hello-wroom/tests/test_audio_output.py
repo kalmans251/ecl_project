@@ -29,7 +29,7 @@ TaskHandle_t xTaskGetCurrentTaskHandle(void);
 #include <stdint.h>
 #include "esp_err.h"
 typedef void *i2s_chan_handle_t;
-typedef struct { bool auto_clear_after_cb; } i2s_chan_config_t;
+typedef struct { bool auto_clear_after_cb; unsigned dma_desc_num, dma_frame_num; } i2s_chan_config_t;
 typedef struct { uint32_t sample_rate_hz; } i2s_std_clk_config_t;
 typedef struct {
  i2s_std_clk_config_t clk_cfg;
@@ -42,7 +42,7 @@ typedef struct {
 #define I2S_GPIO_UNUSED -1
 #define I2S_DATA_BIT_WIDTH_16BIT 16
 #define I2S_SLOT_MODE_STEREO 2
-#define I2S_CHANNEL_DEFAULT_CONFIG(a,b) ((i2s_chan_config_t){false})
+#define I2S_CHANNEL_DEFAULT_CONFIG(a,b) ((i2s_chan_config_t){false,6,240})
 #define I2S_STD_CLK_DEFAULT_CONFIG(rate) ((i2s_std_clk_config_t){rate})
 #define I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(a,b) 0
 esp_err_t i2s_new_channel(const i2s_chan_config_t *,i2s_chan_handle_t *,void *);
@@ -58,18 +58,19 @@ HARNESS = r'''
 #include <assert.h>
 #include <string.h>
 #include "audio_output.c"
-static bool auto_clear;
+static bool auto_clear, fail_init;
+static unsigned descriptors, frames, deleted;
 static int16_t dma[16];
 static size_t dma_bytes;
 static uint32_t output_rate;
 TaskHandle_t xTaskGetCurrentTaskHandle(void) { return (void *)1; }
 esp_err_t i2s_new_channel(const i2s_chan_config_t *cfg,i2s_chan_handle_t *tx,void *rx) {
- (void)rx; auto_clear=cfg->auto_clear_after_cb; *tx=(void *)1; return ESP_OK;
+ (void)rx; auto_clear=cfg->auto_clear_after_cb; descriptors=cfg->dma_desc_num;frames=cfg->dma_frame_num; *tx=(void *)1; return ESP_OK;
 }
 esp_err_t i2s_channel_init_std_mode(i2s_chan_handle_t h,const i2s_std_config_t *cfg) {
- (void)h; output_rate=cfg->clk_cfg.sample_rate_hz; return ESP_OK;
+ (void)h; output_rate=cfg->clk_cfg.sample_rate_hz; return fail_init ? -1 : ESP_OK;
 }
-esp_err_t i2s_del_channel(i2s_chan_handle_t h) { (void)h; return ESP_OK; }
+esp_err_t i2s_del_channel(i2s_chan_handle_t h) { (void)h; ++deleted;return ESP_OK; }
 esp_err_t i2s_channel_enable(i2s_chan_handle_t h) { (void)h; return ESP_OK; }
 esp_err_t i2s_channel_disable(i2s_chan_handle_t h) { (void)h; return ESP_OK; }
 esp_err_t i2s_channel_reconfig_std_clock(i2s_chan_handle_t h,const i2s_std_clk_config_t *cfg) {
@@ -85,6 +86,7 @@ static int16_t tx_cycle(void) {
 int main(void) {
  int16_t music[4]={12000,-12000,3000,-3000};
  assert(audio_output_init(44100));
+ assert(descriptors==6 && frames==240);
  audio_output_set_volume(100);
  assert(audio_output_write(music,4));
  assert(tx_cycle()==12000);
@@ -102,6 +104,17 @@ int main(void) {
  audio_output_deinit();
  assert(audio_output_init(48000));
  assert(auto_clear); assert(output_rate==48000);
+ unsigned before=deleted;
+ assert(audio_output_init_voice());assert(output_rate==16000);
+ assert(descriptors==4 && frames==160 && deleted==before+1);
+ assert(auto_clear);
+ assert(audio_output_init_voice());assert(deleted==before+1);
+ assert(audio_output_init(44100));assert(output_rate==44100);
+ assert(descriptors==6 && frames==240 && deleted==before+2);
+ fail_init=true;assert(!audio_output_init_voice());
+ assert(!audio_output_is_initialized());
+ fail_init=false;assert(audio_output_init(44100));
+ assert(descriptors==6 && frames==240);
  return 0;
 }
 '''

@@ -57,6 +57,8 @@ static uint32_t
 s_sample_rate =
     0;
 
+static bool s_voice_profile;
+
 
 static uint8_t
 s_volume_percent =
@@ -73,9 +75,7 @@ s_volume_buffer[
  * INIT
  * ============================================================ */
 
-bool audio_output_init(
-    uint32_t sample_rate
-)
+static bool init_profile(uint32_t sample_rate, bool voice)
 {
     if (!output_allowed()) return false;
 
@@ -87,6 +87,8 @@ bool audio_output_init(
         return false;
     }
 
+
+    if (s_initialized && s_voice_profile != voice) audio_output_deinit();
 
     if (
         s_initialized
@@ -111,6 +113,12 @@ bool audio_output_init(
      * This also silences gaps between tracks without changing resume position.
      */
     chan_config.auto_clear_after_cb = true;
+    if (voice) {
+        /* 16kHz stereo PCM: 4 x 160 x 4 = 2560 bytes, 40ms of DMA audio.
+         * Leave the normal music/emergency profile at the IDF defaults. */
+        chan_config.dma_desc_num = 4;
+        chan_config.dma_frame_num = 160;
+    }
 
     esp_err_t err =
         i2s_new_channel(
@@ -236,22 +244,35 @@ bool audio_output_init(
 
     s_initialized =
         true;
+    s_voice_profile = voice;
 
 
     ESP_LOGI(
         TAG,
-        "I2S %lu Hz BCLK=%d LRCK=%d DOUT=%d volume=%u%%",
+        "I2S %lu Hz BCLK=%d LRCK=%d DOUT=%d volume=%u%% dma=%lu x %lu",
         (unsigned long)sample_rate,
         I2S_BCLK_PIN,
         I2S_LRCK_PIN,
         I2S_DOUT_PIN,
-        s_volume_percent
+        s_volume_percent,
+        (unsigned long)chan_config.dma_desc_num,
+        (unsigned long)chan_config.dma_frame_num
     );
 
 
     return true;
 }
 
+
+bool audio_output_init(uint32_t sample_rate)
+{
+    return init_profile(sample_rate, false);
+}
+
+bool audio_output_init_voice(void)
+{
+    return init_profile(16000, true);
+}
 
 /* ============================================================
  * SAMPLE RATE

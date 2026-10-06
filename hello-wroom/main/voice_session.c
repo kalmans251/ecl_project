@@ -69,13 +69,16 @@ static void playback_task(void *arg)
     uint16_t previous = 0;
     unsigned packets = 0, missing = 0, underflows = 0;
     uint32_t restore_rate = 0;
+    bool init_failed = false;
+    uint32_t failed_generation = 0;
     voice_packet_t packet;
     while (1) {
         if (decoder && !control_active(generation)) {
-            if (restore_rate) audio_output_set_sample_rate(restore_rate);
-            else audio_output_deinit();
             voice_decoder_destroy(decoder);
             decoder = NULL;
+            /* Release decoder memory before recreating the normal DMA profile. */
+            if (restore_rate) audio_output_init(restore_rate);
+            else audio_output_deinit();
             audio_output_release();
             output_busy(false);
         }
@@ -89,6 +92,8 @@ static void playback_task(void *arg)
             continue;
         }
         if (!control_active(packet.generation)) continue;
+        /* Retry only after a fresh PTT direction/session generation. */
+        if (init_failed && packet.generation == failed_generation) continue;
         if (!decoder) {
             generation = packet.generation;
             output_busy(true);
@@ -111,20 +116,26 @@ static void playback_task(void *arg)
             ESP_LOGI(TAG, "Decoder heap before free=%u largest=%u",
                      (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
                      (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-            decoder = voice_decoder_create();
+            /* Free music DMA and reserve the small DMA profile before general
+             * decoder allocations consume the remaining DMA-capable heap. */
+            bool output_ready = audio_output_init_voice();
+            decoder = output_ready ? voice_decoder_create() : NULL;
             if (!decoder || codec2_samples_per_frame(decoder) != 160
-                    || codec2_bits_per_frame(decoder) != 48 || !audio_output_init(16000)) {
+                    || codec2_bits_per_frame(decoder) != 48) {
                 if (decoder) voice_decoder_destroy(decoder);
                 decoder = NULL;
-                if (restore_rate) audio_output_set_sample_rate(restore_rate);
-                else audio_output_deinit();
+                audio_output_deinit();
+                if (restore_rate) audio_output_init(restore_rate);
+                init_failed = true;
+                failed_generation = generation;
                 audio_output_release();
                 output_busy(false);
-                ESP_LOGE(TAG, "Codec2/I2S initialization failed heap_free=%u largest=%u",
+                ESP_LOGE(TAG, "Codec2/I2S initialization failed; retry with PTT off/on heap_free=%u largest=%u",
                          (unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),
                          (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
                 continue;
             }
+            init_failed = false;
             have_sequence = false;
             packets = missing = underflows = 0;
             /* Hold first packet until two more arrive, or 600ms elapses. */

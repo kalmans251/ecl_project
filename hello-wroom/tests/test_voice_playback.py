@@ -91,7 +91,8 @@ bool emergency_alert_is_active(void) { return false; }
 bool audio_output_claim(void) { return true; }
 void audio_output_release(void) { ++released; }
 void audio_output_deinit(void) {}
-bool audio_output_init(uint32_t rate) { assert(rate==16000); return true; }
+bool audio_output_init(uint32_t rate) { assert(rate==44100);restored_rate=rate; return true; }
+bool audio_output_init_voice(void) { return true; }
 bool audio_output_write(const int16_t *pcm, size_t n) {
     assert(n==640);
     for (unsigned i=0; i<160; ++i)
@@ -160,3 +161,61 @@ class VoicePlaybackTests(unittest.TestCase):
             binary=root/'test'
             subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-I',str(root),'-I',str(MAIN),'-I',CODEC2_SRC,str(source),str(MAIN/'voice_decoder.c'),CODEC2_LIB if '/' in CODEC2_LIB else '-l:'+CODEC2_LIB,'-o',str(binary)],check=True)
             subprocess.run([str(binary)],check=True,timeout=5)
+
+FAILURE_MAIN = r'''
+static unsigned rounds;
+static bool transitioned;
+static void enqueue_audio(void) {
+    uint8_t payload[55]={AUDIO_DATA_CODEC2,1,AUDIO_DIR_CONTROL_TX,0,1,8,6};
+    for(unsigned i=0;i<8;++i) assert(voice_session_handle_codec2(payload,55));
+}
+int main(void) {
+    voice_session_init();
+    music_playing=true;
+    voice_session_start();assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
+    enqueue_audio();
+    if(setjmp(finished)==0) worker(NULL);
+    assert(voice_inits==2 && released==2 && restored_rate==44100);
+    assert(decoder_inits==(dma_ok?2:0));
+    assert(writes==0);
+    return 0;
+}
+'''
+
+class VoiceInitializationFailureTests(unittest.TestCase):
+    def test_dma_or_decoder_failure_is_suppressed_until_new_ptt_generation(self):
+        # Compile the actual worker without requiring an external Codec2 library.
+        harness=HARNESS[:HARNESS.index('int main(void)')]
+        harness=harness.replace('static uint32_t restored_rate;',
+            'static uint32_t restored_rate;\nstatic unsigned voice_inits,decoder_inits;\nstatic bool dma_ok=DMA_OK;\nstatic bool transitioned;')
+        harness=harness.replace('if (released) longjmp(finished, 1);', '''if (index_==count && released) {
+        if (!transitioned) {
+            assert(voice_inits==1 && released==1); // all eight failed-generation packets drained
+            transitioned=true;
+            assert(voice_session_set_direction(AUDIO_DIR_FIELD_TX));
+            assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
+            uint8_t payload[55]={AUDIO_DATA_CODEC2,1,AUDIO_DIR_CONTROL_TX,0,1,8,6};
+            for(unsigned i=0;i<8;++i) assert(voice_session_handle_codec2(payload,55));
+        } else longjmp(finished,1);
+    }''')
+        harness=harness.replace('bool audio_output_init_voice(void) { return true; }',
+            'bool audio_output_init_voice(void) { ++voice_inits;return dma_ok; }')
+        harness += r'''
+struct CODEC2 *voice_decoder_create(void) { ++decoder_inits;return NULL; }
+void voice_decoder_destroy(struct CODEC2 *decoder) { assert(!decoder); }
+int codec2_samples_per_frame(struct CODEC2 *decoder) { (void)decoder;return 160; }
+int codec2_bits_per_frame(struct CODEC2 *decoder) { (void)decoder;return 48; }
+void codec2_decode(struct CODEC2 *decoder,short *pcm,const unsigned char *bits) { (void)decoder;(void)pcm;(void)bits;assert(0); }
+'''
+        harness += FAILURE_MAIN.replace('static unsigned rounds;\n','').replace('static bool transitioned;\n','')
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            for name,text in HEADERS.items():
+                p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
+            source=root/'failure.c';source.write_text(harness)
+            for dma_ok in (0,1):
+                binary=root/('failure'+str(dma_ok))
+                subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror',
+                    '-DDMA_OK='+str(dma_ok),'-I',str(root),'-I',str(MAIN),
+                    str(source),'-o',str(binary)],check=True)
+                subprocess.run([str(binary)],check=True,timeout=5)
