@@ -36,9 +36,20 @@ class CallStartTests(unittest.TestCase):
         frame, kwargs = self.bus.sent[0]
         self.assertEqual((frame.src, frame.dst, frame.service, frame.command, frame.payload),
                          (Node.PI, Node.P4, Service.AUDIO, Command.START, b''))
-        self.assertTrue(kwargs['wait_for_window'])
+        self.assertFalse(kwargs['wait_for_window'])
         self.assertEqual(self.states.get_call_direction(1), AudioDirection.FIELD_TX)
         self.assertFalse(self.audio.start_call(1))
+        self.assertEqual(len(self.bus.sent), 1)
+
+    def test_idle_p4_with_no_grants_still_receives_start(self):
+        def idle_p4(frame):
+            # Actual P4 only emits grants in FIELD_TX. An idle simulator must
+            # reject any start request that waits for a nonexistent grant.
+            if self.bus.sent[-1][1]['wait_for_window']:
+                raise TimeoutError('Idle P4 never grants a receive window')
+            self.audio.handle_frame(event())
+        self.bus.callback = idle_p4
+        self.assertTrue(self.audio.start_call(1))
         self.assertEqual(len(self.bus.sent), 1)
 
     def test_missing_confirmation_does_not_activate_audio(self):
@@ -79,10 +90,10 @@ class CallStartTests(unittest.TestCase):
         self.worker.join()
         self.assertEqual(len(self.bus.sent), 1)
 
-    def test_grant_timeout_can_retry(self):
+    def test_transmission_timeout_can_retry(self):
         def confirm(frame):
             if len(self.bus.sent) == 1:
-                raise TimeoutError('No window')
+                raise TimeoutError('Transmission timeout')
             self.audio.handle_frame(event())
         self.bus.callback = confirm
         self.assertTrue(self.audio.start_call(1))

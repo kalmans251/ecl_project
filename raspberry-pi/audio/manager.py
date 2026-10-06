@@ -203,9 +203,10 @@ class AudioManager:
                 LOG.info("CALL start request rail=%d attempt=%d/%d",
                          railing_id, attempt, self._attempts)
                 try:
-                    # Idle P4 also grants receive windows. Use them rather than
-                    # racing a P4 transmission or an unknown field voice stream.
-                    self._bus.send_control_frame(frame, wait_for_window=True)
+                    # P4 emits receive grants only during FIELD_TX calls. A
+                    # normal call starts from idle, so use the existing guarded
+                    # direct-control path; waiting for a grant would deadlock.
+                    self._bus.send_control_frame(frame, wait_for_window=False)
                 except TimeoutError:
                     if attempt == self._attempts:
                         raise
