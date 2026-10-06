@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* One MP3 frame, already reduced to mono. No dynamic PCM queues. */
 #define EQ_MAX_FRAMES 1152U
@@ -17,11 +18,19 @@ typedef struct {
     size_t frames;
     unsigned rate, epoch;
 } eq_block_t;
-static eq_block_t s_pending, s_work;
+typedef struct {
+    eq_block_t pending, work;
+    music_eq_analyzer_t analyzer;
+} eq_context_t;
+/* Owned/allocated/freed only by the EQ worker; producer access is locked. */
+static eq_context_t *s_context;
+static bool s_suspended, s_worker_busy, s_alloc_failed;
+#define s_pending (s_context->pending)
+#define s_work (s_context->work)
+#define s_analyzer (s_context->analyzer)
 static portMUX_TYPE s_lock=portMUX_INITIALIZER_UNLOCKED;
 static TaskHandle_t s_task;
 static unsigned s_epoch, s_worker_epoch, s_overwritten;
-static music_eq_analyzer_t s_analyzer;
 static unsigned s_sent, s_dropped;
 static int64_t s_max_us;
 
@@ -36,8 +45,38 @@ static void send_levels(const uint8_t levels[8])
     else ++s_dropped;
 }
 
-static void process_pending(void)
+static void process_inner(void)
 {
+    portENTER_CRITICAL(&s_lock);
+    bool suspended=s_suspended;
+    bool allocation_failed=s_alloc_failed;
+    eq_context_t *context=s_context;
+    if (suspended) s_context=NULL;
+    portEXIT_CRITICAL(&s_lock);
+    if (suspended) {
+        free(context);
+        if (context) ESP_LOGI("MUSIC_EQ","Released EQ memory for call: %u bytes", (unsigned)sizeof(*context));
+        return;
+    }
+    if (!context) {
+        if (allocation_failed || voice_session_is_active()) return;
+        context=calloc(1,sizeof(*context));
+        if (!context) {
+            portENTER_CRITICAL(&s_lock);
+            s_alloc_failed=true;
+            portEXIT_CRITICAL(&s_lock);
+            ESP_LOGW("MUSIC_EQ","EQ memory unavailable; music continues without EQ");
+            return;
+        }
+        portENTER_CRITICAL(&s_lock);
+        suspended=s_suspended;
+        if (!suspended) {
+            s_context=context;
+            s_worker_epoch=~s_epoch; /* force initialization of the new window */
+        }
+        portEXIT_CRITICAL(&s_lock);
+        if (suspended) { free(context);return; }
+    }
     portENTER_CRITICAL(&s_lock);
     s_work=s_pending;
     s_pending.frames=0;
@@ -54,7 +93,7 @@ static void process_pending(void)
     int64_t elapsed=esp_timer_get_time()-start;
     if (elapsed>s_max_us) s_max_us=elapsed;
     portENTER_CRITICAL(&s_lock);
-    bool current=s_work.epoch==s_epoch;
+    bool current=!s_suspended && s_work.epoch==s_epoch;
     unsigned overwritten=s_overwritten;
     portEXIT_CRITICAL(&s_lock);
     if (!ready || !current) return;
@@ -66,6 +105,46 @@ static void process_pending(void)
             levels[4],levels[5],levels[6],levels[7]);
     (void)overwritten;
 }
+static void process_pending(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    s_worker_busy=true;
+    portEXIT_CRITICAL(&s_lock);
+    process_inner();
+    portENTER_CRITICAL(&s_lock);
+    s_worker_busy=false;
+    portEXIT_CRITICAL(&s_lock);
+}
+
+bool music_eq_suspend(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    s_suspended=true;
+    ++s_epoch;
+    if (s_context) s_pending.frames=0;
+    portEXIT_CRITICAL(&s_lock);
+    if (s_task) xTaskNotifyGive(s_task);
+    /* Only the control thread waits. Music producer and FFT never wait here. */
+    for (unsigned i=0;i<100;++i) {
+        portENTER_CRITICAL(&s_lock);
+        bool released=!s_context && !s_worker_busy;
+        portEXIT_CRITICAL(&s_lock);
+        if (released) return true;
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    ESP_LOGW("MUSIC_EQ","Timed out waiting for EQ memory release");
+    return false;
+}
+void music_eq_resume(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    s_suspended=false;
+    s_alloc_failed=false;
+    ++s_epoch;
+    portEXIT_CRITICAL(&s_lock);
+    if (s_task) xTaskNotifyGive(s_task);
+}
+
 static void eq_task(void *arg)
 {
     (void)arg;
@@ -87,8 +166,9 @@ bool music_eq_init(void)
 void music_eq_reset(void)
 {
     portENTER_CRITICAL(&s_lock);
+    s_alloc_failed=false;
     ++s_epoch;
-    s_pending.frames=0;
+    if (s_context) s_pending.frames=0;
     portEXIT_CRITICAL(&s_lock);
     if (s_task) xTaskNotifyGive(s_task);
 }
@@ -110,6 +190,12 @@ void music_eq_feed(const int16_t *pcm, size_t samples, unsigned rate)
     if (!s_task || !pcm || !samples || samples%2 || samples/2>EQ_MAX_FRAMES
             || rate<8000 || rate>48000 || voice_session_is_active()) return;
     portENTER_CRITICAL(&s_lock);
+    if (s_suspended || !s_context) {
+        bool wake=!s_suspended && !s_alloc_failed;
+        portEXIT_CRITICAL(&s_lock);
+        if (wake) xTaskNotifyGive(s_task);
+        return;
+    }
     if (s_pending.frames) ++s_overwritten;
     s_pending.frames=samples/2;
     s_pending.rate=rate;

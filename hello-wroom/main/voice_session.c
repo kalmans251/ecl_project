@@ -1,6 +1,7 @@
 #include "voice_session.h"
 #include "audio_output.h"
 #include "music_player.h"
+#include "music_eq.h"
 #include "emergency_alert.h"
 #include "codec2.h"
 #include "voice_decoder.h"
@@ -120,6 +121,11 @@ static void playback_task(void *arg)
              * decoder allocations consume the remaining DMA-capable heap. */
             bool output_ready = audio_output_init_voice();
             decoder = output_ready ? voice_decoder_create() : NULL;
+            if (!output_ready) ESP_LOGE(TAG, "Voice I2S DMA initialization failed");
+            else if (!decoder) ESP_LOGE(TAG, "Codec2 decoder allocation failed");
+            else if (codec2_samples_per_frame(decoder) != 160 || codec2_bits_per_frame(decoder) != 48)
+                ESP_LOGE(TAG, "Codec2 decoder format mismatch samples=%d bits=%d",
+                    codec2_samples_per_frame(decoder), codec2_bits_per_frame(decoder));
             if (!decoder || codec2_samples_per_frame(decoder) != 160
                     || codec2_bits_per_frame(decoder) != 48) {
                 if (decoder) voice_decoder_destroy(decoder);
@@ -211,10 +217,12 @@ static void change_session(bool active, audio_direction_t direction)
 
 void voice_session_start(void) {
     change_session(true, AUDIO_DIR_FIELD_TX);
+    music_eq_suspend();
     ESP_LOGI(TAG, "CALL START -> FIELD_TX");
 }
 void voice_session_stop(void) {
     change_session(false, AUDIO_DIR_FIELD_TX);
+    music_eq_resume();
     ESP_LOGI(TAG, "CALL STOP");
 }
 bool voice_session_set_direction(audio_direction_t direction)

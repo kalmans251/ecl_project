@@ -81,6 +81,8 @@ int xQueueReceive(QueueHandle_t q, void *p, unsigned ticks) {
     if (index_==count) return 0;
     memcpy(p, &queued[index_++], sizeof(voice_packet_t)); return pdTRUE;
 }
+bool music_eq_suspend(void) { return true; }
+void music_eq_resume(void) {}
 bool music_player_pause(void) { music_paused=music_playing; return true; }
 bool music_player_is_playing(void) { return music_playing; }
 bool music_player_is_paused(void) { return music_paused; }
