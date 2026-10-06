@@ -638,3 +638,15 @@ P4의 `PLC: CALL END UART sent rail=1 bytes=14; quiet=100ms`는
 난간 1의 일반 통화 종료 프레임은 `a5 5a 04 01 02 01 05 23 01 02 00 00 2d 5b`입니다.
 수신 로그는 여러 조각으로 나뉠 수 있습니다. P4 송신 로그, Pi `PLC RX raw=`,
 `PLC frame rejected` 로그 및 `CALL ENDED`를 비교해 누락 구간을 확인하세요.
+
+#### P4 송신 원본과 Pi 수신 비교
+
+P4의 `PLC: CALL END UART TX rail=1 raw=...`는 UART 쓰기 직전의
+전체 인코딩 버퍼입니다. 뒤의 `CALL END UART sent`는 로컬 UART 전송 완료입니다.
+Pi는 `--log-level DEBUG`로 실행하고 `call 1` → `hangup 1`을 수행하세요.
+Pi의 `PLC RX raw`는 여러 줄로 나뉠 수 있으므로 P4의 한 프레임과 합쳐 비교합니다.
+정상적인 난간 1 일반 통화 종료는
+`a5 5a 04 01 02 01 05 23 01 02 00 00 2d 5b`입니다.
+P4 송신 원본도 CRC가 다르면 인코딩/실행 중인 펌웨어를 확인합니다.
+P4 원본이 정상인데 Pi 수신이 다르면 UART/모뎀/전력선 전달 구간을 확인합니다.
+이 로그만으로 해당 구간 안의 어느 장치에서 변형됐는지까지는 알 수 없습니다.
