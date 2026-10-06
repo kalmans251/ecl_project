@@ -611,3 +611,16 @@ call without a P4 state event.
 Call initiation must not wait for a receive grant: current P4 grants only during
 FIELD_TX calls, including FIELD_TX with no voice packets. It does not emit grants
 while idle. PTT from FIELD_TX still uses the existing granted-window scheduling.
+
+### 통화 종료 확인 및 재시도
+
+`hangup 1`은 P4의 CALL_ENDED 응답을 확인한 뒤 종료합니다. 기본 종료 응답 대기는
+1.5초이며, 응답을 받지 못하면 최대 3회 STOP을 시도합니다. P4는 종료 후 8초 동안
+200ms 제어 창을 계속 제공하고, 이미 IDLE이어도 중복 STOP에 종료 응답을 다시 보냅니다.
+중복 STOP은 음악/프로젝터 복원을 반복하지 않습니다. 새 통화가 시작되면 종료 복구 창은 해제됩니다.
+
+이 변경은 라즈베리파이 코드와 P4 펌웨어를 함께 업데이트해야 합니다.
+실물 확인 순서: `call 1` → `ptt 1 on` → `ptt 1 off` → `hangup 1` → `status 1`.
+`CALL end confirmed rail=1` 및 `[CALL] ENDED`를 확인하고 통화가 비활성인지 확인하세요.
+다시 `call 1`을 실행해 양방향 전환 및 종료를 반복하세요.
+실제 통신 실패로 음성 릴레이가 일시정지되었다면, 연결 확인 후 `hangup 1`을 다시 실행하세요.

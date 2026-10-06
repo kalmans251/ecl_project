@@ -119,6 +119,40 @@ class CallStartTests(unittest.TestCase):
                 self.audio.start_call(railing)
         self.assertEqual(self.bus.sent, [])
 
+    def test_hangup_delayed_confirmation(self):
+        self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
+        def confirm(frame):
+            self.worker = threading.Timer(0.035, lambda: self.audio.handle_frame(
+                event(kind=AudioEvent.CALL_ENDED)))
+            self.worker.start()
+        self.bus.callback = confirm
+        self.audio.end_call(1)
+        self.worker.join()
+        self.assertEqual(len(self.bus.sent), 1)
+        self.assertIsNone(self.states.get_call_direction(1))
+
+    def test_hangup_lost_end_retries_stop(self):
+        self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
+        def confirm(frame):
+            if len(self.bus.sent) == 2:
+                self.audio.handle_frame(event(kind=AudioEvent.CALL_ENDED))
+        self.bus.callback = confirm
+        self.audio.end_call(1)
+        self.assertEqual(len(self.bus.sent), 2)
+        self.assertTrue(all(f.command == Command.STOP and options['wait_for_window']
+                            for f, options in self.bus.sent))
+        self.audio.end_call(1)
+        self.assertEqual(len(self.bus.sent), 2)
+
+    def test_hangup_end_arrives_during_grant_timeout(self):
+        self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
+        def confirm(frame):
+            self.audio.handle_frame(event(kind=AudioEvent.CALL_ENDED))
+            raise TimeoutError('No fresh grant after end')
+        self.bus.callback = confirm
+        self.audio.end_call(1)
+        self.assertIsNone(self.states.get_call_direction(1))
+
     def test_console_start_ptt_and_hangup(self):
         import main
         class ConsoleBus(Bus):

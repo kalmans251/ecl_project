@@ -7,6 +7,7 @@
 #include "freertos/semphr.h"
 
 #include "esp_log.h"
+#include "esp_timer.h"
 
 #include "board_config.h"
 #include "protocol.h"
@@ -87,6 +88,11 @@ static call_origin_t
 static call_restore_state_t
     s_restore;
 
+
+/* Brief recovery grants after hangup; idle nodes otherwise stay silent. */
+#define END_RECOVERY_US (8LL * 1000 * 1000)
+static int64_t s_end_recovery_until_us;
+static call_origin_t s_last_end_origin = CALL_ORIGIN_NORMAL;
 
 /* ============================================================
  * LOCK
@@ -438,6 +444,8 @@ void call_manager_init(void)
 
     s_call_origin =
         CALL_ORIGIN_NORMAL;
+    s_end_recovery_until_us = 0;
+    s_last_end_origin = CALL_ORIGIN_NORMAL;
 
 
     ESP_LOGI(
@@ -489,6 +497,7 @@ bool call_manager_start(
 
     s_call_origin =
         origin;
+    s_end_recovery_until_us = 0;
 
 
     /*
@@ -712,16 +721,19 @@ bool call_manager_end(void)
         CALL_STATE_IDLE
     )
     {
+        call_origin_t origin = s_last_end_origin;
+        s_end_recovery_until_us = esp_timer_get_time() + END_RECOVERY_US;
         unlock_manager();
-
+        /* Idempotent STOP: the first END event may have been lost. */
+        notify_pi_call_event(AUDIO_EVENT_CALL_ENDED, origin, 0);
 
         ESP_LOGW(
             TAG,
-            "CALL END ignored: already idle"
+            "CALL already idle -> resend END confirmation"
         );
 
 
-        return false;
+        return true;
     }
 
 
@@ -804,6 +816,9 @@ bool call_manager_end(void)
 
     lock_manager();
 
+
+    s_last_end_origin = origin;
+    s_end_recovery_until_us = esp_timer_get_time() + END_RECOVERY_US;
 
     s_call_state =
         CALL_STATE_IDLE;
@@ -896,4 +911,13 @@ call_origin_t call_manager_get_origin(void)
 
 
     return origin;
+}
+
+bool call_manager_end_recovery_active(void)
+{
+    lock_manager();
+    bool active = s_call_state == CALL_STATE_IDLE &&
+                  esp_timer_get_time() < s_end_recovery_until_us;
+    unlock_manager();
+    return active;
 }

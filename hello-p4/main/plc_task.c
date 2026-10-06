@@ -114,8 +114,8 @@ static void process_plc_tx_queue(void)
             return;
         }
     }
-    // Keep controls possible if S3 has stopped producing audio during a call.
-    if (call_manager_get_state() == CALL_STATE_FIELD_TX
+    // Allow controls without voice, including the bounded hangup recovery period.
+    if ((call_manager_get_state() == CALL_STATE_FIELD_TX || call_manager_end_recovery_active())
         && esp_timer_get_time() - s_last_grant_us >= PLC_IDLE_GRANT_MS * 1000
         && esp_timer_get_time() - s_last_voice_us >= PLC_IDLE_GRANT_MS * 1000) {
         grant_control_window();
