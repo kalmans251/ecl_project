@@ -1,10 +1,13 @@
 """Validated console controls using the device firmware's protocol.
 
-Requests are transmitted, not acknowledged/applied state. P4 owns policy and
+Music STOP and volume require correlated WROOM application results. Other
+requests confirm transmission only. P4 owns policy and
 forwards music settings to WROOM. General controls never queue behind a call.
 """
 from __future__ import annotations
 import threading
+import secrets
+import time
 from protocol import Command, Frame, Node, Service
 
 HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop current mode
@@ -21,9 +24,14 @@ HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop cu
 
 
 class DeviceControls:
-    def __init__(self, bus, railings, voice):
+    def __init__(self, bus, railings, voice, ack_timeout=3.0):
         self.bus, self.railings, self.voice = bus, railings, voice
         self.lock = threading.Lock()
+        self.condition = threading.Condition()
+        self.ack_timeout = ack_timeout
+        self.request_id = secrets.randbits(32)
+        self.pending = None
+        self.result = None
 
     def execute(self, parts):
         if not parts or parts[0].lower() not in (
@@ -97,11 +105,59 @@ class DeviceControls:
             if args:
                 raise ValueError('ping: expected only railing_id')
             add(Service.SYSTEM, Command.PING)
+        confirmed = name == 'volume' or (name == 'music' and args == ['stop'])
         with self.lock:
+            if confirmed:
+                self._check_idle()
+                original = frames[0]
+                self.request_id = (self.request_id + 1) & 0xffffffff
+                token = self.request_id.to_bytes(4, 'big')
+                with self.condition:
+                    self.pending = (rail, token, original.command,
+                                    original.payload[-1] if name == 'volume' else 0)
+                    self.result = None
+                try:
+                    self.bus.send_frame(Frame(rail, Node.PI, Node.P4, Service.MUSIC,
+                        Command.APPLY, token + bytes([original.command]) + original.payload))
+                    deadline = time.monotonic() + self.ack_timeout
+                    with self.condition:
+                        while self.result is None:
+                            remaining = deadline - time.monotonic()
+                            if remaining <= 0:
+                                raise TimeoutError('Device application confirmation timed out; '
+                                                   'application state is unknown')
+                            self.condition.wait(remaining)
+                        status, detail = self.result
+                    if status != 0:
+                        reason = 'rejected' if status == 1 else 'execution failed'
+                        raise RuntimeError(f'Device application {reason} rail={rail}')
+                    return f'Applied rail={rail}: {" ".join(parts)} (WROOM confirmed)'
+                finally:
+                    with self.condition:
+                        self.pending = None
+                        self.result = None
             for frame in frames:
                 self._check_idle()
                 self.bus.send_frame(frame)
         return f'Request sent rail={rail}: {" ".join(parts)} ({len(frames)} frame(s)); device application not confirmed'
+
+    def handle_frame(self, frame):
+        if (frame.dst != Node.PI or frame.src not in (Node.P4, Node.WROOM)
+                or frame.service != Service.MUSIC or frame.command != Command.APPLY_RESULT
+                or len(frame.payload) != 7):
+            return False
+        token, op, status, detail = frame.payload[:4], *frame.payload[4:]
+        if status not in (0, 1, 2):
+            return False
+        with self.condition:
+            pending = self.pending
+            if pending is None or (frame.railing_id, token, op) != pending[:3]:
+                return True # delayed/foreign response cannot confirm a new request
+            if status == 0 and (frame.src != Node.WROOM or detail != pending[3]):
+                return True
+            self.result = (status, detail)
+            self.condition.notify_all()
+        return True
 
     def _check_idle(self):
         if self.voice.control_paused():

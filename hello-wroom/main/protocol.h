@@ -109,6 +109,9 @@ typedef enum
 
 typedef enum
 {
+    CMD_APPLY = 0x28,
+    CMD_APPLY_RESULT = 0x29,
+
     CMD_PING =
         0x01,
 

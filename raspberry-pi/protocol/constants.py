@@ -49,6 +49,8 @@ class Command(IntEnum):
     RESUME = 0x25
     NEXT = 0x26
     PREVIOUS = 0x27
+    APPLY = 0x28
+    APPLY_RESULT = 0x29
 
 
 class EmergencySource(IntEnum):

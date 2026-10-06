@@ -225,10 +225,37 @@ static void handle_system(
  * MUSIC
  * ============================================================ */
 
+static void handle_music_apply(const protocol_frame_t *frame)
+{
+    if (frame->src != NODE_P4 || frame->payload_len < 5) return;
+    uint8_t response[7] = {0};
+    memcpy(response, frame->payload, 5);
+    response[5] = 1; // rejected unless validated and applied
+    uint8_t op = frame->payload[4];
+    if (voice_session_is_active() || emergency_alert_is_active()) {
+        send_reply(frame, CMD_APPLY_RESULT, response, sizeof(response));
+        return;
+    }
+    if (op == CMD_STOP && frame->payload_len == 5) {
+        if (music_player_stop_confirmed(frame->railing_id, frame->payload)) return;
+        response[5] = 2; // command queue failure
+    } else if (op == CMD_SET && frame->payload_len == 7 &&
+               frame->payload[5] == MUSIC_SET_VOLUME && frame->payload[6] <= 100) {
+        audio_output_set_volume(frame->payload[6]);
+        response[6] = audio_output_get_volume();
+        response[5] = response[6] == frame->payload[6] ? 0 : 2;
+    }
+    send_reply(frame, CMD_APPLY_RESULT, response, sizeof(response));
+}
+
 static void handle_music(
     const protocol_frame_t *frame
 )
 {
+    if (frame->cmd == CMD_APPLY) {
+        handle_music_apply(frame);
+        return;
+    }
     if (voice_session_is_active() && frame->cmd != CMD_STOP
             && frame->cmd != CMD_PAUSE && frame->cmd != CMD_STATUS_REQUEST) {
         ESP_LOGW(TAG, "Music command rejected during voice session");
