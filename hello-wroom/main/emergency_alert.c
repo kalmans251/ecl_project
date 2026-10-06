@@ -24,7 +24,8 @@ static const char *TAG =
 #define ALERT_FREQ_LOW                660U
 
 #define ALERT_SWITCH_INTERVAL_MS      350U
-#define ALERT_VOLUME_PERCENT          70U
+//볼륨 설정 70 -> 1 로
+#define ALERT_VOLUME_PERCENT          1U
 
 #define ALERT_TASK_STACK_SIZE         4096
 #define ALERT_TASK_PRIORITY           9

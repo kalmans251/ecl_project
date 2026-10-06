@@ -1356,10 +1356,10 @@ static play_result_t play_mp3_file(
             }
         }
 
+        if (samples == 0){
+            vTaskDelay(1);
+        }
 
-        vTaskDelay(
-            1
-        );
     }
 
 
