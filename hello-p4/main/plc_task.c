@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "board_config.h"
 
 #include "plc_uart.h"
@@ -26,6 +28,19 @@ static bool send_complete_frame(const protocol_frame_t *frame)
 {
     uint8_t buffer[PROTOCOL_MAX_FRAME_SIZE];
     int len = protocol_encode(frame, buffer, sizeof(buffer));
+    if (len == 14 && frame->src == NODE_P4 && frame->dst == NODE_PI &&
+        frame->service == SERVICE_AUDIO && frame->command == CMD_DATA &&
+        frame->length == 4 && frame->payload[0] == AUDIO_DATA_EVENT &&
+        frame->payload[1] == AUDIO_EVENT_CALL_ENDED) {
+        char raw[14 * 3];
+        for (int i = 0; i < len; ++i) {
+            snprintf(raw + i * 3, sizeof(raw) - i * 3,
+                     i == len - 1 ? "%02x" : "%02x ", (unsigned)buffer[i]);
+        }
+        // This is the exact encoded buffer passed to uart_write_bytes below.
+        ESP_LOGI("PLC", "CALL END UART TX rail=%u raw=%s",
+                 (unsigned)frame->railing_id, raw);
+    }
     if (len <= 0 || plc_uart_send(buffer, len) != len
         || !plc_uart_wait_tx_done(300)) {
         ESP_LOGW("PLC", "UART transmission failed; no control grant issued");
