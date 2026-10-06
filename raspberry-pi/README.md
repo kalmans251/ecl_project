@@ -585,7 +585,7 @@ ptt 1 off
 hangup 1
 ```
 
-`call 1` sends PI → P4 AUDIO/START in a P4 receive window and waits for that
+`call 1` sends PI → P4 AUDIO/START using the existing guarded direct-control path and waits for that
 railing's P4 CALL_STARTED event. Only confirmed state enables the existing local
 mic/AUX or Codec2 relay. The default direction is FIELD_TX: listen to the field
 through AUX first, then use `ptt 1 on` to speak from the USB microphone. A repeated
@@ -607,3 +607,7 @@ and P4 logs, allow any late event to arrive, then hang up once state is confirme
 No new call state is fabricated locally after a timeout. As with the existing
 console, a Pi restart does not automatically recover an already active remote
 call without a P4 state event.
+
+Call initiation must not wait for a receive grant: current P4 grants only during
+FIELD_TX calls, including FIELD_TX with no voice packets. It does not emit grants
+while idle. PTT from FIELD_TX still uses the existing granted-window scheduling.
