@@ -37,6 +37,7 @@ class AudioManager:
         self._condition = threading.Condition()
         self._control_lock = threading.Lock()
         self._direction_revision: dict[int, int] = {}
+        self._start_revision: dict[int, int] = {}
 
     def handle_frame(
         self,
@@ -75,11 +76,20 @@ class AudioManager:
         direction = frame.payload[3]
 
         if event == int(AudioEvent.CALL_STARTED):
+            if (origin not in (int(CallOrigin.NORMAL), int(CallOrigin.EMERGENCY))
+                    or direction not in (int(AudioDirection.FIELD_TX), int(AudioDirection.CONTROL_TX))):
+                LOG.warning("Invalid CALL STARTED event rail=%d", frame.railing_id)
+                return True
             self._railings.call_started(
                 frame.railing_id,
                 origin,
                 direction,
             )
+
+            with self._condition:
+                self._start_revision[frame.railing_id] = (
+                    self._start_revision.get(frame.railing_id, 0) + 1)
+                self._condition.notify_all()
 
             LOG.info(
                 "CALL STARTED rail=%d origin=%s direction=%s",
@@ -162,6 +172,58 @@ class AudioManager:
 
         return True
 
+
+    def start_call(self, railing_id: int) -> bool:
+        """Start a normal call; return False if this railing is already connected.
+
+        Keep local audio disabled until the P4 CALL_STARTED event. This method
+        runs on the control thread, never from the PLC reader callback.
+        """
+        if not 1 <= railing_id <= 255:
+            raise ValueError("railing_id must be 1..255")
+        frame = Frame(railing_id=railing_id, src=Node.PI, dst=Node.P4,
+                      service=Service.AUDIO, command=Command.START)
+        with self._control_lock:
+            if self._railings.get_call_direction(railing_id) is not None:
+                return False
+            for state in self._railings.snapshot().values():
+                if state["emergency"]["active"]:
+                    raise RuntimeError("An emergency is active; use ack for the emergency call")
+                if state["call"]["active"]:
+                    raise RuntimeError("Another railing has an active call; hang up first")
+            with self._condition:
+                revision = self._start_revision.get(railing_id, 0)
+            for attempt in range(1, self._attempts + 1):
+                # A late confirmation from the previous attempt may already be here.
+                with self._condition:
+                    if self._start_revision.get(railing_id, 0) > revision:
+                        if self._railings.get_call_direction(railing_id) is None:
+                            raise RuntimeError("Call ended before start confirmation")
+                        return True
+                LOG.info("CALL start request rail=%d attempt=%d/%d",
+                         railing_id, attempt, self._attempts)
+                try:
+                    # Idle P4 also grants receive windows. Use them rather than
+                    # racing a P4 transmission or an unknown field voice stream.
+                    self._bus.send_control_frame(frame, wait_for_window=True)
+                except TimeoutError:
+                    if attempt == self._attempts:
+                        raise
+                    continue
+                deadline = time.monotonic() + self._ack_timeout
+                with self._condition:
+                    while self._start_revision.get(railing_id, 0) <= revision:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            break
+                        self._condition.wait(remaining)
+                    if self._start_revision.get(railing_id, 0) > revision:
+                        if self._railings.get_call_direction(railing_id) is None:
+                            raise RuntimeError("Call ended before start confirmation")
+                        LOG.info("CALL start confirmed rail=%d", railing_id)
+                        return True
+                LOG.warning("No P4 call-start confirmation rail=%d attempt=%d", railing_id, attempt)
+            raise TimeoutError("Call start was not confirmed by P4; the remote call may have started")
 
     def set_direction(
         self,
