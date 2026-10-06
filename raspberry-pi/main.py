@@ -98,6 +98,7 @@ def print_help() -> None:
         "  status [railing_id]  show cached railing state\n"
         "  ack <railing_id>     acknowledge active emergency\n"
         "  ping <railing_id>    send SYSTEM/PING to P4\n"
+        "  call <id>           start a normal call (initial FIELD_TX)\n"
         "  ptt <id> on|off      switch CONTROL_TX / FIELD_TX\n"
         "  hangup <id>          end active call\n"
         "  voice-status         show Codec2 relay counters\n"
@@ -311,6 +312,20 @@ def main() -> int:
                 )
                 continue
 
+
+            if command == "call":
+                if len(parts) != 2:
+                    print("usage: call <railing_id>")
+                    continue
+                try:
+                    railing_id = int(parts[1], 0)
+                    started = audio.start_call(railing_id)
+                except (ValueError, RuntimeError, OSError) as exc:
+                    print(f"CALL failed: {exc}")
+                    continue
+                print(f"CALL {'confirmed' if started else 'already active'} rail={railing_id}; "
+                      "use ptt on to talk, ptt off to listen")
+                continue
 
             if command == "ptt":
                 if (

@@ -67,6 +67,7 @@ status
 status 1
 ping 1
 ack 1
+call 1
 ptt 1 on
 ptt 1 off
 hangup 1
@@ -461,7 +462,7 @@ also be used: `--speaker-device "bcm2835 Headphones"` (the local-mode default).
 Connect the AUX powered speaker/amp as in the earlier Pi listening test.
 Use the project's active virtual environment for pip and main.py.
 
-After emergency ACK establishes a call:
+After `call 1` starts a normal call, or emergency ACK establishes a call:
 
 - `ptt 1 on`: after P4 confirmation, USB microphone PCM is encoded as Codec2 and
   sent to WROOM. AUX playback is muted and its stale buffer cleared.
@@ -565,3 +566,44 @@ weather/basic and projector; test sleep/radar wake. During a call, try `led 1
 basic` and verify rejection while PTT still responds. Test configured power
 selection as a separate step. EQ data generation remains the next integration
 work item.
+
+
+## Control-center initiated normal call
+
+No field emergency request is required. Run the existing local-audio command:
+
+```bash
+python main.py --local-audio --audio-railing 1 --mic-device 1 --speaker-device 0
+```
+
+Then use the console:
+
+```text
+call 1
+ptt 1 on
+ptt 1 off
+hangup 1
+```
+
+`call 1` sends PI → P4 AUDIO/START in a P4 receive window and waits for that
+railing's P4 CALL_STARTED event. Only confirmed state enables the existing local
+mic/AUX or Codec2 relay. The default direction is FIELD_TX: listen to the field
+through AUX first, then use `ptt 1 on` to speak from the USB microphone. A repeated
+`call 1` on an already confirmed call sends nothing and preserves direction.
+An active call on another railing or an active emergency blocks a new normal
+call; handle an emergency with the existing `ack` flow.
+
+Apply this change to Pi only; the existing P4 firmware already implements normal
+call START, music pause, physical wake and call-end restoration. Check with music
+playing and while sleeping, confirm both voice directions, and verify music or
+sleep restores after hangup. P4 confirmation establishes call state; physical
+S3/BLE audio readiness and audible restoration still require hardware checks.
+
+Missing confirmation is reported as a timeout, never as successful connection.
+A lost request is retried up to three times. If the CALL_STARTED response itself
+was lost, P4 may already be in a call and ignore duplicate START requests; this
+version does not claim to repair that state automatically. Inspect `status 1`
+and P4 logs, allow any late event to arrive, then hang up once state is confirmed.
+No new call state is fabricated locally after a timeout. As with the existing
+console, a Pi restart does not automatically recover an already active remote
+call without a P4 state event.
