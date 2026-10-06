@@ -46,11 +46,10 @@ static protocol_frame_t queue[16], sent[32];
 static unsigned count, index_, sent_count, drained;
 static int64_t now;
 static call_state_t mode;
-static bool drain_ok, recovery;
+static bool drain_ok;
 
 int64_t esp_timer_get_time(void) { return now; }
 call_state_t call_manager_get_state(void) { return mode; }
-bool call_manager_end_recovery_active(void) { return recovery; }
 int xQueueReceive(QueueHandle_t q, void *out, TickType_t timeout) {
     (void)timeout;
     assert(q == plc_tx_queue);
@@ -75,7 +74,7 @@ int plc_uart_receive(uint8_t *buffer, size_t len) {
 }
 static void reset(void) {
     count = index_ = sent_count = drained = 0;
-    now = 0; mode = CALL_STATE_FIELD_TX; drain_ok = true; recovery=false;
+    now = 0; mode = CALL_STATE_FIELD_TX; drain_ok = true;
     s_receive_until_us = s_last_grant_us = s_last_voice_us = s_end_tx_quiet_until_us = 0;
     s_voice_packets_since_grant = 0;
 }
@@ -125,11 +124,11 @@ int main(void) {
     reset(); mode = CALL_STATE_IDLE; queue[count++] = voice();
     process_plc_tx_queue(); assert(sent_count == 0);
 
-    reset();mode=CALL_STATE_IDLE;recovery=true;now=PLC_IDLE_GRANT_MS*1000;
-    process_plc_tx_queue();assert(sent_count==1 && sent[0].payload[0]==AUDIO_DATA_CONTROL_WINDOW);
-    recovery=false;now=s_receive_until_us;process_plc_tx_queue();assert(sent_count==1);
+    reset();mode=CALL_STATE_IDLE;now=PLC_IDLE_GRANT_MS*1000;
+    process_plc_tx_queue();assert(sent_count==0);
+    now+=8000000;process_plc_tx_queue();assert(sent_count==0);
 
-    reset(); mode=CALL_STATE_IDLE; recovery=true; now=PLC_IDLE_GRANT_MS*1000;
+    reset(); mode=CALL_STATE_IDLE; now=PLC_IDLE_GRANT_MS*1000;
     queue[count++]=event();queue[0].payload[1]=AUDIO_EVENT_CALL_ENDED;
     queue[0].payload[3]=0;
     process_plc_tx_queue();
@@ -138,8 +137,8 @@ int main(void) {
     now=end_drained+PLC_END_TX_QUIET_MS*1000-1;
     process_plc_tx_queue();assert(sent_count==1);
     now=end_drained+PLC_END_TX_QUIET_MS*1000;
-    process_plc_tx_queue();assert(sent_count==2);
-    assert(sent[1].payload[0]==AUDIO_DATA_CONTROL_WINDOW);
+    process_plc_tx_queue();assert(sent_count==1);
+    queue[count++]=event();process_plc_tx_queue();assert(sent_count==2);
 
     reset(); drain_ok = false; queue[count++] = voice(); queue[count++] = voice();
     process_plc_tx_queue();
