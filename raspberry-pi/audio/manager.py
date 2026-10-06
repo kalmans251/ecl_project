@@ -302,10 +302,15 @@ class AudioManager:
                               service=Service.AUDIO, command=Command.STOP),
                         wait_for_window=(current == int(AudioDirection.FIELD_TX)))
                 except TimeoutError:
+                    # END may arrive while waiting for a retry grant, after P4
+                    # has already become idle. Recheck before declaring failure.
+                    if self._railings.get_call_direction(railing_id) is None:
+                        return
                     if attempt == self._attempts:
                         raise
                     continue
-                deadline = time.monotonic() + self._ack_timeout
+                # END follows the current receive window and restoration traffic.
+                deadline = time.monotonic() + self._ack_timeout * 3
                 with self._condition:
                     while self._railings.get_call_direction(railing_id) is not None:
                         remaining = deadline - time.monotonic()
