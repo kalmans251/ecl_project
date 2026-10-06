@@ -76,7 +76,20 @@ class MusicEqTests(unittest.TestCase):
 WRAPPER_HARNESS=r'''
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
+#include <stdbool.h>
+static bool workspace_ok=true;
+static unsigned live_workspaces;
+static void *workspace_calloc(size_t count,size_t size) {
+    if (!workspace_ok) return NULL;
+    void *p=calloc(count,size);if(p) ++live_workspaces;return p;
+}
+static void workspace_free(void *p) { if(p) --live_workspaces;free(p); }
+#define calloc workspace_calloc
+#define free workspace_free
 #include "music_eq.c"
+#undef calloc
+#undef free
 static bool active, accepting=true;
 static protocol_frame_t captured;
 static unsigned attempts, notifications;
@@ -86,6 +99,7 @@ BaseType_t xTaskCreate(void (*fn)(void *),const char *name,unsigned stack,void *
     *task=allocation_ok?(void *)1:NULL;return allocation_ok?pdPASS:0;
 }
 void xTaskNotifyGive(TaskHandle_t task) { assert(task);++notifications; }
+void vTaskDelay(unsigned ticks) { (void)ticks;process_pending(); }
 unsigned ulTaskNotifyTake(int clear,unsigned timeout) { (void)clear;(void)timeout;return 1; }
 int64_t esp_timer_get_time(void) { static int64_t t; t+=100; if(invalidate) { invalidate=false; music_eq_reset(); } return t; }
 bool voice_session_is_active(void) { return active; }
@@ -98,6 +112,7 @@ int main(void) {
     music_eq_feed(pcm,1024,16000);assert(notifications==0);
     allocation_ok=true; assert(music_eq_init());
     music_eq_reset();
+    process_pending(); // worker allocates the workspace, never the producer
     music_eq_feed(pcm,1024,16000);
     music_eq_feed(pcm,1024,16000);
     assert(s_overwritten==1 && attempts==0); // producer never runs FFT or sends
@@ -125,6 +140,20 @@ int main(void) {
     for(int i=0;i<8;++i) music_eq_feed(pcm,1024,16000);
     music_eq_clear();
     assert(attempts==old); // no EQ traffic during calls
+    assert(s_context);
+    assert(music_eq_suspend());assert(!s_context);
+    music_eq_feed(pcm,1024,16000);process_pending();assert(!s_context);
+    active=false;music_eq_resume();process_pending();assert(s_context);
+    for(int i=0;i<4;++i) { music_eq_feed(pcm,1024,16000);process_pending(); }
+    assert(attempts>old);
+    assert(music_eq_suspend());assert(!s_context && live_workspaces==0);
+    workspace_ok=false;music_eq_resume();process_pending();
+    assert(!s_context && s_alloc_failed);
+    unsigned notified=notifications;
+    for(int i=0;i<4;++i) music_eq_feed(pcm,1024,16000);
+    assert(notifications==notified); // allocation failure does not flood retries
+    workspace_ok=true;music_eq_reset();process_pending();assert(s_context);
+    assert(music_eq_suspend());assert(live_workspaces==0);
     return 0;
 }
 '''
@@ -136,12 +165,13 @@ class EqTransportTests(unittest.TestCase):
             root=Path(folder)
             for name, text in HEADERS.items():
                 p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
-            (root/'freertos/FreeRTOS.h').write_text(HEADERS['freertos/FreeRTOS.h']+'\ntypedef int BaseType_t;\n#define pdPASS 1\n#define pdTRUE 1\n')
+            (root/'freertos/FreeRTOS.h').write_text(HEADERS['freertos/FreeRTOS.h']+'\ntypedef int BaseType_t;\n#define pdPASS 1\n#define pdTRUE 1\n#define pdMS_TO_TICKS(ms) (ms)\n')
             (root/'freertos/task.h').write_text('''#pragma once
 #include "FreeRTOS.h"
 BaseType_t xTaskCreate(void (*)(void *),const char *,unsigned,void *,unsigned,TaskHandle_t *);
 void xTaskNotifyGive(TaskHandle_t);
 unsigned ulTaskNotifyTake(int,unsigned);
+void vTaskDelay(unsigned);
 ''')
             (root/'esp_log.h').write_text('#define ESP_LOGI(tag,...) ((void)(tag))\n#define ESP_LOGW(tag,...) ((void)(tag))\n')
             (root/'esp_timer.h').write_text('#include <stdint.h>\nint64_t esp_timer_get_time(void);\n')

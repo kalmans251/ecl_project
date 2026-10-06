@@ -7,3 +7,7 @@ void music_eq_reset(void);
 void music_eq_clear(void);
 /* Copies PCM only; FFT and logging run in the low-priority EQ task. */
 void music_eq_feed(const int16_t *stereo, size_t samples, unsigned rate);
+
+/* Controller-only: wait for worker to release its heap workspace on calls. */
+bool music_eq_suspend(void);
+void music_eq_resume(void);
