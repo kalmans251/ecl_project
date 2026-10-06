@@ -12,6 +12,8 @@
 #include "esp_log.h"
 
 static int64_t s_receive_until_us;
+static int64_t s_end_tx_quiet_until_us;
+#define PLC_END_TX_QUIET_MS 100
 static int64_t s_last_grant_us;
 static int64_t s_last_voice_us;
 static unsigned s_voice_packets_since_grant;
@@ -82,7 +84,8 @@ static void handle_plc_frame(
 
 static void process_plc_tx_queue(void)
 {
-    if (esp_timer_get_time() < s_receive_until_us) return;
+    if (esp_timer_get_time() < s_receive_until_us ||
+        esp_timer_get_time() < s_end_tx_quiet_until_us) return;
     protocol_frame_t frame;
 
 
@@ -103,6 +106,17 @@ static void process_plc_tx_queue(void)
         if (!send_complete_frame(&frame)) {
             // Do not stream more bytes over a transmission that did not drain.
             s_receive_until_us = esp_timer_get_time() + PLC_CONTROL_WINDOW_MS * 1000;
+            return;
+        }
+        if (frame.src == NODE_P4 && frame.dst == NODE_PI &&
+            frame.service == SERVICE_AUDIO && frame.command == CMD_DATA &&
+            frame.length == 4 && frame.payload[0] == AUDIO_DATA_EVENT &&
+            frame.payload[1] == AUDIO_EVENT_CALL_ENDED) {
+            ESP_LOGI("PLC", "CALL END UART sent rail=%u bytes=14; quiet=%ums",
+                     (unsigned)frame.railing_id, PLC_END_TX_QUIET_MS);
+            // UART drain only confirms local transmission. Separate END from
+            // the next grant so modem delivery is not one continuous burst.
+            s_end_tx_quiet_until_us = esp_timer_get_time() + PLC_END_TX_QUIET_MS * 1000;
             return;
         }
         if (voice) {

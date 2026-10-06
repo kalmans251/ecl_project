@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from .constants import HEADER_SIZE, MAX_PAYLOAD, SOF1, SOF2
 from .frame import Frame, ProtocolError
+
+
+LOG = logging.getLogger(__name__)
 
 
 class FrameParser:
@@ -59,7 +64,8 @@ class FrameParser:
 
             try:
                 frame = Frame.decode(candidate)
-            except ProtocolError:
+            except ProtocolError as exc:
+                LOG.debug("PLC frame rejected: %s raw=%s", exc, candidate.hex(" "))
                 # Drop one byte, then search for the next SOF.
                 del self._buffer[0]
                 continue

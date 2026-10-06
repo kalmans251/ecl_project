@@ -29,7 +29,7 @@ HEADERS = {
         int xQueueSend(QueueHandle_t, const void *, TickType_t);
     """,
     "esp_timer.h": "#include <stdint.h>\nint64_t esp_timer_get_time(void);\n",
-    "esp_log.h": '#define ESP_LOGW(tag, ...) ((void)0)\n',
+    "esp_log.h": '#define ESP_LOGW(tag, ...) ((void)0)\n#define ESP_LOGI(tag, ...) ((void)0)\n',
 }
 
 HARNESS = r"""
@@ -76,7 +76,7 @@ int plc_uart_receive(uint8_t *buffer, size_t len) {
 static void reset(void) {
     count = index_ = sent_count = drained = 0;
     now = 0; mode = CALL_STATE_FIELD_TX; drain_ok = true; recovery=false;
-    s_receive_until_us = s_last_grant_us = s_last_voice_us = 0;
+    s_receive_until_us = s_last_grant_us = s_last_voice_us = s_end_tx_quiet_until_us = 0;
     s_voice_packets_since_grant = 0;
 }
 static protocol_frame_t voice(void) {
@@ -128,6 +128,18 @@ int main(void) {
     reset();mode=CALL_STATE_IDLE;recovery=true;now=PLC_IDLE_GRANT_MS*1000;
     process_plc_tx_queue();assert(sent_count==1 && sent[0].payload[0]==AUDIO_DATA_CONTROL_WINDOW);
     recovery=false;now=s_receive_until_us;process_plc_tx_queue();assert(sent_count==1);
+
+    reset(); mode=CALL_STATE_IDLE; recovery=true; now=PLC_IDLE_GRANT_MS*1000;
+    queue[count++]=event();queue[0].payload[1]=AUDIO_EVENT_CALL_ENDED;
+    queue[0].payload[3]=0;
+    process_plc_tx_queue();
+    assert(sent_count==1 && sent[0].payload[1]==AUDIO_EVENT_CALL_ENDED);
+    int64_t end_drained=now;
+    now=end_drained+PLC_END_TX_QUIET_MS*1000-1;
+    process_plc_tx_queue();assert(sent_count==1);
+    now=end_drained+PLC_END_TX_QUIET_MS*1000;
+    process_plc_tx_queue();assert(sent_count==2);
+    assert(sent[1].payload[0]==AUDIO_DATA_CONTROL_WINDOW);
 
     reset(); drain_ok = false; queue[count++] = voice(); queue[count++] = voice();
     process_plc_tx_queue();
