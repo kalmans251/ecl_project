@@ -1,0 +1,7 @@
+/target/
+/data/
+.env
+application-local.yml
+/.venv/
+__pycache__/
+*.pyc

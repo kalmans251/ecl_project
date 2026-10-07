@@ -1,0 +1,15 @@
+services:
+  monitoring-server:
+    build: .
+    environment:
+      SERVER_ADDRESS: 0.0.0.0
+      MONITOR_ADMIN_TOKEN: ${MONITOR_ADMIN_TOKEN:?Set admin token}
+      MONITOR_ANALYTICS_TOKEN: ${MONITOR_ANALYTICS_TOKEN:?Set analytics token}
+      MONITOR_GATEWAY_TOKEN: ${MONITOR_GATEWAY_TOKEN:?Set gateway token}
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - monitoring-data:/app/data
+    restart: unless-stopped
+volumes:
+  monitoring-data:

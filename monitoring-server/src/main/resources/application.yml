@@ -1,0 +1,26 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  port: ${SERVER_PORT:8080}
+  tomcat:
+    max-connections: 100
+spring:
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:file:./data/monitoring}
+    username: sa
+    password: ${DATABASE_PASSWORD:}
+  sql:
+    init:
+      mode: always
+monitoring:
+  admin-token: ${MONITOR_ADMIN_TOKEN:}
+  analytics-token: ${MONITOR_ANALYTICS_TOKEN:}
+  gateways:
+    - id: gateway-01
+      token: ${MONITOR_GATEWAY_TOKEN:}
+  cameras:
+    - id: cctv01
+      gateway-id: gateway-01
+      railing-id: 1
