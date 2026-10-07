@@ -71,6 +71,31 @@ class ControlsTests(unittest.TestCase):
                 from protocol import FrameParser
                 self.assertEqual(FrameParser().feed(self.bus.sent[0].encode()), self.bus.sent)
 
+    def test_cctv_event_wire_format_and_validation(self):
+        cases = [('cctv 1 enter 100', bytes.fromhex('01 00 00 00 64')),
+                 ('cctv 1 enter 0', bytes.fromhex('01 00 00 00 00')),
+                 ('cctv 1 enter 0xffffffff', bytes.fromhex('01 ff ff ff ff'))]
+        for age, code in [('10', 1), ('20', 2), ('30', 3), ('40', 4), ('keep', 255)]:
+            cases.append((f'cctv 1 age 100 {age}', bytes([2, 0, 0, 0, 100, code])))
+        for line, payload in cases:
+            self.bus.sent.clear()
+            self.assertIn('not confirmed', self.controls.execute(line.split()))
+            frame = Frame(1, Node.PI, Node.P4, Service.DETECTION, Command.DATA, payload)
+            self.assertEqual(self.bus.sent, [frame])
+            from protocol import FrameParser
+            self.assertEqual(FrameParser().feed(frame.encode()), [frame])
+        self.bus.sent.clear()
+        for line in ['cctv 1 enter -1', 'cctv 1 enter 4294967296', 'cctv 1 enter x',
+                     'cctv 1 enter', 'cctv 1 enter 1 extra', 'cctv 1 age 1',
+                     'cctv 1 age 1 50', 'cctv 1 age 1 20 extra', 'cctv 1 other 1']:
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                self.controls.execute(line.split())
+        self.assertEqual(self.bus.sent, [])
+        self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
+        with self.assertRaises(RuntimeError):
+            self.controls.execute('cctv 1 enter 1'.split())
+        self.assertEqual(self.bus.sent, [])
+
     def test_application_timeout_is_unknown_and_not_retried(self):
         self.bus.send_frame = self.bus.sent.append
         with self.assertRaisesRegex(TimeoutError, 'unknown'):
