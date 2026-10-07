@@ -19,7 +19,7 @@ HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop cu
   volume <id> <0..100>           shared WROOM music/voice volume (outside calls)
   sleep <id> on|off              enable/disable existing sleep policy
   detection <id> radar|cctv      choose detection source (CCTV input needs server)
-  query <id> p4|wroom|s3         request live SYSTEM status
+  cctv <id> enter <seq>          inject a new-person event (CCTV mode)\n  cctv <id> age <seq> 10|20|30|40|keep\n                                inject matching age result; keep preserves group\n  query <id> p4|wroom|s3         request live SYSTEM status
 '''
 
 
@@ -35,7 +35,7 @@ class DeviceControls:
 
     def execute(self, parts):
         if not parts or parts[0].lower() not in (
-                'power', 'projector', 'led', 'music', 'volume', 'sleep', 'detection', 'query', 'ping'):
+                'power', 'projector', 'led', 'music', 'volume', 'sleep', 'detection', 'query', 'ping', 'cctv'):
             return None
         name = parts[0].lower()
         if len(parts) < 3 and not (name == 'ping' and len(parts) == 2):
@@ -98,6 +98,24 @@ class DeviceControls:
             add(Service.SLEEP, one({'on': Command.START, 'off': Command.STOP}))
         elif name == 'detection':
             add(Service.DETECTION, Command.SET, bytes([one({'radar': 0, 'cctv': 1})]))
+        elif name == 'cctv':
+            if (not args or args[0] not in ('enter', 'age')
+                    or len(args) != (2 if args[0] == 'enter' else 3)):
+                raise ValueError('cctv: use enter <seq> or age <seq> 10|20|30|40|keep')
+            try:
+                seq = int(args[1], 0)
+            except ValueError:
+                raise ValueError('cctv: seq must be an integer 0..4294967295') from None
+            if not 0 <= seq <= 0xffffffff:
+                raise ValueError('cctv: seq must be 0..4294967295')
+            token = seq.to_bytes(4, 'big')
+            if args[0] == 'enter':
+                add(Service.DETECTION, Command.DATA, bytes([1]) + token)
+            else:
+                ages = {'10': 1, '20': 2, '30': 3, '40': 4, 'keep': 0xff}
+                if args[2] not in ages:
+                    raise ValueError('cctv age: expected 10|20|30|40|keep')
+                add(Service.DETECTION, Command.DATA, bytes([2]) + token + bytes([ages[args[2]]]))
         elif name == 'query':
             add(Service.SYSTEM, Command.STATUS_REQUEST,
                 dst=one({'p4': Node.P4, 'wroom': Node.WROOM, 's3': Node.S3}))
