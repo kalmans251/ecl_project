@@ -9,13 +9,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import tools.jackson.databind.json.JsonMapper;
-@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
+@SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"portal.bootstrap-password=integration-test-password",
     "spring.datasource.url=jdbc:h2:mem:monitor-test;DB_CLOSE_DELAY=-1",
     "monitoring.admin-token=admin-012345678901234567890123456789",
     "monitoring.analytics-token=analytics-012345678901234567890123456789",
     "monitoring.gateways[0].id=gateway-01", "monitoring.gateways[0].token=gateway-012345678901234567890123456789",
     "monitoring.gateways[1].id=gateway-02", "monitoring.gateways[1].token=other-012345678901234567890123456789"})
 class ServerTest {
+    @org.springframework.beans.factory.annotation.Autowired Registry registry;
     @Value("${local.server.port}") int port;
     @Autowired Events events;
     @Autowired Settings settings;
@@ -96,7 +97,7 @@ class ServerTest {
     }
     @Test void offlineDoesNotClaimSuccessOrReplay() {
         var offline=new Gateways();
-        var service=new Events(database,settings,offline);
+        var service=new Events(database,settings,offline,registry);
         UUID id=UUID.randomUUID();
         var input=new Events.Input("cctv01",id,"enter",null,Instant.now());
         var result=service.submit(input);

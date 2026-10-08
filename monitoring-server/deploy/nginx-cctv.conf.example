@@ -1,0 +1,27 @@
+# Include inside the HTTPS server block. Spring listens only on 127.0.0.1:8080.
+# MediaMTX WebRTC HTTP listener: 127.0.0.1:8889. Keep MediaMTX's direct listener private.
+# Register each camera id with exactly /cctv/<same-id>/ as its stream_path.
+# Configure trusted proxy forwarding in Spring for your deployment before enabling WSS voice.
+location ~ ^/cctv/(?<camera_id>[A-Za-z0-9_-]+)/(?<camera_path>.*)$ {
+    auth_request /_camera_access;
+    proxy_pass http://127.0.0.1:8889/$camera_id/$camera_path$is_args$args;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_buffering off;
+}
+location = /_camera_access {
+    internal;
+    proxy_pass http://127.0.0.1:8080/api/portal/cameras/$camera_id/authorize;
+    proxy_pass_request_body off;
+    proxy_set_header Content-Length "";
+    proxy_set_header Cookie $http_cookie;
+}
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 75s;
+}

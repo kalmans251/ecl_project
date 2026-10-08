@@ -3,6 +3,9 @@ services:
     build: .
     environment:
       SERVER_ADDRESS: 0.0.0.0
+      MONITOR_BOOTSTRAP_USER: ${MONITOR_BOOTSTRAP_USER:-admin}
+      MONITOR_BOOTSTRAP_PASSWORD: ${MONITOR_BOOTSTRAP_PASSWORD:?Set initial admin password}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       MONITOR_ADMIN_TOKEN: ${MONITOR_ADMIN_TOKEN:?Set admin token}
       MONITOR_ANALYTICS_TOKEN: ${MONITOR_ANALYTICS_TOKEN:?Set analytics token}
       MONITOR_GATEWAY_TOKEN: ${MONITOR_GATEWAY_TOKEN:?Set gateway token}

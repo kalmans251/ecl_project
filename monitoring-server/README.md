@@ -1,15 +1,9 @@
-# Monitoring server — CCTV delivery foundation
+# Monitoring server — 모니터링 화면과 현장별 제어 서버
 
-Spring Boot 4.1.1 / Java 17 / Maven 3.9+. 이 모듈은 새로운 서버의 첫 단계입니다.
-기존 Pi/P4/WROOM/S3 코드는 변경하지 않습니다.
+Spring Boot 4.1.1 / Java 17 / Maven 3.9+. 기존 모니터링 화면을 새 계정·현장 권한·장치 명령 구조에 연결했습니다.
 
-- CCTV Pi: 카메라 영상을 서버로 전송 (기존 영상 경로 유지).
-- 서버 PC 분석 프로그램: YOLO/추적/연령 추정 후 이 서버의 HTTPS API로 이벤트 전송.
-- Spring Boot: 카메라 매핑, 영속 이벤트 번호/중복 관리, 난간 Pi로 WSS 전달.
-- 난간 Pi: 다음 단계에서 실제 클라이언트를 추가하여 기존 CCTV 프레임으로 변환.
-
-현재 실제 Pi 클라이언트, 영상 분석 프로그램의 송신 어댑터, 웹 대시보드,
-일반 제어/통화/Codec2 서버 연동은 포함하지 않습니다.
+화면 이식 범위와 지원 상태는 [UI_MIGRATION.md](UI_MIGRATION.md), 새 Pi 어댑터 규격은 [DEVICE_PROTOCOL.md](DEVICE_PROTOCOL.md)를 확인하세요.
+기존 Pi/P4/WROOM/S3 펌웨어는 이 변경에서 수정하지 않습니다. 실물 연결에는 새 서버 규격을 처리하는 Pi 어댑터가 필요합니다.
 
 ## 실행
 
@@ -25,16 +19,21 @@ function New-Token { $b = New-Object byte[] 32; $r = [System.Security.Cryptograp
 $env:MONITOR_ADMIN_TOKEN = New-Token
 $env:MONITOR_ANALYTICS_TOKEN = New-Token
 $env:MONITOR_GATEWAY_TOKEN = New-Token
+$env:MONITOR_BOOTSTRAP_USER = "admin"
+$env:MONITOR_BOOTSTRAP_PASSWORD = Read-Host "최초 관리자 비밀번호 (12자 이상)"
 mvn verify
 mvn spring-boot:run
 ```
 
+브라우저에서 http://localhost:8080 을 열어 위 관리자 계정으로 로그인합니다.
+최초 빈 DB에만 관리자를 생성합니다. 이후 환경변수 변경은 기존 비밀번호를 바꾸지 않습니다.
+
 다른 테스트 터미널에는 해당 역할의 토큰만 같은 값으로 설정합니다.
 서버를 다시 실행할 때 기존 토큰을 다시 설정해야 합니다. 토큰은 URL이나 로그에 넣지 않습니다.
 
-Linux/macOS에서는 세 환경변수를 export한 뒤 같은 Maven 명령으로 실행합니다.
+Linux/macOS에서는 세 토큰과 최초 관리자 비밀번호 환경변수를 export한 뒤 같은 Maven 명령으로 실행합니다.
 패키징: `mvn verify`, 실행: `java -jar target/monitoring-server-0.1.0.jar`.
-Docker: 세 환경변수를 설정하고 `docker compose up --build`.
+Docker: 세 토큰과 최초 관리자 비밀번호 환경변수를 설정하고 `docker compose up --build`.
 Docker 볼륨에는 DB가 보존되며 `down -v`는 이벤트 번호/기록을 삭제하므로 운영 중 사용하지 않습니다.
 
 ## 로컬 동작 테스트
@@ -46,7 +45,7 @@ python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r tools/requirements.txt
 # gateway 토큰을 설정한 터미널
-python tools/mock_gateway.py
+python tools/mock_gateway.py --simulate-device
 # analytics 토큰을 설정한 별도 터미널
 python tools/send_event.py
 ```
@@ -58,7 +57,7 @@ python tools/send_event.py --type age --event-id <출력된-UUID> --age-group 20
 ```
 
 모의 클라이언트에서 두 메시지의 `event_seq`가 같은지 확인합니다.
-모의 클라이언트는 RECEIVED만 응답합니다. PLC나 스피커를 제어하지 않습니다.
+기본 모의 클라이언트는 RECEIVED만 응답합니다. `--simulate-device`를 추가하면 화면 확인용 가짜 계측과 APPLIED/PLC_SENT 응답도 생성합니다. 실제 PLC나 스피커를 제어하지 않습니다.
 연결 상태 및 전달 결과 조회 (관리자 토큰 터미널):
 
 ```powershell
@@ -76,11 +75,11 @@ Invoke-RestMethod http://127.0.0.1:8080/api/events/<message_id> -Headers $header
 | GET /api/events/{message_id} | admin Bearer 토큰 | 처리 상태 |
 | /ws/gateways/{gateway_id} | 해당 gateway Bearer 토큰 | 네이티브 Pi WebSocket |
 
-카메라→gateway→난간 번호는 `application.yml`의 monitoring.cameras에 등록합니다.
+초기 카메라→gateway→난간 매핑은 `application.yml`에서 DB에 한 번 등록합니다. 이후 추가는 화면의 관리 메뉴에서 합니다.
 초기값은 **cctv01 → gateway-01 → 난간 1**입니다. 한 Pi의 여러 난간은 동일 gateway에 매핑합니다.
 카메라 없는 난간에는 camera 항목을 추가하지 않습니다. gateway 토큰은 장치별로 다르게 지정합니다.
 설정은 서버 운영자가 관리하며 분석 요청이 임의의 난간 번호를 지정할 수 없습니다.
-브라우저 Origin이 있는 장치 WebSocket 요청은 거절합니다. 향후 웹 화면은 별도 인증 경로를 사용합니다.
+브라우저 Origin이 있는 장치 WebSocket 요청은 거절합니다. 웹 화면은 별도 세션 인증과 현장 권한을 사용합니다.
 
 ## 분석 입력 규격
 
@@ -134,7 +133,7 @@ Pi→서버:
 | EXPIRED | Pi에서 유효시간 초과로 폐기 |
 | UNKNOWN | 연결/송신 실패, 응답 시간 초과 또는 서버 재시작으로 결과 불명 |
 
-모든 결과에 device_application_confirmed=false를 반환합니다.
+CCTV 이벤트 결과는 device_application_confirmed=false를 반환합니다. 일반 제어의 APPLIED 구분은 DEVICE_PROTOCOL.md를 참고하세요.
 서버는 실패/불명 결과를 자동 재전송하지 않으며 재연결 때 오래된 감지를 재생하지 않습니다.
 CCTV 수신은 P4 적용 응답이 없으므로 전달 성공만으로 음악/슬립 적용을 단정하지 않습니다.
 Pi 클라이언트는 수신/PLC 작업을 분리하고, 통화 중에는 BUSY를 응답하며,
@@ -149,16 +148,22 @@ HTTPS/WSS 443을 제공합니다. WebSocket Upgrade 전달과 proxy_read_timeout
 인터넷에서 HTTP/WS로 Bearer 토큰을 보내거나 Pi에서 인증서 검증을 끄지 않습니다.
 Pi는 서버로 접속하므로 Pi 수신 포트 개방은 필요 없습니다.
 
-초기 제한: 요청 본문/WebSocket 메시지 4KiB, 인증 역할/장치당 HTTP 600회/분,
+초기 제한: 네이티브 API 본문/WebSocket 메시지 4KiB, 인증 역할/장치당 HTTP 600회/분,
 연결당 ack 30회/초, WebSocket 송신 버퍼 32KiB, 장치당 연결 1개.
 DB는 단일 서버 로컬 H2이며 전달 기록 10만 건에서 신규 입력을 중단합니다.
 장기 운영 전 기록 보존/정리 및 운영 DB 정책을 추가해야 합니다. DB를 삭제하면 번호가 재사용되므로
 연결된 P4의 이벤트 기록도 초기화하지 않은 상태에서 DB를 삭제하지 않습니다.
-토큰 회전은 설정 변경 후 서버 재시작으로 수행합니다.
+초기 장치 토큰은 DB에 해시로 등록됩니다. 환경변수 변경만으로 기존 장치 토큰을 덮어쓰지 않습니다.
+운영 배포 전 계정 비밀번호 재설정·장치 토큰 교체 절차와 로그인 시도 제한을 추가해야 합니다.
 
 ## 검증 범위와 다음 작업
 
 `mvn verify`에는 실제 HTTP/WebSocket 연결을 사용하는 인증·권한·메시지 전달·번호 매칭·중복·ack 테스트가 포함됩니다.
 GitHub Actions에서도 monitoring-server 변경 시 별도 빌드합니다.
-다음 단계는 난간 Pi의 WSS 클라이언트, 실제 분석 프로그램 송신 어댑터, 장치 적용 확인,
-일반 제어/통화와 모니터링 화면입니다. 펌웨어/PLC 하드웨어 테스트는 이 서버 테스트와 별도로 필요합니다.
+다음 단계는 난간 Pi의 WSS 어댑터와 실제 분석 프로그램 송신 어댑터입니다.
+일반 제어/통화/화면의 서버 처리는 구현되어 있고, 실물 장치 적용 확인은 Pi 연동 후 검증합니다.
+펌웨어/PLC 하드웨어 테스트는 이 서버 테스트와 별도로 필요합니다.
+
+이번 검증: Java HTTP/WebSocket 통합 테스트 9개, 실제 libcodec2 변환 테스트 3개,
+실제 서버와 시뮬레이터를 연결한 DOM/API 테스트(로그인, 상태 수신, 옵션 적용, 처리 이력, 통화 시작/종료, 관리 화면).
+실행 환경의 브라우저 제약으로 픽셀 렌더링·마이크·실제 CCTV 영상은 검증하지 않았습니다.

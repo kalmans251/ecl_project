@@ -3,25 +3,24 @@ import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
-import org.springframework.stereotype.Component;
+
 import org.springframework.web.filter.OncePerRequestFilter;
-@Component
 public class Authentication extends OncePerRequestFilter {
     private final Settings settings;
+    private final Registry registry;
     private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
     private static class Bucket { long minute; int count; synchronized boolean allow() {
         long current = System.nanoTime()/60_000_000_000L;
         if (minute != current) { minute=current; count=0; }
         return ++count <= 600;
     }}
-    public Authentication(Settings settings) { this.settings = settings; }
+    public Authentication(Settings settings, Registry registry) { this.settings = settings; this.registry=registry; }
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String path=request.getRequestURI(), expected=null, identity="";
         if (path.startsWith("/ws/gateways/")) {
             String id=path.substring("/ws/gateways/".length());
-            Settings.Gateway gateway=settings.gateway(id);
-            if (gateway != null) { expected=gateway.token(); identity="gateway:"+id; }
+            identity="gateway:"+id; expected="gateway";
             // Native device endpoint: browser cookies/Origin are never accepted as credentials.
             if (request.getHeader("Origin") != null || !request.getMethod().equals("GET")) {
                 response.sendError(403); return;
@@ -33,7 +32,7 @@ public class Authentication extends OncePerRequestFilter {
         } else { response.sendError(404); return; }
         String header=request.getHeader("Authorization");
         String supplied=header != null && header.startsWith("Bearer ") ? header.substring(7) : null;
-        if (expected == null || !Settings.matches(expected,supplied)) { response.sendError(401); return; }
+        if (expected == null || !(identity.startsWith("gateway:") ? registry.authenticateGateway(identity.substring(8),supplied) : Settings.matches(expected,supplied))) { response.sendError(401); return; }
         if (!buckets.computeIfAbsent(identity,k -> new Bucket()).allow()) { response.sendError(429); return; }
         if (request.getContentLengthLong() > 4096) { response.sendError(413); return; }
         // Also bound bodies without Content-Length (chunked requests).
