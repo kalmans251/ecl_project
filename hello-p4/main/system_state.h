@@ -78,6 +78,9 @@ typedef struct
 
     led_mode_t led_mode;
 
+    uint8_t led_basic_pattern;
+    uint8_t led_music_pattern;
+
     weather_type_t weather_type;
 
 
@@ -217,3 +220,5 @@ void system_state_set_power_source(
 void system_state_set_call_active(
     bool active
 );
+/* Pattern selection does not change music/sleep policy. */
+void system_state_set_led_pattern(led_mode_t mode, uint8_t pattern);

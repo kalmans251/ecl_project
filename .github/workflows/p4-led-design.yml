@@ -1,0 +1,28 @@
+name: P4 LED design
+on:
+  push:
+    paths: ['hello-p4/**', 'raspberry-pi/device_control.py', 'raspberry-pi/tests/test_device_control.py', '.github/workflows/p4-led-design.yml']
+  pull_request:
+    paths: ['hello-p4/**', 'raspberry-pi/device_control.py', 'raspberry-pi/tests/test_device_control.py', '.github/workflows/p4-led-design.yml']
+permissions:
+  contents: read
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r raspberry-pi/requirements.txt
+      - run: python -m unittest discover -s hello-p4/tests -v
+      - run: PYTHONPATH=raspberry-pi python -m unittest discover -s raspberry-pi/tests -p test_device_control.py -v
+  p4-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: espressif/esp-idf-ci-action@v1
+        with:
+          path: hello-p4
+          esp_idf_version: v6.0.2
+          target: esp32p4

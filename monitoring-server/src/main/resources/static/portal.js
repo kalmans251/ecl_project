@@ -26,7 +26,7 @@ function renderSelection(){
 function mark(operation,value){dirty.set(operation,value);toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
 function switchCategoryTabUI(name,code,edit=true){currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>b.classList.toggle('active',i===code));['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');if(edit){if(code===1)mark('weather',['clear','rain','snow'][Number(document.querySelector('input[name="ledGroup1"]:checked')?.value||0)]);else mark('led',name);}}
-function setSubModeUI(value){if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);}
+function setSubModeUI(value){if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);else mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
 function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit)dirty.set('volume',String(value));}
 function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','age'][Number(value)]);}
 function updateAudioTrack(){toast('현재 펌웨어에서 트랙 선택 명령을 지원하지 않습니다.');}

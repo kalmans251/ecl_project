@@ -21,6 +21,8 @@ CCTV와 음성은 별도 메시지이므로 Pi의 기존 통화 우선순위·�
 | power | ac/battery/on/off | power `<id>` `<value>` |
 | projector | on/off | projector `<id>` `<value>` |
 | led | on/off/basic/music | led `<id>` `<value>` |
+| led.basic_pattern | 숫자 문자열 0..5 | led `<id>` basic `<value + 1>` |
+| led.music_pattern | 숫자 문자열 0..2 | led `<id>` music `<value + 1>` |
 | weather | clear/cloudy/rain/snow | led `<id>` weather `<value>` |
 | music.start/stop/pause/resume/next | 없음 | music `<id>` `<action>` |
 | music.mode | sequential/shuffle/age | music `<id>` mode `<value>` |

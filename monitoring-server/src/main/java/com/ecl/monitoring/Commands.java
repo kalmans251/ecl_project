@@ -31,7 +31,10 @@ public class Commands {
     }
     public static void validate(String operation,String value) {
         if(operation==null) throw Accounts.bad("Operation required");
-        if(operation.equals("volume")) {
+        if(operation.equals("led.basic_pattern") || operation.equals("led.music_pattern")) {
+            int max=operation.equals("led.basic_pattern")?5:2;
+            if(value==null || !value.matches("[0-"+max+"]")) throw Accounts.bad("Unsupported LED pattern");
+        } else if(operation.equals("volume")) {
             if(value==null || !value.matches("(?:[0-9]|[1-9][0-9]|100)")) throw Accounts.bad("Volume must be 0..100");
         } else if(VALUES.containsKey(operation)) {
             if(!VALUES.get(operation).contains(value==null?"":value)) throw Accounts.bad("Unsupported value");

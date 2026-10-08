@@ -358,6 +358,20 @@ static void handle_led(
             );
 
 
+            /* Backward compatible SET: [mode] retains the selected pattern;
+             * BASIC/MUSIC may add a zero-based pattern in byte 1.
+             * WEATHER byte 1 keeps its existing weather meaning. */
+            if (frame->length > 2 ||
+                (frame->length == 2 &&
+                 ((mode == LED_MODE_BASIC && frame->payload[1] >= 6) ||
+                  (mode == LED_MODE_MUSIC && frame->payload[1] >= 3) ||
+                  (mode == LED_MODE_WEATHER && frame->payload[1] > WEATHER_SNOW)))) {
+                break;
+            }
+            uint8_t pattern = mode == LED_MODE_MUSIC
+                ? previous_state.led_music_pattern : previous_state.led_basic_pattern;
+            if (mode != LED_MODE_WEATHER && frame->length == 2) pattern=frame->payload[1];
+
             led_mode_t old_mode =
                 previous_state.led_mode;
 
@@ -371,17 +385,18 @@ static void handle_led(
                 .type =
                     LED_COMMAND_SET_MODE,
 
+                .pattern = pattern,
+                .weather = (mode == LED_MODE_WEATHER && frame->length == 2)
+                    ? (weather_type_t)frame->payload[1] : previous_state.weather_type,
+
                 .mode =
                     (led_mode_t)
                     mode
             };
 
 
-            xQueueSend(
-                led_command_queue,
-                &cmd,
-                0
-            );
+            if (xQueueSend(led_command_queue,&cmd,0) != pdTRUE) break;
+            system_state_set_led_pattern(new_mode,pattern);
             /*
             * System State에도 즉시 반영.
             *
@@ -448,46 +463,7 @@ static void handle_led(
                 );
             }
 
-            /*
-             * WEATHER TYPE도 같이 온 경우
-             */
-            if (
-                mode ==
-                LED_MODE_WEATHER &&
-                frame->length >= 2
-            )
-            {
-                uint8_t weather =
-                    frame->payload[1];
-
-
-                if (
-                    weather <=
-                    WEATHER_SNOW
-                )
-                {
-                    led_command_t
-                        weather_cmd =
-                    {
-                        .type =
-                            LED_COMMAND_SET_WEATHER,
-
-                        .weather =
-                            (
-                                weather_type_t
-                            )
-                            weather
-                    };
-
-
-                    xQueueSend(
-                        led_command_queue,
-                        &weather_cmd,
-                        0
-                    );
-                }
-            }
-
+            if (new_mode == LED_MODE_WEATHER) system_state_set_weather(cmd.weather);
 
             break;
         }

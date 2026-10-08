@@ -27,6 +27,8 @@ class ControlsTests(unittest.TestCase):
             ('projector 1 off', Service.PROJECTOR, Command.STOP, b'', Node.P4),
             ('led 1 on', Service.LED, Command.START, b'', Node.P4),
             ('led 1 off', Service.LED, Command.STOP, b'', Node.P4),
+            ('led 1 basic 6', Service.LED, Command.SET, b'\x01\x05', Node.P4),
+            ('led 1 music 3', Service.LED, Command.SET, b'\x03\x02', Node.P4),
             ('led 1 basic', Service.LED, Command.SET, b'\x01', Node.P4),
             ('led 1 music', Service.LED, Command.SET, b'\x03', Node.P4),
             ('led 1 weather clear', Service.LED, Command.SET, b'\x02\x00', Node.P4),
@@ -162,7 +164,7 @@ class ControlsTests(unittest.TestCase):
 
     def test_invalid_input_never_writes_uart(self):
         for line in ['volume 1 -1', 'volume 1 101', 'volume 1 x', 'volume 1 10 extra',
-                     'led 1 weather fog', 'led 1 weather', 'led 1 basic extra',
+                     'led 1 basic 0', 'led 1 basic 7', 'led 1 music 4', 'led 1 music -1', 'led 1 weather fog', 'led 1 weather', 'led 1 basic extra',
                      'music 1 mode x', 'music 1 previous', 'music 1',
                      'power 1 auto', 'sleep 1 yes', 'projector 1 yes', 'query 1 all',
                      'ping 1 extra', 'ping 0', 'sleep 256 on', 'volume x 10']:
