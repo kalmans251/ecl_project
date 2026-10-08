@@ -11,6 +11,7 @@ idf_component_register(
         "p4_controller.c"
         "system_state.c"
         "led_task.c"
+        "led_design.c"
         "power_control.c"
         "projector_control.c"
         "detection_manager.c"

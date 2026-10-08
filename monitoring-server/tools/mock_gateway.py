@@ -35,7 +35,9 @@ async def run(args):
                 if args.simulate_device and status != 'EXPIRED':
                     op, value = message.get('operation'), message.get('value')
                     status = 'APPLIED' if op in ('volume', 'music.stop', 'call.start', 'call.end', 'ptt.on', 'ptt.off') else 'PLC_SENT'
-                    if op == 'volume':
+                    if op in ('led.basic_pattern', 'led.music_pattern'):
+                        state['led'] = 'basic' if op == 'led.basic_pattern' else 'music'
+                    elif op == 'volume':
                         state['volume'] = int(value)
                     elif op == 'power':
                         state['power' if value in ('ac', 'battery') else 'power_on'] = value if value in ('ac', 'battery') else value == 'on'

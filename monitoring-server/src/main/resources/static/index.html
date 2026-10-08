@@ -613,12 +613,12 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <button class="category-tab-btn" onclick="switchCategoryTabUI('music', 2)">🎵 음악 연동</button>
         </div>
         <div id="tabContentBasic" class="led-select-group">
-            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="0" checked onchange="setSubModeUI(0)"> 기본 LED (현재 펌웨어)</label>
-            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="1" disabled title="현재 펌웨어 세부 패턴 선택 미지원" onchange="setSubModeUI(1)"> 모드2 : 바람돌이 시퀀스</label>
-            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="2" disabled title="현재 펌웨어 세부 패턴 선택 미지원" onchange="setSubModeUI(2)"> 모드3 : 폭죽놀이 버스트</label>
-            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="3" disabled title="현재 펌웨어 세부 패턴 선택 미지원" onchange="setSubModeUI(3)"> 모드4 : 맑게 흐르는 시냇물결</label>
-            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="4" disabled title="현재 펌웨어 세부 패턴 선택 미지원" onchange="setSubModeUI(4)"> 모드5 : 시원한 폭포수 스트림</label>
-            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="5" disabled title="현재 펌웨어 세부 패턴 선택 미지원" onchange="setSubModeUI(5)"> 모드6 : 오로라 화이트 웨이브</label>
+            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="0" checked onchange="setSubModeUI(0)"> 모드1 : 상하 왕복 라인</label>
+            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="1" onchange="setSubModeUI(1)"> 모드2 : 바람돌이 시퀀스</label>
+            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="2" onchange="setSubModeUI(2)"> 모드3 : 폭죽놀이 버스트</label>
+            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="3" onchange="setSubModeUI(3)"> 모드4 : 맑게 흐르는 시냇물결</label>
+            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="4" onchange="setSubModeUI(4)"> 모드5 : 시원한 폭포수 스트림</label>
+            <label class="led-radio-label"><input type="radio" name="ledGroup0" value="5" onchange="setSubModeUI(5)"> 모드6 : 오로라 화이트 웨이브</label>
         </div>
         <div id="tabContentWeather" class="led-select-group" style="display: none;">
             <label class="led-radio-label"><input type="radio" name="ledGroup1" value="0" onchange="setSubModeUI(0)"> ☀️ 맑음 : 앰버 워밍 라이트</label>
@@ -627,9 +627,9 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
         </div>
         <div id="tabContentMusic" class="led-select-group" style="display: none;">
             <div>
-                <label class="led-radio-label" style="margin-bottom: 5px;"><input type="radio" name="ledGroup2" value="0" onchange="setSubModeUI(0)"> 📊 음악 이퀄라이저 (현재 펌웨어)</label>
-                <label class="led-radio-label" style="margin-bottom: 5px;"><input type="radio" name="ledGroup2" value="1" disabled title="현재 펌웨어 세부 패턴 선택 미지원" onchange="setSubModeUI(1)"> 🥁 베이스 비트 점멸</label>
-                <label class="led-radio-label" style="margin-bottom: 5px;"><input type="radio" name="ledGroup2" value="2" disabled title="현재 펌웨어 세부 패턴 선택 미지원" onchange="setSubModeUI(2)"> 🌊 아쿠스틱 플로우 웨이브</label>
+                <label class="led-radio-label" style="margin-bottom: 5px;"><input type="radio" name="ledGroup2" value="0" onchange="setSubModeUI(0)"> 📊 음악 이퀄라이저 바</label>
+                <label class="led-radio-label" style="margin-bottom: 5px;"><input type="radio" name="ledGroup2" value="1" onchange="setSubModeUI(1)"> 🥁 베이스 비트 점멸</label>
+                <label class="led-radio-label" style="margin-bottom: 5px;"><input type="radio" name="ledGroup2" value="2" onchange="setSubModeUI(2)"> 🌊 아쿠스틱 플로우 웨이브</label>
             </div>
             <div class="audio-ctrl-box">
                 <div class="audio-ctrl-title">🎧 오디오 원격 제어</div>

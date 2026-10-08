@@ -340,3 +340,9 @@ void system_state_set_call_active(
 
     unlock_state();
 }
+void system_state_set_led_pattern(led_mode_t mode,uint8_t pattern) {
+    lock_state();
+    if(mode==LED_MODE_BASIC && pattern<6)s_state.led_basic_pattern=pattern;
+    if(mode==LED_MODE_MUSIC && pattern<3)s_state.led_music_pattern=pattern;
+    unlock_state();
+}
