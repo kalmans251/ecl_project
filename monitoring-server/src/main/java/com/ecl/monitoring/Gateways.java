@@ -27,6 +27,7 @@ public class Gateways {
         if (c == null || !c.session().isOpen()) throw new IOException("Gateway offline");
         c.session().sendMessage(new TextMessage(json));
     }
+    public boolean online(String id) { Connection c=connections.get(id); return c!=null && c.session().isOpen(); }
     public List<Map<String,Object>> status(Settings settings) {
         return settings.gateways().stream().map(g -> {
             Connection c=connections.get(g.id());

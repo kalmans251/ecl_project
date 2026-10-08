@@ -1,6 +1,13 @@
 server:
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: strict
+        secure: ${COOKIE_SECURE:false}
   tomcat:
     max-connections: 100
 spring:
@@ -24,3 +31,12 @@ monitoring:
     - id: cctv01
       gateway-id: gateway-01
       railing-id: 1
+
+portal:
+  bootstrap-user: ${MONITOR_BOOTSTRAP_USER:admin}
+  bootstrap-password: ${MONITOR_BOOTSTRAP_PASSWORD:}
+  sms-key: ${SMS_API_KEY:}
+  sms-secret: ${SMS_API_SECRET:}
+  sms-from: ${SMS_FROM:}
+  codec-url: ${CODEC_URL:http://127.0.0.1:9200}
+  codec-token: ${CODEC_TOKEN:}

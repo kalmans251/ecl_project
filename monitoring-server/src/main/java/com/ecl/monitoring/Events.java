@@ -11,10 +11,11 @@ public class Events {
     public record Input(String camera_id, UUID event_id, String type, String age_group, Instant observed_at) {}
     private final JdbcTemplate db;
     private final Settings settings;
+    private final Registry registry;
     private final Gateways gateways;
     private final JsonMapper json=JsonMapper.builder().build();
-    public Events(JdbcTemplate db, Settings settings, Gateways gateways) {
-        this.db=db; this.settings=settings; this.gateways=gateways;
+    public Events(JdbcTemplate db, Settings settings, Gateways gateways, Registry registry) {
+        this.db=db; this.settings=settings; this.gateways=gateways; this.registry=registry;
     }
     @jakarta.annotation.PostConstruct public void recover() {
         db.update("UPDATE deliveries SET status='UNKNOWN' WHERE status IN ('SENT','RECEIVED')");
@@ -29,8 +30,7 @@ public class Events {
     public synchronized Map<String,Object> submit(Input input) {
         if (input == null || input.event_id()==null || input.observed_at()==null
                 || !Set.of("enter","age").contains(input.type()==null ? "" : input.type())) bad("Invalid event fields");
-        Settings.Camera camera=settings.cameras().stream().filter(c -> c.id().equals(input.camera_id())).findFirst()
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,"Unknown camera"));
+        Settings.Camera camera=registry.camera(input.camera_id());
         if (input.type().equals("enter") && input.age_group()!=null) bad("enter cannot contain age_group");
         if (input.type().equals("age") && !Set.of("10","20","30","40","keep").contains(input.age_group()==null ? "" : input.age_group())) bad("Invalid age_group");
         List<Map<String,Object>> duplicates=db.queryForList("SELECT * FROM deliveries WHERE camera_id=? AND event_id=? AND event_type=?",

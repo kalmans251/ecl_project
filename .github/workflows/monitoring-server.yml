@@ -21,3 +21,9 @@ jobs:
           cache: maven
           cache-dependency-path: monitoring-server/pom.xml
       - run: mvn -B -ntp verify
+      - run: |
+          node --check src/main/resources/static/portal.js
+          node --check src/main/resources/static/mic-worklet.js
+          node --check src/main/resources/static/login.js
+      - run: sudo apt-get update && sudo apt-get install -y libcodec2-dev
+      - run: python3 -m unittest discover -s tools -p 'test_codec_adapter.py'
