@@ -715,3 +715,32 @@ never report Applied. Restore the connection and query before retrying; a
 lost reply does not imply that the device did not execute the command.
 Finally verify the existing `call 1` / `ptt 1 on` / `ptt 1 off` / `hangup 1`
 sequence and a field emergency acknowledgment separately.
+
+## Recovering an unconfirmed call
+
+`status 1` now includes `call.phase`: idle, starting, active, ending, unknown,
+or ended. A missing START/END reply keeps the shared bus reserved. Other normal
+calls, emergency ACKs that would start another call, and general controls are
+blocked until the owner is ended. Emergency notifications are still recorded;
+ACK a waiting emergency manually after resolving the earlier call.
+
+After `call 1` times out, use `hangup 1`. It first waits for that P4's receive
+window and sends STOP even without a confirmed local direction. If no window
+arrives for an unconfirmed start, explicit hangup probes with STOP directly:
+the original START may never have arrived and an idle P4 does not grant windows.
+This probe is not a bus-arbitration guarantee; a lost window/line fault can still
+cause collision or timeout. Only CALL_ENDED releases the reservation. Failed
+hangup remains unknown and must be retried. A locally idle hangup explicitly
+reports that it sent nothing instead of claiming remote completion.
+
+This is Pi-side recovery using the current P4's idempotent STOP/END support;
+no new firmware protocol is introduced. State is in memory and is lost if Pi
+restarts. Startup reconciliation, session IDs in call events, expiring transmit
+leases, and multi-node event arbitration remain separate work. Do not restart
+Pi as a substitute for ending a remote call.
+
+Bench check: suppress only CALL_STARTED replies after P4 starts; verify status
+unknown, call/ACK for another rail blocked, and hangup sends STOP and waits for
+END. Repeat with START itself dropped (idle P4), then with END replies dropped;
+in the last case unknown must remain until a later confirmed hangup. Finally
+verify a waiting emergency can be acknowledged after the original call ends.

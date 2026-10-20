@@ -185,7 +185,13 @@ class EmergencyManager:
             payload=payload,
         )
 
-        self._bus.send_frame(frame)
+        self._railings.reserve_call(railing_id, emergency=True)
+        try:
+            self._bus.send_frame(frame)
+        finally:
+            # CALL_STARTED may have arrived synchronously. Otherwise retain
+            # ownership until a late START or an explicitly confirmed hangup.
+            self._railings.call_request_failed(railing_id)
 
         self._railings.mark_emergency_ack_sent(
             railing_id,

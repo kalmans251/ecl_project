@@ -89,6 +89,8 @@ class VoiceRelay:
             if self._transitioning:
                 return None
             epoch = self._epoch
+        if self._railings.snapshot(railing_id).get("call", {}).get("phase") != "active":
+            return None
         if self._railings.get_call_direction(railing_id) != int(direction):
             return None
         return epoch
@@ -284,6 +286,10 @@ class VoiceRelay:
                 packet.sequence,
             )
 
+            return True
+
+        if self._railings.snapshot(packet.railing_id).get("call", {}).get("phase") != "active":
+            self.dropped_packets += 1
             return True
 
         self.field_packets += 1

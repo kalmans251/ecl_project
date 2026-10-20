@@ -195,7 +195,7 @@ class DeviceControls:
     def _check_idle(self):
         if self.voice.control_paused():
             raise RuntimeError('PTT/control confirmation unresolved; retry PTT or hangup first')
-        if any(s['call']['active'] or s['emergency']['active']
+        if any(s['call']['active'] or s['call'].get('phase', 'idle') not in ('idle', 'ended') or s['emergency']['active']
                for s in self.railings.snapshot().values()):
             raise RuntimeError('General controls blocked while a call/emergency is active on the PLC bus')
 

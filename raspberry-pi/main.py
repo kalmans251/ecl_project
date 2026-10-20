@@ -381,7 +381,7 @@ def main() -> int:
 
                 try:
                     with voice.control_transition():
-                        audio.end_call(railing_id)
+                        ended = audio.end_call(railing_id)
                 except Exception as exc:
                     print(
                         f"hangup failed: {exc}"
@@ -389,7 +389,8 @@ def main() -> int:
                     continue
 
                 print(
-                    f"CALL ended rail={railing_id}"
+                    f"CALL ended rail={railing_id}" if ended else
+                    f"CALL locally idle rail={railing_id}; no remote confirmation requested"
                 )
                 continue
 
