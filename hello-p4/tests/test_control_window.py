@@ -42,6 +42,10 @@ QueueHandle_t router_queue = (void *)1;
 QueueHandle_t plc_tx_queue = (void *)2;
 QueueHandle_t wroom_tx_queue;
 QueueHandle_t p4_controller_queue;
+void event_outbox_reply(const protocol_frame_t *poll, protocol_frame_t *reply) {
+    *reply=*poll;reply->src=NODE_P4;reply->dst=NODE_PI;
+    reply->command=CMD_EVENT_REPLY;reply->length=14;
+}
 static protocol_frame_t queue[16], sent[32];
 static unsigned count, index_, sent_count, drained;
 static int64_t now;
@@ -78,6 +82,7 @@ static void reset(void) {
     now = 0; mode = CALL_STATE_FIELD_TX; drain_ok = true; recovery=false;
     s_receive_until_us = s_last_grant_us = s_last_voice_us = s_end_tx_quiet_until_us = 0;
     s_voice_packets_since_grant = 0;
+    s_poll_pending=false;
 }
 static protocol_frame_t voice(void) {
     protocol_frame_t f = {.railing_id=1, .src=NODE_S3, .dst=NODE_PI,
@@ -148,6 +153,14 @@ int main(void) {
 
     reset(); now = PLC_IDLE_GRANT_MS * 1000; drain_ok = false;
     process_plc_tx_queue(); assert(s_receive_until_us > now);
+    reset();
+    protocol_frame_t poll={.railing_id=RAILING_ID,.src=NODE_PI,.dst=NODE_P4,
+        .service=SERVICE_SYSTEM,.command=CMD_EVENT_POLL,.length=8};
+    handle_plc_frame(&poll);assert(s_poll_pending);
+    s_receive_until_us=200000; // owner may answer its solicited poll inside the grant
+    process_plc_tx_queue();assert(sent_count==0);
+    now=20000;process_plc_tx_queue();assert(sent_count==1 && sent[0].command==CMD_EVENT_REPLY);
+    handle_plc_frame(&poll);now+=80001;process_plc_tx_queue();assert(sent_count==1);
     puts("P4 UART drain, receive-window silence, idle grants and stale voice: PASS");
     return 0;
 }

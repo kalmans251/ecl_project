@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "router.h"
+#include "event_outbox.h"
 
 
 QueueHandle_t router_queue = NULL;
@@ -91,6 +92,7 @@ void router_task(void *arg)
 
             case NODE_PI:
             {
+                if (event_outbox_capture(&frame)) break;
                 xQueueSend(
                     plc_tx_queue,
                     &frame,

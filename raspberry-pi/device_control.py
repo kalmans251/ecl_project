@@ -6,6 +6,7 @@ forwards music settings to WROOM. General controls never queue behind a call.
 """
 from __future__ import annotations
 import threading
+from contextlib import nullcontext
 import secrets
 import time
 from protocol import Command, Frame, Node, Service
@@ -129,7 +130,7 @@ class DeviceControls:
             if args:
                 raise ValueError('ping: expected only railing_id')
             add(Service.SYSTEM, Command.PING)
-        with self.lock:
+        with self.lock, getattr(self.bus, "transaction", nullcontext)():
             results = []
             for original in frames:
                 self._check_idle()

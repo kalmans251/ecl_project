@@ -10,9 +10,13 @@
 
 #include "router.h"
 #include "call_manager.h"
+#include "event_outbox.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
+static bool s_poll_pending;
+static protocol_frame_t s_poll_reply;
+static int64_t s_poll_reply_at, s_poll_reply_deadline;
 static int64_t s_receive_until_us;
 static int64_t s_end_tx_quiet_until_us;
 #define PLC_END_TX_QUIET_MS 100
@@ -85,6 +89,16 @@ static void handle_plc_frame(
     }
 
 
+    if (frame->src == NODE_PI && frame->dst == NODE_P4 &&
+        frame->service == SERVICE_SYSTEM && frame->command == CMD_EVENT_POLL) {
+        if(frame->length != 8 || s_poll_pending)return;
+        event_outbox_reply(frame, &s_poll_reply);
+        int64_t now=esp_timer_get_time();
+        s_poll_reply_at=now+20000; s_poll_reply_deadline=now+80000;
+        s_poll_pending=true;
+        return;
+    }
+
     xQueueSend(
         router_queue,
         frame,
@@ -99,6 +113,14 @@ static void handle_plc_frame(
 
 static void process_plc_tx_queue(void)
 {
+    if(s_poll_pending) {
+        int64_t now=esp_timer_get_time();
+        if(now<s_poll_reply_at)return;
+        s_poll_pending=false;
+        /* Never send a delayed report after its allotted response slot. */
+        if(now<=s_poll_reply_deadline)send_complete_frame(&s_poll_reply);
+        return;
+    }
     if (esp_timer_get_time() < s_receive_until_us ||
         esp_timer_get_time() < s_end_tx_quiet_until_us) return;
     protocol_frame_t frame;

@@ -782,3 +782,52 @@ Bench tests:
    other calls blocked, and `hangup` or an incoming END releases the reservation.
 4. Restart after expiry with the END lost: journal stays unknown until a fresh
    `hangup` receives P4's idempotent END. Do not infer END just from elapsed time.
+
+## Polled emergency reports on a shared PLC line
+
+Update **every P4 on the line and Pi together**. P4 now retains unsolicited
+EMERGENCY START/STOP in a 32-entry RAM outbox instead of immediately sending them
+to Pi. Local alarm/music policy runs immediately. ACKED/call control responses
+remain on their existing path. WROOM/S3 require no changes in this step.
+
+Pi polls installed railing IDs in round-robin order; default `--event-railings
+1,2,3,4`. Set this list explicitly to match installed hardware (and each P4's
+unique RAILING_ID). Omitting a node means its emergency reports will not be
+retrieved. Old Pi cannot retrieve reports from new P4. Mixed old/new P4 firmware
+still allows unsolicited transmissions and is not supported for this feature.
+
+Example: `python main.py --port /dev/serial0 --event-railings 1,2,3,4`.
+Existing `--local-audio` and microphone/speaker options may be appended.
+
+SYSTEM/EVENT_POLL 0x2B contains request token[4] + last delivered event ID[4].
+EVENT_REPLY 0x2C contains token[4] + event ID[4] + lost-report count[4] +
+original service/command[2] + optional emergency payload[5]. ID zero means no
+pending event. Only a matching head ID is removed on the next poll; lost replies
+are retried, and Pi suppresses duplicate delivery within the running process.
+IDs start from a random seed on P4 boot. Pi's event receipt acknowledgment is
+separate from the operator's `ack`, which starts an emergency call.
+
+One exchange runs at a time. Polling yields to PTT/hangup and due keepalives;
+unknown/starting/ending calls suspend polling. During FIELD_TX, the request to
+another railing waits for the current speaker's grant. The 200ms window must
+fit request airtime + 40ms allowance + 120ms reply budget. During CONTROL_TX,
+Pi serializes the exchange against microphone transmission, then resumes audio.
+This can add jitter; continuous audio with the physical modems is **not yet
+verified**. P4 schedules its requested report 20ms after poll receipt and drops
+responses whose scheduled start is over 80ms late, retaining the event for retry.
+UART drain is bounded to 300ms; modem buffering and scheduler stalls are not a
+hard real-time guarantee that a reply stays inside the receive window.
+
+The poll loop pauses 250ms between attempts; absent nodes and voice grants add
+delay. This is not a fixed emergency latency guarantee. Outbox overflow preserves
+existing entries, drops new reports and raises a loss counter/error; P4 reboot
+loses queued reports. Emergency event durability and full bus arbitration remain
+future work. In particular automatic CALL_END/recovery grants still use existing
+transmission rules: this change does not claim collision-free operation for
+all message types.
+
+Bench checks when hardware testing resumes: press emergencies on 2/3/4 together,
+check only the addressed P4 reports during each poll, interrupt a reply and check
+redelivery without duplicate operator events, then repeat while 1 is in both
+PTT directions. Verify report latency, audio continuity, missing-node handling,
+and queue-overflow indication. Software tests cannot validate PLC modem timing.

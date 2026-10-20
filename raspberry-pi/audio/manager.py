@@ -38,6 +38,7 @@ class AudioManager:
         self._control_lock = threading.Lock()
         self._direction_revision: dict[int, int] = {}
         self._start_revision: dict[int, int] = {}
+        self._keepalive_due = threading.Event()
         self._keepalive_stop = threading.Event()
         self._keepalive_thread = None
 
@@ -64,6 +65,7 @@ class AudioManager:
 
     def renew_calls(self) -> None:
         # Yield to explicit PTT/hangup; never renew recovered/unknown calls.
+        self._keepalive_due.set()
         if not self._control_lock.acquire(blocking=False):
             return
         try:
@@ -75,6 +77,7 @@ class AudioManager:
                     Frame(rid, Node.PI, Node.P4, Service.AUDIO, Command.CALL_KEEPALIVE),
                     wait_for_window=call["direction"] == int(AudioDirection.FIELD_TX),
                     timeout=0.8)
+            self._keepalive_due.clear()
         finally:
             self._control_lock.release()
 

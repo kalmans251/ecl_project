@@ -92,6 +92,8 @@ typedef enum
     CMD_APPLY = 0x28,
     CMD_APPLY_RESULT = 0x29,
     CMD_CALL_KEEPALIVE = 0x2A,
+    CMD_EVENT_POLL = 0x2B,
+    CMD_EVENT_REPLY = 0x2C,
 
     CMD_PING             = 0x01,
     CMD_PONG             = 0x02,

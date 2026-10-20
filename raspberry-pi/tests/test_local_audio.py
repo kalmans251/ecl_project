@@ -202,10 +202,11 @@ class LocalAudioTests(unittest.TestCase):
                     'volume 1 101', 'volume 1 10', 'led 1 basic', 'query 1 wroom', 'quit']), \
                 redirect_stdout(io.StringIO()):
             self.assertEqual(main.main(), 0)
-        self.assertEqual([f.command for f in bus.sent],
+        self.assertEqual([f.command for f in bus.sent if f.command != Command.EVENT_POLL],
             [Command.SET, Command.SET, Command.STOP, Command.APPLY, Command.APPLY, Command.APPLY])
-        self.assertEqual(bus.sent[3].payload[4:], bytes([Command.SET, 3, 10]))
-        self.assertEqual(bus.sent[-1].dst, Node.WROOM)
+        commands = [f for f in bus.sent if f.command != Command.EVENT_POLL]
+        self.assertEqual(commands[3].payload[4:], bytes([Command.SET, 3, 10]))
+        self.assertEqual(commands[-1].dst, Node.WROOM)
         self.assertTrue(bus.closed)
 
     def test_start_failure_closes_partial_resources(self):

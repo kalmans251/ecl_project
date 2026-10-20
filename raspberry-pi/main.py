@@ -11,6 +11,7 @@ from audio import AudioManager
 from device_control import DeviceControls, HELP as DEVICE_HELP, device_status
 from emergency import EmergencyManager
 from plc import PlcBus
+from plc.events import EventPoller
 from protocol import (
     AudioDirection,
     Command,
@@ -89,7 +90,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--call-state-file', default=os.environ.get(
         'ECL_CALL_STATE_FILE', '~/.local/state/ecl-railing/calls.json'),
         help='Durable unresolved-call journal; keep the same path across restarts')
+    parser.add_argument('--event-railings', default='1,2,3,4',
+                        help='Comma-separated installed railing IDs to poll (default: 1,2,3,4)')
     args = parser.parse_args()
+    try:
+        args.event_railings = tuple(dict.fromkeys(int(x.strip(), 0) for x in args.event_railings.split(',')))
+        if not args.event_railings or any(not 1 <= x <= 255 for x in args.event_railings):
+            raise ValueError()
+    except ValueError:
+        parser.error('--event-railings requires IDs in 1..255')
     if not 1 <= args.audio_railing <= 255:
         parser.error('--audio-railing must be 1..255')
     return args
@@ -182,6 +191,9 @@ def main() -> int:
             frame.railing_id
         )
 
+        if event_poller.handle_frame(frame):
+            return
+
         if controls.handle_frame(frame):
             return
 
@@ -211,6 +223,8 @@ def main() -> int:
             int(frame.command),
             frame.payload.hex(" "),
         )
+
+    event_poller = EventPoller(bus, railings, audio, args.event_railings, on_frame)
 
     bus.set_frame_handler(
         on_frame
@@ -246,6 +260,7 @@ def main() -> int:
             return 1
 
     audio.start_keepalive()
+    event_poller.start()
     try:
         if args.no_console:
             while True:
@@ -442,6 +457,7 @@ def main() -> int:
         print()
 
     finally:
+        event_poller.close()
         audio.close()
         if local_audio:
             local_audio.close()
