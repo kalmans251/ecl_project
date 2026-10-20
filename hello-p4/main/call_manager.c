@@ -12,6 +12,7 @@
 #include "board_config.h"
 #include "protocol.h"
 #include "router.h"
+#include "event_outbox.h"
 
 #include "system_state.h"
 #include "projector_control.h"
@@ -92,9 +93,7 @@ static call_restore_state_t
     s_restore;
 
 
-/* Brief recovery grants after hangup; idle nodes otherwise stay silent. */
-#define END_RECOVERY_US (8LL * 1000 * 1000)
-static int64_t s_end_recovery_until_us;
+/* Preserve origin for idempotent STOP replies. */
 static call_origin_t s_last_end_origin = CALL_ORIGIN_NORMAL;
 
 /* ============================================================
@@ -447,7 +446,6 @@ void call_manager_init(void)
 
     s_call_origin =
         CALL_ORIGIN_NORMAL;
-    s_end_recovery_until_us = 0;
     s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
     s_last_end_origin = CALL_ORIGIN_NORMAL;
 
@@ -499,9 +497,9 @@ bool call_manager_start(
     save_restore_state();
 
 
+    event_outbox_clear_call_end();
     s_call_origin =
         origin;
-    s_end_recovery_until_us = 0;
     s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
 
 
@@ -716,7 +714,15 @@ bool call_manager_set_direction(
  * END CALL
  * ============================================================ */
 
-bool call_manager_end(void)
+static void notify_call_end(call_origin_t origin, bool polled_only) {
+    protocol_frame_t frame={.railing_id=RAILING_ID,.src=NODE_P4,.dst=NODE_PI,
+        .service=SERVICE_AUDIO,.command=CMD_DATA,.length=4,
+        .payload={AUDIO_DATA_EVENT,AUDIO_EVENT_CALL_ENDED,(uint8_t)origin,0}};
+    event_outbox_store_call_end(&frame);
+    if(!polled_only)notify_pi_call_event(AUDIO_EVENT_CALL_ENDED,origin,0);
+}
+
+static bool end_call(bool polled_only)
 {
     lock_manager();
 
@@ -727,10 +733,9 @@ bool call_manager_end(void)
     )
     {
         call_origin_t origin = s_last_end_origin;
-        s_end_recovery_until_us = esp_timer_get_time() + END_RECOVERY_US;
         unlock_manager();
         /* Idempotent STOP: the first END event may have been lost. */
-        notify_pi_call_event(AUDIO_EVENT_CALL_ENDED, origin, 0);
+        notify_call_end(origin, polled_only);
 
         ESP_LOGW(
             TAG,
@@ -823,7 +828,6 @@ bool call_manager_end(void)
 
 
     s_last_end_origin = origin;
-    s_end_recovery_until_us = esp_timer_get_time() + END_RECOVERY_US;
 
     s_call_state =
         CALL_STATE_IDLE;
@@ -843,11 +847,7 @@ bool call_manager_end(void)
     unlock_manager();
 
 
-    notify_pi_call_event(
-        AUDIO_EVENT_CALL_ENDED,
-        origin,
-        0
-    );
+    notify_call_end(origin, polled_only);
 
 
     ESP_LOGI(
@@ -918,14 +918,10 @@ call_origin_t call_manager_get_origin(void)
     return origin;
 }
 
-bool call_manager_end_recovery_active(void)
-{
-    lock_manager();
-    bool active = s_call_state == CALL_STATE_IDLE &&
-                  esp_timer_get_time() < s_end_recovery_until_us;
-    unlock_manager();
-    return active;
-}
+bool call_manager_end(void) { return end_call(false); }
+
+/* Retained for source compatibility; an idle node no longer grants the bus. */
+bool call_manager_end_recovery_active(void) { return false; }
 
 void call_manager_keepalive(void)
 {
@@ -943,6 +939,6 @@ void call_manager_tick(void)
     unlock_manager();
     if (expired) {
         ESP_LOGW(TAG, "Pi keepalive expired; ending call");
-        call_manager_end();
+        end_call(true);
     }
 }

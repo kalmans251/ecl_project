@@ -11,7 +11,10 @@ HARNESS=r'''
 #include "call_manager.c"
 static int64_t now;
 static unsigned sent, restores, removes;
-static protocol_frame_t last;
+static protocol_frame_t last, terminal;
+static unsigned terminal_count;
+void event_outbox_store_call_end(const protocol_frame_t *f){terminal=*f;terminal_count++;}
+void event_outbox_clear_call_end(void){terminal_count=0;}
 QueueHandle_t router_queue=(void *)1;
 int64_t esp_timer_get_time(void) { return now; }
 SemaphoreHandle_t xSemaphoreCreateMutex(void) { return (void *)1; }
@@ -30,14 +33,14 @@ int main(void) {
     assert(call_manager_end());
     assert(last.dst==NODE_PI && last.payload[1]==AUDIO_EVENT_CALL_ENDED);
     assert(last.payload[2]==CALL_ORIGIN_EMERGENCY);
-    assert(call_manager_end_recovery_active());
+    assert(!call_manager_end_recovery_active());
     unsigned before=sent, r=restores, m=removes;
     assert(call_manager_end());
     assert(sent==before+1 && restores==r && removes==m);
     assert(last.payload[2]==CALL_ORIGIN_EMERGENCY);
-    now+=END_RECOVERY_US;
+    now+=8000000;
     assert(!call_manager_end_recovery_active());
-    assert(call_manager_end());assert(call_manager_end_recovery_active());
+    assert(call_manager_end());assert(!call_manager_end_recovery_active());
     assert(call_manager_start(CALL_ORIGIN_NORMAL));
     assert(!call_manager_end_recovery_active());
     assert(call_manager_end());assert(last.payload[2]==CALL_ORIGIN_NORMAL);
@@ -45,9 +48,11 @@ int main(void) {
     now+=CALL_LEASE_US-1;call_manager_tick();assert(call_manager_is_active());
     call_manager_keepalive();
     now+=CALL_LEASE_US-1;call_manager_tick();assert(call_manager_is_active());
+    unsigned before_expiry=sent;
     now+=1;call_manager_keepalive(); // cannot revive an expired lease
     call_manager_tick();assert(!call_manager_is_active());
-    assert(last.payload[1]==AUDIO_EVENT_CALL_ENDED);
+    assert(terminal.payload[1]==AUDIO_EVENT_CALL_ENDED && terminal_count==1);
+    assert(sent==before_expiry+2); // S3/WROOM stop, no unsolicited Pi END
     before=sent;call_manager_tick();call_manager_keepalive();assert(sent==before);
     assert(call_manager_start(CALL_ORIGIN_EMERGENCY));
     now+=CALL_LEASE_US;call_manager_tick();assert(!call_manager_is_active());

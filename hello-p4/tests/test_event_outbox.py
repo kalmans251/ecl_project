@@ -30,6 +30,17 @@ int main(void){
  assert(count==CAPACITY && dropped==1);
  memset(poll.payload+4,0,4);event_outbox_reply(&poll,&reply);assert(get32(reply.payload+8)==1);
  f.command=CMD_DATA;assert(!event_outbox_capture(&f)); // requested ACKED response stays direct
+ protocol_frame_t end={.railing_id=1,.src=NODE_P4,.dst=NODE_PI,.service=SERVICE_AUDIO,
+    .command=CMD_DATA,.length=4,.payload={AUDIO_DATA_EVENT,AUDIO_EVENT_CALL_ENDED,0,0}};
+ event_outbox_store_call_end(&end);event_outbox_reply(&poll,&reply);
+ assert(reply.length==18 && reply.payload[12]==SERVICE_AUDIO && count==CAPACITY);
+ uint32_t terminal_token=get32(reply.payload+4);
+ event_outbox_store_call_end(&end);event_outbox_reply(&poll,&reply);
+ assert(get32(reply.payload+4)==terminal_token); // duplicate STOP shares terminal report
+ event_outbox_clear_call_end();event_outbox_reply(&poll,&reply);
+ assert(reply.length==19 && reply.payload[12]==SERVICE_EMERGENCY); // new call removes old END
+ event_outbox_store_call_end(&end);put32(poll.payload+4,terminal_id);
+ event_outbox_reply(&poll,&reply);assert(terminal_id==0 && count==CAPACITY);
  return 0;
 }
 '''

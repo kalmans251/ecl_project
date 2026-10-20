@@ -41,11 +41,22 @@ class PlcBus:
         self._parser = FrameParser()
         self._tx_lock = threading.Lock()
         self._transaction_lock = threading.RLock()
+        self._last_call_tx = {}
         self._stop_event = threading.Event()
         self._reader_thread: threading.Thread | None = None
         self._frame_handler: Callable[[Frame], None] | None = None
         self._pending_lock = threading.Lock()
         self._pending: list[_ControlWrite] = []
+
+    def last_call_tx(self, rail):
+        return self._last_call_tx.get(rail, 0.0)
+
+    def _record_call_tx(self, frame):
+        if (frame.src == Node.PI and frame.dst == Node.P4 and
+            ((frame.service == Service.AUDIO and frame.command in (Command.START, Command.CALL_KEEPALIVE))
+             or (frame.service == Service.EMERGENCY and frame.command == Command.SET))):
+            # Record an actual write attempt, not a failed wait for a receive grant.
+            self._last_call_tx[frame.railing_id] = time.monotonic()
 
     def transaction(self):
         """Serialize a complete request/reply exchange against other Pi TX."""
@@ -180,6 +191,7 @@ class PlcBus:
             # Use a fixed short turnaround rather than the general TX guard.
             time.sleep(0.020)
             raw = request.frame.encode()
+            self._record_call_tx(request.frame)
             written = serial_port.write(raw)
             serial_port.flush()
             if written != len(raw):
@@ -208,6 +220,7 @@ class PlcBus:
             if self.tx_guard_seconds > 0:
                 time.sleep(self.tx_guard_seconds)
 
+            self._record_call_tx(frame)
             written = serial_port.write(raw)
             serial_port.flush()
 

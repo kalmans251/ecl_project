@@ -615,9 +615,10 @@ while idle. PTT from FIELD_TX still uses the existing granted-window scheduling.
 ### 통화 종료 확인 및 재시도
 
 `hangup 1`은 P4의 CALL_ENDED 응답을 확인한 뒤 종료합니다. 기본 종료 응답 대기는
-1.5초이며, 응답을 받지 못하면 최대 3회 STOP을 시도합니다. P4는 종료 후 8초 동안
-200ms 제어 창을 계속 제공하고, 이미 IDLE이어도 중복 STOP에 종료 응답을 다시 보냅니다.
-중복 STOP은 음악/프로젝터 복원을 반복하지 않습니다. 새 통화가 시작되면 종료 복구 창은 해제됩니다.
+1.5초이며, 응답을 받지 못하면 최대 3회 STOP을 시도합니다. P4는 종료 후 제어 창을 보내지 않습니다.
+이미 IDLE이어도 중복 STOP에는 종료 응답을 다시 보냅니다. 제어 창을 받지 못하면
+Pi는 마지막 통화 시작/유지 송신 또는 프로세스 시작으로부터 12초가 지난 뒤 직접 재시도합니다.
+중복 STOP은 음악/프로젝터 복원을 반복하지 않습니다. 시간 경과만으로 종료 성공 처리하지 않습니다.
 
 이 변경은 라즈베리파이 코드와 P4 펌웨어를 함께 업데이트해야 합니다.
 실물 확인 순서: `call 1` → `ptt 1 on` → `ptt 1 off` → `hangup 1` → `status 1`.
@@ -628,7 +629,7 @@ while idle. PTT from FIELD_TX still uses the existing granted-window scheduling.
 #### 종료 이벤트 진단
 
 P4는 CALL_ENDED 프레임의 UART 전송 완료 후 100ms 동안 다음 PLC 전송을 보류합니다.
-종료 이벤트와 다음 복구 제어 창이 연속 UART 버스트가 되는 것을 피하기 위한 간격입니다.
+종료 응답과 후속 PLC 전송 사이의 간격이며, 종료 후 복구 제어 창은 더 이상 보내지 않습니다.
 이 간격은 종료 이벤트에만 적용하며 음악/LED 작업을 대기시키지 않습니다.
 모뎀 구간에서 유실된다는 가설을 검증하는 변경으로, 실제 수신 여부는 로그로 확인해야 합니다.
 
@@ -726,7 +727,7 @@ ACK a waiting emergency manually after resolving the earlier call.
 
 After `call 1` times out, use `hangup 1`. It first waits for that P4's receive
 window and sends STOP even without a confirmed local direction. If no window
-arrives for an unconfirmed start, explicit hangup probes with STOP directly:
+arrives, explicit hangup waits past the 12-second recovery deadline before probing with STOP directly:
 the original START may never have arrived and an idle P4 does not grant windows.
 This probe is not a bus-arbitration guarantee; a lost window/line fault can still
 cause collision or timeout. Only CALL_ENDED releases the reservation. Failed
@@ -808,7 +809,7 @@ IDs start from a random seed on P4 boot. Pi's event receipt acknowledgment is
 separate from the operator's `ack`, which starts an emergency call.
 
 One exchange runs at a time. Polling yields to PTT/hangup and due keepalives;
-unknown/starting/ending calls suspend polling. During FIELD_TX, the request to
+Starting/ending calls suspend polling. Unknown calls wait for grants; without a grant, direct polling is allowed only after the recovery deadline. During FIELD_TX, the request to
 another railing waits for the current speaker's grant. The 200ms window must
 fit request airtime + 40ms allowance + 120ms reply budget. During CONTROL_TX,
 Pi serializes the exchange against microphone transmission, then resumes audio.
@@ -822,12 +823,26 @@ The poll loop pauses 250ms between attempts; absent nodes and voice grants add
 delay. This is not a fixed emergency latency guarantee. Outbox overflow preserves
 existing entries, drops new reports and raises a loss counter/error; P4 reboot
 loses queued reports. Emergency event durability and full bus arbitration remain
-future work. In particular automatic CALL_END/recovery grants still use existing
-transmission rules: this change does not claim collision-free operation for
-all message types.
+future work. Automatic lease-expiry CALL_END reports are retained for polling; ended nodes no longer grant the bus. This does not claim collision-free operation for all message types.
 
 Bench checks when hardware testing resumes: press emergencies on 2/3/4 together,
 check only the addressed P4 reports during each poll, interrupt a reply and check
 redelivery without duplicate operator events, then repeat while 1 is in both
 PTT directions. Verify report latency, audio continuity, missing-node handling,
 and queue-overflow indication. Software tests cannot validate PLC modem timing.
+
+## Retained terminal call reports (Pi and P4 must be updated together)
+
+Explicit STOP receives an immediate END reply. Both explicit and lease-expired
+END are also retained in a separate terminal slot, ahead of emergency reports,
+until acknowledged by a poll. Emergency queue overflow cannot discard this slot.
+A lease-expired P4 does not spontaneously transmit END on the shared PLC line.
+A new call clears the previous terminal slot. Poll replies carrying END have
+18 payload bytes (token, event ID, loss count, AUDIO/DATA, four-byte END event).
+
+If grants disappear, Pi preserves ownership and waits until 12 seconds after
+the latest actual START/emergency ACK/keepalive write or process startup before
+sending a direct recovery request. This includes the normal 10-second P4 lease
+and a 2-second allowance; delayed modem delivery or a stalled P4 is not covered
+by a hard timing guarantee. Only a received END releases ownership. Hardware
+collision/audio checks remain deferred. Per-call session IDs are still future work.
