@@ -18,6 +18,7 @@ jobs:
       - run: PYTHONPATH=raspberry-pi python -m unittest discover -s raspberry-pi/tests -v
       - run: python -m unittest discover -s hello-p4/tests -v
       - run: python -m unittest discover -s hello-wroom/tests -p test_music_apply.py -v
+      - run: python -m unittest discover -s hello-wroom/tests -p test_player_confirmation.py -v
   wroom-build:
     runs-on: ubuntu-latest
     steps:

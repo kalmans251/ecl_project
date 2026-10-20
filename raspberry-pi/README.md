@@ -698,3 +698,20 @@ protocols remain unchanged; locally-idle hangup is not proof of a remote respons
 
 Default UART is /dev/serial0 (configured Pi 4B GPIO14/15, physical 8/10).
 The prior UART remains selectable with --port /dev/ttyAMA2.
+
+### Bench verification after updating all firmware
+
+Run `python main.py --port /dev/serial0 --baud 9600 --log-level DEBUG`.
+While no call/emergency is active, run `ping 1`, then `query 1 p4`,
+`query 1 wroom`, `query 1 s3`. Each must report the addressed node's response.
+Test LED/basic/music/weather, projector, sleep, detection source and power
+commands against the connected hardware; confirm the result as well as the
+visible state. For music, use `music 1 start`, `pause`, `resume`, `next`,
+`mode shuffle`, then `music 1 stop` and a low `volume 1 10`.
+A sleep/pause policy may intentionally produce a policy-only result.
+
+With the remote device disconnected, a command must time out as unknown,
+never report Applied. Restore the connection and query before retrying; a
+lost reply does not imply that the device did not execute the command.
+Finally verify the existing `call 1` / `ptt 1 on` / `ptt 1 off` / `hangup 1`
+sequence and a field emergency acknowledgment separately.
