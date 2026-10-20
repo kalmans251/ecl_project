@@ -27,6 +27,16 @@ static uint8_t audio_output_get_volume(void) { return volume; }
 static bool music_player_stop_confirmed(uint8_t rail,const uint8_t *id) {
  ++stops; saved_rail=rail; memcpy(saved_id,id,4); return queue_ok;
 }
+static bool sd_manager_is_ready(void){return true;}
+static bool playlist_manager_start(void){return true;}
+static bool playlist_manager_next(void){return true;}
+static bool music_player_pause(void){return true;}
+static bool music_player_resume(void){return true;}
+static void music_player_confirm_begin(uint8_t rail,const uint8_t *id,uint8_t op){(void)rail;(void)id;(void)op;}
+static bool music_player_confirm_end(void){return queue_ok;}
+static music_play_mode_t play_mode;
+static bool playlist_manager_set_mode(music_play_mode_t mode){play_mode=mode;return mode>=1 && mode<=3;}
+static music_play_mode_t playlist_manager_get_mode(void){return play_mode;}
 static void send_reply(const protocol_frame_t *f,uint8_t cmd,const uint8_t *p,size_t n) {
  (void)f; assert(cmd==CMD_APPLY_RESULT && n==7); memcpy(response,p,n); ++replies;
 }
@@ -45,6 +55,14 @@ int main(void) {
  assert(stops==1 && replies==before && saved_rail==1 && memcmp(saved_id,p,4)==0);
  queue_ok=false;handle_music_apply(&f);assert(response[5]==2 && replies==before+1);
  f.payload_len=6;before=stops;handle_music_apply(&f);assert(stops==before && response[5]==1);
+ f.payload_len=5;f.payload[4]=CMD_START;queue_ok=true;before=replies;
+ handle_music_apply(&f);assert(replies==before); // actual player must reply later
+ queue_ok=false;handle_music_apply(&f);assert(response[5]==2);
+ f.payload[4]=CMD_NEXT;queue_ok=true;before=replies;handle_music_apply(&f);assert(replies==before);
+ f.payload[4]=CMD_PAUSE;handle_music_apply(&f);assert(replies==before);
+ f.payload[4]=CMD_RESUME;handle_music_apply(&f);assert(replies==before);
+ f.payload_len=7;f.payload[4]=CMD_SET;f.payload[5]=1;f.payload[6]=2;
+ handle_music_apply(&f);assert(response[5]==0 && response[6]==2);
  f.src=NODE_PI;before=replies;handle_music_apply(&f);assert(replies==before);
  return 0;
 }

@@ -1,3 +1,4 @@
+#include "control_confirm.h"
 #include "music_policy.h"
 
 #include <string.h>
@@ -89,14 +90,7 @@ static bool send_music_command(
         0;
 
 
-    return
-        xQueueSend(
-            router_queue,
-            &frame,
-            pdMS_TO_TICKS(100)
-        )
-        ==
-        pdTRUE;
+    return control_confirm_send_music(&frame,pdMS_TO_TICKS(100));
 }
 
 

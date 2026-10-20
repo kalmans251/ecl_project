@@ -22,6 +22,10 @@ void detection_manager_get_summary(detection_summary_t *summary) { memset(summar
 SemaphoreHandle_t xSemaphoreCreateMutex(void) { return (void *)1; }
 int xSemaphoreTake(SemaphoreHandle_t handle,unsigned wait) { (void)handle;(void)wait;return 1; }
 int xSemaphoreGive(SemaphoreHandle_t handle) { (void)handle;return 1; }
+int xQueueSend(QueueHandle_t queue,const void *data,TickType_t wait);
+bool control_confirm_send_music(protocol_frame_t *frame,TickType_t wait) {
+    return xQueueSend(router_queue,frame,wait)==pdTRUE;
+}
 int xQueueSend(QueueHandle_t queue,const void *data,TickType_t wait) {
     (void)wait;assert(queue==router_queue);
     const protocol_frame_t *frame=data;

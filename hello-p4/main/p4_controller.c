@@ -27,6 +27,7 @@
 
 #include "call_manager.h"
 #include "music_policy.h"
+#include "control_confirm.h"
 
 #include "music_manager.h"
 #include "emergency_manager.h"
@@ -34,6 +35,19 @@
 /* ============================================================
  * LOG TAG
  * ============================================================ */
+
+static const protocol_frame_t *s_apply_request;
+static bool s_apply_accepted;
+static BaseType_t enqueue_led(led_command_t *cmd) {
+    if(s_apply_request) {
+        cmd->confirm=true;cmd->reply_rail=s_apply_request->railing_id;
+        cmd->reply_op=s_apply_request->payload[4];
+        memcpy(cmd->request_id,s_apply_request->payload,4);
+    }
+    BaseType_t result=xQueueSend(led_command_queue,cmd,0);
+    if(result==pdTRUE)s_apply_accepted=true;
+    return result;
+}
 
 static const char *TAG = "P4_CONTROLLER";
 
@@ -275,11 +289,7 @@ static void handle_led(
             };
 
 
-            xQueueSend(
-                led_command_queue,
-                &cmd,
-                0
-            );
+            enqueue_led(&cmd);
 
 
             break;
@@ -299,11 +309,7 @@ static void handle_led(
             };
 
 
-            xQueueSend(
-                led_command_queue,
-                &cmd,
-                0
-            );
+            enqueue_led(&cmd);
 
 
             break;
@@ -395,7 +401,7 @@ static void handle_led(
             };
 
 
-            if (xQueueSend(led_command_queue,&cmd,0) != pdTRUE) break;
+            if (enqueue_led(&cmd) != pdTRUE) break;
             system_state_set_led_pattern(new_mode,pattern);
             /*
             * System State에도 즉시 반영.
@@ -549,6 +555,91 @@ static void handle_led(
  * CONTROLLER TASK
  * ============================================================ */
 
+/* APPLY v1: request_id[4], original command, original payload.
+ * RESULT: request_id[4], original command, status, detail/status bytes.
+ * 0=local execution complete, 1=rejected, 2=failed, 3=music policy only.
+ * No automatic replay: NEXT/CCTV are not idempotent. */
+static void handle_general_apply(const protocol_frame_t *request)
+{
+    if(request->length<5)return;
+    protocol_frame_t f=*request;
+    f.command=request->payload[4];f.length=request->length-5;
+    memmove(f.payload,request->payload+5,f.length);
+    uint8_t response[11]={0};memcpy(response,request->payload,5);
+    response[5]=1;
+    bool active=call_manager_is_active() || emergency_manager_is_active();
+    s_apply_accepted=false;
+    if(!active) {
+        p4_system_state_t state;system_state_get(&state);
+        switch(f.service) {
+        case SERVICE_SYSTEM:
+            if(f.length==0 && (f.command==CMD_PING || f.command==CMD_STATUS_REQUEST)) {
+                response[5]=0;response[6]=1;
+            }
+            break;
+        case SERVICE_LED:
+            if((f.length==0 && (f.command==CMD_START || f.command==CMD_STOP)) ||
+               (f.command==CMD_SET && f.length>=1 && f.length<=2)) {
+                s_apply_request=request;handle_led(&f);s_apply_request=NULL;
+                if(s_apply_accepted)return; /* task sends completion */
+                response[5]=2;
+            }
+            break;
+        case SERVICE_POWER:
+            if(f.command==CMD_SET && f.length==1 && (f.payload[0]==1 || f.payload[0]==2)) {
+                handle_power(&f);system_state_get(&state);
+                response[5]=state.power_mode==f.payload[0]?0:2;
+            } else if(f.length==0 && (f.command==CMD_START || f.command==CMD_STOP) &&
+                      (state.power_mode==POWER_MODE_AC || state.power_mode==POWER_MODE_BATTERY)) {
+                handle_power(&f);
+                bool enabled=state.power_mode==POWER_MODE_AC?power_control_get_ac():power_control_get_battery();
+                response[5]=enabled==(f.command==CMD_START)?0:2;
+            }
+            break;
+        case SERVICE_PROJECTOR:
+            if(f.length==0 && (f.command==CMD_START || f.command==CMD_STOP)) {
+                handle_projector(&f);response[5]=projector_control_get()==(f.command==CMD_START)?0:2;
+            }
+            break;
+        case SERVICE_SLEEP:
+            if(f.length==0 && (f.command==CMD_START || f.command==CMD_STOP)) {
+                handle_sleep(&f);system_state_get(&state);
+                response[5]=state.sleep_mode_enabled==(f.command==CMD_START)?0:2;
+            }
+            break;
+        case SERVICE_DETECTION:
+            if(f.command==CMD_SET && f.length==1 && f.payload[0]<=1) {
+                handle_detection(&f);response[5]=detection_manager_get_source()==f.payload[0]?0:2;
+            } else if(f.command==CMD_DATA &&
+                ((f.length==5 && f.payload[0]==DETECT_EVENT_CCTV_NEW_PERSON) ||
+                 (f.length==6 && f.payload[0]==DETECT_EVENT_CCTV_AGE_RESULT &&
+                  ((f.payload[5]>=1 && f.payload[5]<=4) || f.payload[5]==255)))) {
+                handle_detection(&f);response[5]=s_apply_accepted?0:1;
+            }
+            break;
+        case SERVICE_MUSIC:
+            control_confirm_begin(request);
+            /* Existing policy may arm/reserve playback rather than start it.
+             * Never label a manager return as WROOM execution confirmation. */
+            if(f.length==0) {
+                if(f.command==CMD_START)response[5]=music_manager_start()?3:2;
+                else if(f.command==CMD_NEXT)response[5]=music_manager_next()?3:1;
+                else if(f.command==CMD_PAUSE) {
+                    music_manager_user_pause();response[5]=3;
+                } else if(f.command==CMD_RESUME) {
+                    music_manager_user_resume();response[5]=3;
+                }
+            } else if(f.command==CMD_SET && f.length==2 && f.payload[0]==MUSIC_SET_PLAY_MODE) {
+                response[5]=music_manager_set_mode((music_play_mode_t)f.payload[1])?3:1;
+            }
+            if(control_confirm_end())return; /* WROOM task owns final result */
+            break;
+        default:break;
+        }
+    }
+    send_response(request,request->service,CMD_APPLY_RESULT,response,7);
+}
+
 void p4_controller_task(
     void *arg
 )
@@ -569,6 +660,15 @@ void p4_controller_task(
             continue;
         }
 
+
+        if(frame.src==NODE_PI && frame.command==CMD_APPLY) {
+            bool wroom_apply=frame.service==SERVICE_MUSIC && frame.length>=5 &&
+                (frame.payload[4]==CMD_STOP || (frame.payload[4]==CMD_SET &&
+                 frame.length>=6 && frame.payload[5]==MUSIC_SET_VOLUME));
+            if(wroom_apply)handle_music(&frame);
+            else handle_general_apply(&frame);
+            continue;
+        }
 
         /* Pi general controls must not reconfigure hardware during a call. */
         if (frame.src == NODE_PI && call_manager_is_active()
@@ -1179,6 +1279,7 @@ static void handle_detection(
                 );
 
 
+            s_apply_accepted = accepted;
             if (
                 accepted
             )
@@ -1263,6 +1364,7 @@ static void handle_detection(
                 );
 
 
+            s_apply_accepted = accepted;
             if (
                 accepted
             )
@@ -1342,6 +1444,7 @@ static void handle_detection(
                 );
 
 
+            s_apply_accepted = accepted;
             if (
                 accepted
             )
@@ -1396,6 +1499,11 @@ static void handle_music(
         if (frame->length != 7) return;
         if (frame->payload[4] == CMD_STOP && frame->payload[5] == 0 &&
             frame->payload[6] == 0) music_policy_on_stopped();
+        if(frame->payload[5]==0) {
+            if(frame->payload[4]==CMD_START || frame->payload[4]==CMD_NEXT)music_policy_on_started();
+            else if(frame->payload[4]==CMD_PAUSE)music_policy_on_paused();
+            else if(frame->payload[4]==CMD_RESUME)music_policy_on_resumed();
+        }
         protocol_frame_t result = *frame;
         result.dst = NODE_PI; // Preserve WROOM source: this is the device result.
         xQueueSend(router_queue, &result, portMAX_DELAY);

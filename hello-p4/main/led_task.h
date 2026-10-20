@@ -28,6 +28,8 @@ typedef enum
 typedef struct
 {
     led_command_type_t type;
+    bool confirm;
+    uint8_t request_id[4], reply_rail, reply_op;
 
     led_mode_t mode;
 

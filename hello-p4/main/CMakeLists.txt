@@ -9,6 +9,7 @@ idf_component_register(
         "wroom_task.c"
         "router.c"
         "p4_controller.c"
+        "control_confirm.c"
         "system_state.c"
         "led_task.c"
         "led_design.c"

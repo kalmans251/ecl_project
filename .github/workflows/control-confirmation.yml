@@ -1,0 +1,38 @@
+name: Command confirmations
+on:
+  push:
+    paths: ['raspberry-pi/**', 'hello-wroom/**', 'esp32-s3-arduino/**', 'hello-p4/**', '.github/workflows/control-confirmation.yml']
+  pull_request:
+    paths: ['raspberry-pi/**', 'hello-wroom/**', 'esp32-s3-arduino/**', 'hello-p4/**', '.github/workflows/control-confirmation.yml']
+permissions:
+  contents: read
+jobs:
+  protocol-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r raspberry-pi/requirements.txt
+      - run: PYTHONPATH=raspberry-pi python -m unittest discover -s raspberry-pi/tests -v
+      - run: python -m unittest discover -s hello-p4/tests -v
+      - run: python -m unittest discover -s hello-wroom/tests -p test_music_apply.py -v
+  wroom-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: espressif/esp-idf-ci-action@v1
+        with:
+          path: hello-wroom
+          esp_idf_version: v6.0.2
+          target: esp32
+  s3-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install platformio
+      - run: pio run -d esp32-s3-arduino

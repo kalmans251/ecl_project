@@ -53,3 +53,6 @@ bool music_player_is_playing(void);
 
 
 bool music_player_is_paused(void);
+/* Annotate synchronous playlist/player enqueue calls from the controller task. */
+void music_player_confirm_begin(uint8_t rail,const uint8_t id[4],uint8_t op);
+bool music_player_confirm_end(void);

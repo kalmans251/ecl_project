@@ -9,9 +9,12 @@ class Bus:
     def send_frame(self, frame):
         self.sent.append(frame)
         if frame.command == Command.APPLY:
-            self.controls.handle_frame(Frame(frame.railing_id, Node.WROOM, Node.PI,
-                Service.MUSIC, Command.APPLY_RESULT,
-                frame.payload[:5] + bytes([0, frame.payload[-1] if len(frame.payload) == 7 else 0])))
+            wroom = frame.service == Service.MUSIC and (frame.payload[4] == Command.STOP or
+                (frame.payload[4] == Command.SET and frame.payload[5:6] == b'\x03'))
+            status = 3 if frame.service == Service.MUSIC and not wroom else 0
+            self.controls.handle_frame(Frame(frame.railing_id, Node.WROOM if wroom else frame.dst,
+                Node.PI, frame.service, Command.APPLY_RESULT,
+                frame.payload[:5] + bytes([status, frame.payload[-1] if wroom and len(frame.payload)==7 else 0])))
 
 class ControlsTests(unittest.TestCase):
     def setUp(self):
@@ -60,15 +63,10 @@ class ControlsTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.bus.sent.clear()
                 result = self.controls.execute(command.split())
-                confirmed = command.startswith('volume') or command == 'music 1 stop'
-                if confirmed:
-                    self.assertIn('WROOM confirmed', result)
-                    token = self.controls.request_id.to_bytes(4, 'big')
-                    self.assertEqual(self.bus.sent, [Frame(1, Node.PI, destination, service,
-                        Command.APPLY, token + bytes([op]) + payload)])
-                else:
-                    self.assertIn('not confirmed', result)
-                    self.assertEqual(self.bus.sent, [Frame(1, Node.PI, destination, service, op, payload)])
+                self.assertIn('confirmed', result.lower())
+                token = self.controls.request_id.to_bytes(4, 'big')
+                self.assertEqual(self.bus.sent, [Frame(1, Node.PI, destination, service,
+                    Command.APPLY, token + bytes([op]) + payload)])
                 # Must be accepted by the existing parser including the CRC.
                 from protocol import FrameParser
                 self.assertEqual(FrameParser().feed(self.bus.sent[0].encode()), self.bus.sent)
@@ -81,8 +79,9 @@ class ControlsTests(unittest.TestCase):
             cases.append((f'cctv 1 age 100 {age}', bytes([2, 0, 0, 0, 100, code])))
         for line, payload in cases:
             self.bus.sent.clear()
-            self.assertIn('not confirmed', self.controls.execute(line.split()))
-            frame = Frame(1, Node.PI, Node.P4, Service.DETECTION, Command.DATA, payload)
+            self.assertIn('Confirmed', self.controls.execute(line.split()))
+            frame = Frame(1, Node.PI, Node.P4, Service.DETECTION, Command.APPLY,
+                          self.controls.request_id.to_bytes(4, 'big') + bytes([Command.DATA]) + payload)
             self.assertEqual(self.bus.sent, [frame])
             from protocol import FrameParser
             self.assertEqual(FrameParser().feed(frame.encode()), [frame])
@@ -159,7 +158,7 @@ class ControlsTests(unittest.TestCase):
         for mode, value in [('ac', 1), ('battery', 2)]:
             self.bus.sent.clear()
             self.controls.execute(['power', '0xff', mode])
-            self.assertEqual([(f.railing_id, f.command, f.payload) for f in self.bus.sent],
+            self.assertEqual([(f.railing_id, f.payload[4], f.payload[5:]) for f in self.bus.sent],
                 [(255, Command.SET, bytes([value])), (255, Command.START, b'')])
 
     def test_invalid_input_never_writes_uart(self):
@@ -192,12 +191,12 @@ class ControlsTests(unittest.TestCase):
 
     def test_new_call_blocks_remaining_power_frame(self):
         def send(frame):
-            self.bus.sent.append(frame)
+            Bus.send_frame(self.bus,frame)
             self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
         self.bus.send_frame = send
         with self.assertRaises(RuntimeError): self.controls.execute(['power', '1', 'ac'])
         self.assertEqual(len(self.bus.sent), 1)
-        self.assertEqual(self.bus.sent[0].command, Command.SET)
+        self.assertEqual(self.bus.sent[0].payload[4], Command.SET)
 
     def test_status_response_does_not_claim_full_p4_state(self):
         message = device_status(Frame(1, Node.P4, Node.PI, Service.SYSTEM,
@@ -207,3 +206,30 @@ class ControlsTests(unittest.TestCase):
                                      Command.STATUS_RESPONSE, b'\x01\x01\x02\x01'))
         self.assertIn('sd_mounted=1 music=paused', message)
         self.assertIsNone(device_status(Frame(1, Node.P4, Node.PI, Service.SYSTEM, Command.PONG)))
+
+    def test_every_general_command_requires_matching_service_and_source(self):
+        for line in ['led 1 on','query 1 s3','query 1 wroom','ping 1','power 1 on','cctv 1 enter 10']:
+            def send(f):
+                payload=f.payload[:5]+bytes([0,0])
+                self.controls.handle_frame(Frame(f.railing_id, Node.WROOM if f.dst==Node.P4 else Node.P4,
+                    Node.PI,f.service,Command.APPLY_RESULT,payload))
+                self.controls.handle_frame(Frame(f.railing_id,f.dst,Node.PI,Service.AUDIO,
+                    Command.APPLY_RESULT,payload))
+            self.bus.send_frame=send
+            with self.subTest(line=line), self.assertRaises(TimeoutError):
+                self.controls.execute(line.split())
+
+    def test_policy_result_does_not_claim_playback(self):
+        result=self.controls.execute('music 1 start'.split())
+        self.assertIn('policy confirmed',result)
+        self.assertIn('playback not confirmed',result)
+        self.assertNotIn('Applied',result)
+
+    def test_power_first_step_failure_never_sends_start(self):
+        def send(f):
+            self.bus.sent.append(f)
+            self.controls.handle_frame(Frame(f.railing_id,Node.P4,Node.PI,f.service,
+                Command.APPLY_RESULT,f.payload[:5]+bytes([1,0])))
+        self.bus.send_frame=send
+        with self.assertRaises(RuntimeError):self.controls.execute('power 1 ac'.split())
+        self.assertEqual(len(self.bus.sent),1)
