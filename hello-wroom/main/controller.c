@@ -140,6 +140,19 @@ static void handle_system(
     const protocol_frame_t *frame
 )
 {
+    if(frame->cmd==CMD_APPLY) {
+        if(frame->payload_len<5)return;
+        uint8_t result[10]={0};memcpy(result,frame->payload,5);result[5]=1;
+        unsigned length=7;
+        if(frame->payload_len==5 && (result[4]==CMD_PING || result[4]==CMD_STATUS_REQUEST)) {
+            result[5]=0;result[6]=1;
+            if(result[4]==CMD_STATUS_REQUEST) {
+                result[7]=sd_card_is_mounted()?1:0;result[8]=(uint8_t)music_player_get_state();
+                result[9]=RAILING_ID;length=10;
+            }
+        }
+        send_reply(frame,CMD_APPLY_RESULT,result,length);return;
+    }
     switch (
         frame->cmd
     )
@@ -239,6 +252,20 @@ static void handle_music_apply(const protocol_frame_t *frame)
     if (op == CMD_STOP && frame->payload_len == 5) {
         if (music_player_stop_confirmed(frame->railing_id, frame->payload)) return;
         response[5] = 2; // command queue failure
+    } else if(frame->payload_len==5 && (op==CMD_START || op==CMD_NEXT || op==CMD_PAUSE || op==CMD_RESUME)) {
+        if((op==CMD_START || op==CMD_NEXT) && !sd_manager_is_ready()) {
+            response[5]=1;
+        } else {
+            music_player_confirm_begin(frame->railing_id,frame->payload,op);
+            bool ok=op==CMD_START?playlist_manager_start():op==CMD_NEXT?playlist_manager_next():
+                op==CMD_PAUSE?music_player_pause():music_player_resume();
+            bool queued=music_player_confirm_end();
+            if(ok && queued)return;
+            response[5]=2;
+        }
+    } else if(op==CMD_SET && frame->payload_len==7 && frame->payload[5]==MUSIC_SET_PLAY_MODE) {
+        bool ok=playlist_manager_set_mode((music_play_mode_t)frame->payload[6]);
+        response[6]=(uint8_t)playlist_manager_get_mode();response[5]=ok && response[6]==frame->payload[6]?0:1;
     } else if (op == CMD_SET && frame->payload_len == 7 &&
                frame->payload[5] == MUSIC_SET_VOLUME && frame->payload[6] <= 100) {
         audio_output_set_volume(frame->payload[6]);

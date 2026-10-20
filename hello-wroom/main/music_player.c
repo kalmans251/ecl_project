@@ -85,6 +85,8 @@ typedef struct
 {
     player_command_type_t type;
     bool confirm_stop;
+    bool confirm_operation;
+    uint8_t confirm_op;
     uint8_t confirm_rail;
     uint8_t request_id[4];
 
@@ -94,6 +96,32 @@ typedef struct
 
 } player_command_t;
 
+
+static portMUX_TYPE s_confirm_mux=portMUX_INITIALIZER_UNLOCKED;
+static TaskHandle_t s_confirm_owner;
+static player_command_t s_confirm_context;
+static bool s_confirm_enqueued;
+static player_command_t s_start_confirmation, s_restart_confirmation;
+void music_player_confirm_begin(uint8_t rail,const uint8_t id[4],uint8_t op) {
+    portENTER_CRITICAL(&s_confirm_mux);
+    memset(&s_confirm_context,0,sizeof(s_confirm_context));
+    s_confirm_context.confirm_operation=true;s_confirm_context.confirm_op=op;
+    s_confirm_context.confirm_rail=rail;memcpy(s_confirm_context.request_id,id,4);
+    s_confirm_enqueued=false;s_confirm_owner=xTaskGetCurrentTaskHandle();
+    portEXIT_CRITICAL(&s_confirm_mux);
+}
+bool music_player_confirm_end(void) {
+    portENTER_CRITICAL(&s_confirm_mux);bool ok=s_confirm_enqueued;s_confirm_owner=NULL;
+    portEXIT_CRITICAL(&s_confirm_mux);return ok;
+}
+static void confirm_operation(player_command_t *cmd,uint8_t status,uint8_t detail) {
+    if(!cmd->confirm_operation)return;
+    protocol_frame_t result;
+    protocol_frame_init(&result,cmd->confirm_rail,NODE_WROOM,NODE_P4,SERVICE_MUSIC,CMD_APPLY_RESULT);
+    result.payload_len=7;memcpy(result.payload,cmd->request_id,4);
+    result.payload[4]=cmd->confirm_op;result.payload[5]=status;result.payload[6]=detail;
+    router_enqueue(&result);cmd->confirm_operation=false;
+}
 
 static player_command_t s_stop_confirmation;
 
@@ -459,6 +487,7 @@ static void process_control_commands(
                         MUSIC_EVENT_PAUSED
                     );
                 }
+                confirm_operation(&command,s_state==MUSIC_PLAYER_PAUSED?0:1,(uint8_t)s_state);
 
 
                 break;
@@ -493,6 +522,7 @@ static void process_control_commands(
                         MUSIC_EVENT_RESUMED
                     );
                 }
+                confirm_operation(&command,s_state==MUSIC_PLAYER_PLAYING?0:1,(uint8_t)s_state);
 
 
                 break;
@@ -515,6 +545,8 @@ static void process_control_commands(
                     )
                 )
                 {
+                    confirm_operation(&s_restart_confirmation,2,0);
+                    s_restart_confirmation=command;
                     *restart_requested =
                         true;
                 }
@@ -591,6 +623,7 @@ static void wait_while_paused(
                 send_music_event(
                     MUSIC_EVENT_RESUMED
                 );
+                confirm_operation(&command,s_state==MUSIC_PLAYER_PLAYING?0:1,(uint8_t)s_state);
 
 
                 break;
@@ -618,6 +651,8 @@ static void wait_while_paused(
                     )
                 )
                 {
+                    confirm_operation(&s_restart_confirmation,2,0);
+                    s_restart_confirmation=command;
                     *restart_requested =
                         true;
                 }
@@ -628,6 +663,8 @@ static void wait_while_paused(
 
 
             case PLAYER_CMD_PAUSE:
+                confirm_operation(&command,0,MUSIC_PLAYER_PAUSED);
+                break;
             default:
             {
                 break;
@@ -1299,6 +1336,7 @@ static play_result_t play_mp3_file(
             }
 
 
+            confirm_operation(&s_start_confirmation,0,MUSIC_PLAYER_PLAYING);
             music_eq_feed(output, output_samples, info.hz);
 
             /* ================================================
@@ -1557,13 +1595,10 @@ static void music_task(
             continue;
         }
 
-        if (
-            command.type !=
-            PLAYER_CMD_START
-        )
-        {
-            continue;
+        if (command.type != PLAYER_CMD_START) {
+            confirm_operation(&command,1,MUSIC_PLAYER_IDLE);continue;
         }
+        s_start_confirmation=command;
 
 
         if (
@@ -1576,6 +1611,7 @@ static void music_task(
             )
         )
         {
+            confirm_operation(&s_start_confirmation,2,MUSIC_PLAYER_IDLE);
             continue;
         }
 
@@ -1596,6 +1632,12 @@ static void music_task(
                 );
 
 
+            /* Failure/stop/restart before first PCM must resolve the old request. */
+            confirm_operation(&s_start_confirmation,2,(uint8_t)s_state);
+            if(result==PLAY_RESULT_RESTART) {
+                s_start_confirmation=s_restart_confirmation;
+                memset(&s_restart_confirmation,0,sizeof(s_restart_confirmation));
+            }
             if (
                 result ==
                 PLAY_RESULT_RESTART
@@ -1611,6 +1653,7 @@ static void music_task(
                     )
                 )
                 {
+                    confirm_operation(&s_start_confirmation,2,MUSIC_PLAYER_IDLE);
                     break;
                 }
 
@@ -1653,6 +1696,11 @@ static bool send_command(
     );
 
 
+    portENTER_CRITICAL(&s_confirm_mux);
+    bool tracked=s_confirm_owner==xTaskGetCurrentTaskHandle();
+    if(tracked)command=s_confirm_context;
+    portEXIT_CRITICAL(&s_confirm_mux);
+
     command.type =
         type;
 
@@ -1677,18 +1725,9 @@ static bool send_command(
     }
 
 
-    return
-        xQueueSend(
-            s_command_queue,
-
-            &command,
-
-            pdMS_TO_TICKS(
-                100
-            )
-        )
-        ==
-        pdTRUE;
+    bool ok=xQueueSend(s_command_queue,&command,pdMS_TO_TICKS(100))==pdTRUE;
+    if(ok && tracked){portENTER_CRITICAL(&s_confirm_mux);s_confirm_enqueued=true;portEXIT_CRITICAL(&s_confirm_mux);}
+    return ok;
 }
 
 

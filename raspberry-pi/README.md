@@ -669,9 +669,49 @@ To use the previous UART explicitly: `python main.py --port /dev/ttyAMA2`.
 | `hangup 1` during an active call | Send STOP and wait for P4 CALL_ENDED; up to 3 attempts. If locally idle, returns without sending STOP. |
 | `music 1 stop`, `volume 1 20` | Wait for WROOM APPLY_RESULT matching railing, request ID, operation and expected detail; 3-second timeout, no automatic retry. |
 | `ack 1` | Send emergency acknowledgment, then asynchronously match P4 ACKED to the active emergency sequence. ACK sent is not confirmation. |
-| `ping 1`, `query 1 p4/wroom/s3` | Send request; receive handling exists, but no per-request wait/timeout success decision in the CLI. |
-| Other general controls | Transmission only; device application not confirmed. |
+| `ping 1`, `query 1 p4/wroom/s3` | Wait for the addressed device’s correlated SYSTEM result. |
+| Other general controls | Wait for correlated APPLY_RESULT; see result meanings below. |
 | `status 1`, `voice-status` | Local cached state/counters, no live device query. |
 
 These confirmation mechanisms do not establish that the pending field hangup issue
 is resolved. Capture `--log-level DEBUG` output to compare raw RX and P4 END TX.
+
+## Correlated command results
+
+All general CLI commands now send APPLY(request_id[4], original command, payload)
+and wait up to 3 seconds for APPLY_RESULT with matching rail, service, source,
+request ID and operation. Firmware must be updated before using these commands.
+No fallback to unconfirmed sends and no automatic replay of NEXT/CCTV events.
+Power source selection is confirmed before START; failure stops the remaining steps.
+
+- Applied: P4 local operation/LED task processed the setting, or WROOM confirmed the requested music operation. START/NEXT confirms first PCM output; PAUSE/RESUME confirms player state; mode/volume confirms the setting.
+- P4 policy confirmed: no matching playback command was dispatched (e.g. sleep reservation, already enabled session, or another pause reason);
+  this explicitly does not confirm WROOM playback. Sleep may defer playback.
+- SYSTEM response confirmed: P4/WROOM/S3 responded to the tokenized ping/query.
+- Rejected / execution failed / timeout (unknown): never displayed as applied.
+
+LED completion confirms task-side setting changes, not optical feedback or completion
+of music-policy side effects. Relay confirmation checks the controller’s recorded output state after calling the output driver; it does not measure the GPIO pin or connected load.
+CCTV event success confirms P4 acceptance; rejected duplicate/stale/wrong-mode events
+are not reported as applied. Successful WROOM replies are forwarded with their original source and request ID. Existing call/PTT/hangup and emergency ACK
+protocols remain unchanged; locally-idle hangup is not proof of a remote response.
+
+Default UART is /dev/serial0 (configured Pi 4B GPIO14/15, physical 8/10).
+The prior UART remains selectable with --port /dev/ttyAMA2.
+
+### Bench verification after updating all firmware
+
+Run `python main.py --port /dev/serial0 --baud 9600 --log-level DEBUG`.
+While no call/emergency is active, run `ping 1`, then `query 1 p4`,
+`query 1 wroom`, `query 1 s3`. Each must report the addressed node's response.
+Test LED/basic/music/weather, projector, sleep, detection source and power
+commands against the connected hardware; confirm the result as well as the
+visible state. For music, use `music 1 start`, `pause`, `resume`, `next`,
+`mode shuffle`, then `music 1 stop` and a low `volume 1 10`.
+A sleep/pause policy may intentionally produce a policy-only result.
+
+With the remote device disconnected, a command must time out as unknown,
+never report Applied. Restore the connection and query before retrying; a
+lost reply does not imply that the device did not execute the command.
+Finally verify the existing `call 1` / `ptt 1 on` / `ptt 1 off` / `hangup 1`
+sequence and a field emergency acknowledgment separately.

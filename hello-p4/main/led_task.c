@@ -11,6 +11,8 @@
 #include "led_task.h"
 #include "led_eq_fresh.h"
 #include "led_design.h"
+#include "protocol.h"
+#include "router.h"
 
 _Static_assert(LED_NUM_ROWS==LED_DESIGN_ROWS && LEDS_PER_ROW==LED_DESIGN_COLS,
                "LED design requires a 4 x 31 serpentine panel");
@@ -50,6 +52,13 @@ static void handle_command(const led_command_t *cmd) {
             break;
         case LED_COMMAND_SET_WEATHER:system_state_set_weather(cmd->weather);break;
         default:break;
+    }
+    if(cmd->confirm) {
+        protocol_frame_t result={0};
+        result.railing_id=cmd->reply_rail;result.src=NODE_P4;result.dst=NODE_PI;
+        result.service=SERVICE_LED;result.command=CMD_APPLY_RESULT;result.length=7;
+        memcpy(result.payload,cmd->request_id,4);result.payload[4]=cmd->reply_op;
+        xQueueSend(router_queue,&result,portMAX_DELAY);
     }
 }
 

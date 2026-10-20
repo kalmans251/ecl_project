@@ -77,6 +77,8 @@
 #define CMD_STOP              0x21
 #define CMD_SET               0x22
 #define CMD_DATA              0x23
+#define CMD_APPLY             0x28
+#define CMD_APPLY_RESULT      0x29
 #define CMD_PAUSE             0x24
 #define CMD_RESUME            0x25
 #define CMD_NEXT              0x26

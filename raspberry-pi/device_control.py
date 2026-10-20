@@ -1,7 +1,7 @@
 """Validated console controls using the device firmware's protocol.
 
-Music STOP and volume require correlated WROOM application results. Other
-requests confirm transmission only. P4 owns policy and
+Every general request waits for a correlated result. Music STOP and volume
+require WROOM application results; music policy operations report their scope explicitly. P4 owns policy and
 forwards music settings to WROOM. General controls never queue behind a call.
 """
 from __future__ import annotations
@@ -129,57 +129,66 @@ class DeviceControls:
             if args:
                 raise ValueError('ping: expected only railing_id')
             add(Service.SYSTEM, Command.PING)
-        confirmed = name == 'volume' or (name == 'music' and args == ['stop'])
         with self.lock:
-            if confirmed:
+            results = []
+            for original in frames:
                 self._check_idle()
-                original = frames[0]
                 self.request_id = (self.request_id + 1) & 0xffffffff
                 token = self.request_id.to_bytes(4, 'big')
+                wroom_apply = name == 'volume' or (name == 'music' and args == ['stop'])
+                expected = Node.WROOM if original.service == Service.MUSIC else original.dst
+                detail = original.payload[-1] if name == 'volume' else (0 if wroom_apply else None)
                 with self.condition:
-                    self.pending = (rail, token, original.command,
-                                    original.payload[-1] if name == 'volume' else 0)
+                    self.pending = (rail, token, original.command, original.service, expected, detail)
                     self.result = None
                 try:
-                    self.bus.send_frame(Frame(rail, Node.PI, Node.P4, Service.MUSIC,
+                    self.bus.send_frame(Frame(rail, Node.PI, original.dst, original.service,
                         Command.APPLY, token + bytes([original.command]) + original.payload))
                     deadline = time.monotonic() + self.ack_timeout
                     with self.condition:
                         while self.result is None:
                             remaining = deadline - time.monotonic()
                             if remaining <= 0:
-                                raise TimeoutError('Device application confirmation timed out; '
-                                                   'application state is unknown')
+                                raise TimeoutError(f'Device confirmation timed out after {len(results)}/{len(frames)} steps; '
+                                                   'application state is unknown; no automatic retry')
                             self.condition.wait(remaining)
-                        status, detail = self.result
-                    if status != 0:
+                        status, response, source = self.result
+                    if status not in (0, 3):
                         reason = 'rejected' if status == 1 else 'execution failed'
-                        raise RuntimeError(f'Device application {reason} rail={rail}')
-                    return f'Applied rail={rail}: {" ".join(parts)} (WROOM confirmed)'
+                        raise RuntimeError(f'Device application {reason} rail={rail}; completed steps={len(results)}')
+                    if status == 3:
+                        results.append('P4 policy confirmed; WROOM playback not confirmed')
+                    elif original.service == Service.SYSTEM:
+                        results.append(f'{Node(source).name} response confirmed data={response.hex(" ")}')
+                    else:
+                        results.append(f'Applied ({Node(source).name} confirmed)')
                 finally:
                     with self.condition:
                         self.pending = None
                         self.result = None
-            for frame in frames:
-                self._check_idle()
-                self.bus.send_frame(frame)
-        return f'Request sent rail={rail}: {" ".join(parts)} ({len(frames)} frame(s)); device application not confirmed'
+        return f'Confirmed rail={rail}: {" ".join(parts)}; ' + '; '.join(results)
 
     def handle_frame(self, frame):
-        if (frame.dst != Node.PI or frame.src not in (Node.P4, Node.WROOM)
-                or frame.service != Service.MUSIC or frame.command != Command.APPLY_RESULT
-                or len(frame.payload) != 7):
+        if frame.dst != Node.PI or frame.command != Command.APPLY_RESULT or len(frame.payload) < 7:
             return False
-        token, op, status, detail = frame.payload[:4], *frame.payload[4:]
-        if status not in (0, 1, 2):
+        token, op, status = frame.payload[:4], frame.payload[4], frame.payload[5]
+        if status not in (0, 1, 2, 3):
             return False
         with self.condition:
             pending = self.pending
-            if pending is None or (frame.railing_id, token, op) != pending[:3]:
-                return True # delayed/foreign response cannot confirm a new request
-            if status == 0 and (frame.src != Node.WROOM or detail != pending[3]):
+            if pending is None or (frame.railing_id, token, op, frame.service) != pending[:4]:
                 return True
-            self.result = (status, detail)
+            expected, detail = pending[4:]
+            # P4 can reject a downstream request, but never claim WROOM/S3 success.
+            policy = status == 3 and frame.src == Node.P4 and frame.service == Service.MUSIC and detail is None
+            if frame.src != expected and not policy and not (frame.src == Node.P4 and status in (1, 2)):
+                return True
+            if status == 3 and not (frame.src == Node.P4 and frame.service == Service.MUSIC
+                    and detail is None):
+                return True
+            if status == 0 and detail is not None and frame.payload[6] != detail:
+                return True
+            self.result = (status, frame.payload[6:], frame.src)
             self.condition.notify_all()
         return True
 

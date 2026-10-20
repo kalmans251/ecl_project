@@ -35,6 +35,17 @@ static void handle_system(
     const protocol_frame_t *frame
 )
 {
+    if(frame->command==CMD_APPLY) {
+        if(frame->length<5)return;
+        protocol_frame_t response={};
+        response.railing_id=frame->railing_id;response.src=NODE_S3;response.dst=frame->src;
+        response.service=SERVICE_SYSTEM;response.command=CMD_APPLY_RESULT;response.length=7;
+        memcpy(response.payload,frame->payload,5);response.payload[5]=1;
+        if(frame->length==5 && (frame->payload[4]==CMD_PING || frame->payload[4]==CMD_STATUS_REQUEST)) {
+            response.payload[5]=0;response.payload[6]=1;
+        }
+        ble_send_frame(&response);return;
+    }
     // --------------------------------------------------------
     // PING
     // --------------------------------------------------------
