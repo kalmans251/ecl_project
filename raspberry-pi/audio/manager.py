@@ -174,6 +174,20 @@ class AudioManager:
 
 
     def start_call(self, railing_id: int) -> bool:
+        if not 1 <= railing_id <= 255:
+            raise ValueError("railing_id must be 1..255")
+        if self._railings.get_call_direction(railing_id) is not None:
+            if self._railings.snapshot(railing_id)["call"]["phase"] != "active":
+                raise RuntimeError("Call unresolved; hangup first")
+            return False
+        self._railings.reserve_call(railing_id)
+        try:
+            return self._start_call(railing_id)
+        except Exception:
+            self._railings.call_request_failed(railing_id)
+            raise
+
+    def _start_call(self, railing_id: int) -> bool:
         """Start a normal call; return False if this railing is already connected.
 
         Keep local audio disabled until the P4 CALL_STARTED event. This method
@@ -252,6 +266,8 @@ class AudioManager:
                 ),
         )
         with self._control_lock:
+            if self._railings.snapshot(railing_id).get("call", {}).get("phase") != "active":
+                raise RuntimeError("No confirmed active call; hangup unresolved call first")
             for attempt in range(1, self._attempts + 1):
                 current = self._railings.get_call_direction(railing_id)
                 if current is None:
@@ -287,41 +303,52 @@ class AudioManager:
                             railing_id, attempt)
             raise TimeoutError("PTT direction was not confirmed by P4")
 
-    def end_call(
-        self,
-        railing_id: int,
-    ) -> None:
+    def end_call(self, railing_id: int) -> bool:
+        """Return True only after remote END; False means locally idle/no request."""
+        if not 1 <= railing_id <= 255:
+            raise ValueError("railing_id must be 1..255")
         with self._control_lock:
-            for attempt in range(1, self._attempts + 1):
-                current = self._railings.get_call_direction(railing_id)
-                if current is None:
-                    return
-                try:
-                    self._bus.send_control_frame(
-                        Frame(railing_id=railing_id, src=Node.PI, dst=Node.P4,
-                              service=Service.AUDIO, command=Command.STOP),
-                        wait_for_window=(current == int(AudioDirection.FIELD_TX)))
-                except TimeoutError:
-                    # END may arrive while waiting for a retry grant, after P4
-                    # has already become idle. Recheck before declaring failure.
-                    if self._railings.get_call_direction(railing_id) is None:
-                        return
-                    if attempt == self._attempts:
-                        raise
-                    continue
-                # END follows the current receive window and restoration traffic.
-                deadline = time.monotonic() + self._ack_timeout * 3
-                with self._condition:
-                    while self._railings.get_call_direction(railing_id) is not None:
-                        remaining = deadline - time.monotonic()
-                        if remaining <= 0:
-                            break
-                        self._condition.wait(remaining)
-                    if self._railings.get_call_direction(railing_id) is None:
+            if not self._railings.call_pending(railing_id):
+                return False
+            current = self._railings.get_call_direction(railing_id)
+            uncertain = current is None
+            self._railings.call_end_requested(railing_id)
+            try:
+                for attempt in range(1, self._attempts + 1):
+                    if not self._railings.call_pending(railing_id):
+                        return True
+                    frame = Frame(railing_id, Node.PI, Node.P4, Service.AUDIO, Command.STOP)
+                    try:
+                        self._bus.send_control_frame(frame, wait_for_window=(
+                            uncertain or current == int(AudioDirection.FIELD_TX)))
+                    except TimeoutError:
+                        if not self._railings.call_pending(railing_id):
+                            return True
+                        # A lost START request leaves P4 idle with no grants.
+                        # Only an explicit hangup of an unconfirmed start probes
+                        # directly after waiting for a grant. Never claim success
+                        # without END; the original bus reservation stays held.
+                        if uncertain:
+                            self._bus.send_control_frame(frame, wait_for_window=False)
+                        elif attempt == self._attempts:
+                            raise
+                        else:
+                            continue
+                    deadline = time.monotonic() + self._ack_timeout * 3
+                    with self._condition:
+                        while self._railings.call_pending(railing_id):
+                            remaining = deadline - time.monotonic()
+                            if remaining <= 0:
+                                break
+                            self._condition.wait(remaining)
+                    if not self._railings.call_pending(railing_id):
                         LOG.info("CALL end confirmed rail=%d", railing_id)
-                        return
-                LOG.warning("No P4 hangup confirmation rail=%d attempt=%d", railing_id, attempt)
-            raise TimeoutError("Hangup was not confirmed by P4")
+                        return True
+                    LOG.warning("No P4 hangup confirmation rail=%d attempt=%d", railing_id, attempt)
+                raise TimeoutError("Hangup was not confirmed by P4; state remains unknown")
+            except Exception:
+                self._railings.call_request_failed(railing_id)
+                raise
 
     @staticmethod
     def _direction_name(

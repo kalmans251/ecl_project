@@ -133,6 +133,32 @@ class RailingManager:
 
             return True
 
+    def reserve_call(self, railing_id: int, *, emergency: bool = False) -> None:
+        """Atomically reserve the shared bus before a request can reach hardware."""
+        with self._lock:
+            for rid, state in self._states.items():
+                if state.call.phase not in ("idle", "ended") or state.call.active:
+                    raise RuntimeError(f"Another or unresolved call owns PLC rail={rid}; hangup first")
+                if not emergency and state.emergency.active:
+                    raise RuntimeError("An emergency is active; use ack for the emergency call")
+            self._get_or_create_locked(railing_id).call.phase = "starting"
+
+    def call_request_failed(self, railing_id: int) -> None:
+        with self._lock:
+            call = self._get_or_create_locked(railing_id).call
+            if call.phase in ("starting", "ending"):
+                call.phase = "unknown"
+
+    def call_end_requested(self, railing_id: int) -> None:
+        with self._lock:
+            self._get_or_create_locked(railing_id).call.phase = "ending"
+
+    def call_pending(self, railing_id: int) -> bool:
+        with self._lock:
+            state = self._states.get(railing_id)
+            return state is not None and (state.call.active or
+                state.call.phase not in ("idle", "ended"))
+
     def call_started(
         self,
         railing_id: int,
@@ -148,6 +174,7 @@ class RailingManager:
 
             state.mark_seen()
 
+            state.call.phase = "active"
             state.call.active = True
             state.call.origin = origin
             state.call.direction = direction
@@ -188,6 +215,7 @@ class RailingManager:
 
             state.mark_seen()
 
+            state.call.phase = "ended"
             state.call.active = False
             state.call.origin = None
             state.call.direction = None
