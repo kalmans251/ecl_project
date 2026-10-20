@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <string.h>
+#include <atomic>
 
 #include "board_config.h"
 #include "protocol.h"
@@ -8,7 +9,7 @@
 #include "microphone_codec2.h"
 
 
-static uint32_t s_session;
+static std::atomic<uint32_t> s_session{0};
 
 static bool
     s_active =

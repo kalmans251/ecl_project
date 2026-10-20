@@ -10,6 +10,8 @@ CODEC2_SRC = os.environ.get('ECL_TEST_CODEC2_SRC')
 CODEC2_LIB = os.environ.get('ECL_TEST_CODEC2_LIB') or ctypes.util.find_library('codec2')
 MAIN = Path(__file__).resolve().parents[1] / 'main'
 HEADERS = {
+'driver/uart.h': '#pragma once\n',
+'driver/spi_master.h': '#pragma once\n',
 'esp_heap_caps.h': '''#pragma once
 #define MALLOC_CAP_8BIT 1
 ''',
@@ -174,7 +176,7 @@ static void enqueue_audio(void) {
 }
 int main(void) {
     voice_session_init();
-    protocol_frame_t control={.src=NODE_P4,.cmd=CMD_START,.payload_len=4,.payload={0,0,0,7}};
+    protocol_frame_t control={.railing_id=RAILING_ID,.src=NODE_P4,.cmd=CMD_START,.payload_len=4,.payload={0,0,0,7}};
     assert(voice_session_control(&control));
     control.cmd=CMD_SET;control.payload_len=5;control.payload[0]=AUDIO_DIR_CONTROL_TX;
     control.payload[3]=0;control.payload[4]=7;assert(voice_session_control(&control));

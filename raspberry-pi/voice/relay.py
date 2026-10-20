@@ -89,11 +89,10 @@ class VoiceRelay:
             if self._transitioning:
                 return None
             epoch = self._epoch
-        if self._railings.snapshot(railing_id).get("call", {}).get("phase") != "active":
+        call = self._railings.snapshot(railing_id).get("call", {})
+        if call.get("phase") != "active" or call.get("direction") != int(direction):
             return None
-        if self._railings.get_call_direction(railing_id) != int(direction):
-            return None
-        return (epoch, self._railings.snapshot(railing_id)["call"]["session_id"])
+        return (epoch, call["session_id"])
 
     @contextmanager
     def control_transition(self):

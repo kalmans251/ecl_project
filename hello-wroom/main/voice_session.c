@@ -1,4 +1,5 @@
 #include "voice_session.h"
+#include "board_config.h"
 #include "audio_output.h"
 #include "music_player.h"
 #include "music_eq.h"
@@ -311,7 +312,7 @@ bool voice_session_handle_codec2(const uint8_t *payload, size_t length)
 
 /* P4 owns call state; repeated START for the same active session is a no-op. */
 bool voice_session_control(const protocol_frame_t *f) {
-    if (f->src != NODE_P4) return false;
+    if (f->src != NODE_P4 || f->railing_id != RAILING_ID) return false;
     unsigned offset=f->cmd==CMD_SET?1:0;
     if (f->payload_len != offset+4) return false;
     uint32_t id=session_id(f->payload+offset);
@@ -332,7 +333,7 @@ bool voice_session_control(const protocol_frame_t *f) {
 bool voice_session_forward_allowed(const protocol_frame_t *f) {
     if(f->service!=SERVICE_AUDIO || f->cmd!=CMD_DATA || !f->payload_len ||
        f->payload[0]!=AUDIO_DATA_CODEC2)return true;
-    if(f->src!=NODE_S3 || f->dst!=NODE_PI || f->payload_len<AUDIO_CODEC2_META_SIZE ||
+    if(f->railing_id!=RAILING_ID || f->src!=NODE_S3 || f->dst!=NODE_PI || f->payload_len<AUDIO_CODEC2_META_SIZE ||
        f->payload[1]!=CODEC2_MODE_2400 || f->payload[2]!=AUDIO_DIR_FIELD_TX ||
        !f->payload[5] || f->payload[5]>CODEC2_MAX_FRAMES_PER_PACKET ||
        f->payload[6]!=6 || f->payload_len!=AUDIO_CODEC2_META_SIZE+f->payload[5]*6)return false;
