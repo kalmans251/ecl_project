@@ -17,6 +17,9 @@
 #include "projector_control.h"
 #include "music_policy.h"
 
+#define CALL_LEASE_US (10LL * 1000 * 1000)
+static int64_t s_call_lease_until_us;
+
 static const char *TAG =
     "CALL";
 
@@ -445,6 +448,7 @@ void call_manager_init(void)
     s_call_origin =
         CALL_ORIGIN_NORMAL;
     s_end_recovery_until_us = 0;
+    s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
     s_last_end_origin = CALL_ORIGIN_NORMAL;
 
 
@@ -498,6 +502,7 @@ bool call_manager_start(
     s_call_origin =
         origin;
     s_end_recovery_until_us = 0;
+    s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
 
 
     /*
@@ -920,4 +925,24 @@ bool call_manager_end_recovery_active(void)
                   esp_timer_get_time() < s_end_recovery_until_us;
     unlock_manager();
     return active;
+}
+
+void call_manager_keepalive(void)
+{
+    lock_manager();
+    if (s_call_state != CALL_STATE_IDLE && esp_timer_get_time() < s_call_lease_until_us)
+        s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
+    unlock_manager();
+}
+
+void call_manager_tick(void)
+{
+    lock_manager();
+    bool expired = s_call_state != CALL_STATE_IDLE &&
+                   esp_timer_get_time() >= s_call_lease_until_us;
+    unlock_manager();
+    if (expired) {
+        ESP_LOGW(TAG, "Pi keepalive expired; ending call");
+        call_manager_end();
+    }
 }
