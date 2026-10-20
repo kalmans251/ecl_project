@@ -18,7 +18,7 @@ class RailingManager:
         if self._state_file is not None:
             if self._state_file.exists():
                 data = json.loads(self._state_file.read_text())
-                if data.get("version") != 1 or not isinstance(data.get("pending"), list):
+                if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("pending"), list):
                     raise ValueError("Invalid call recovery journal")
                 for rid in data["pending"]:
                     if type(rid) is not int or not 1 <= rid <= 255:

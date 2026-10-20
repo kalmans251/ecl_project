@@ -39,9 +39,11 @@ class LeaseTests(unittest.TestCase):
 
     def test_corrupt_journal_is_not_silently_reset(self):
         with tempfile.TemporaryDirectory() as folder:
-            path=Path(folder)/'calls.json';path.write_text('{broken')
-            with self.assertRaises(ValueError): RailingManager(str(path))
-            self.assertEqual(path.read_text(),'{broken')
+            path=Path(folder)/'calls.json'
+            for content in ('{broken', '[]', 'null', '{"version":1,"pending":[0]}'):
+                path.write_text(content)
+                with self.assertRaises(ValueError): RailingManager(str(path))
+                self.assertEqual(path.read_text(),content)
 
     def test_renewal_uses_window_only_for_field_and_skips_unknown(self):
         states=RailingManager();bus=Bus();audio=AudioManager(bus,states)
