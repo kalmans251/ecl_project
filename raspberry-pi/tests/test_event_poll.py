@@ -66,3 +66,26 @@ class PollTests(unittest.TestCase):
         self.assertNotIn(2,self.poller.ack)
         self.poller.dispatch=self.events.append
         self.poller.poll_once(2);self.assertEqual(len(self.events),1)
+
+    def test_unknown_waits_for_lease_then_polls_terminal_end(self):
+        from unittest.mock import patch
+        from test_call_start import event
+        from protocol import AudioEvent
+        self.states.reserve_call(1)
+        self.states.call_request_failed(1)
+        def no_grant(*args, **kwargs): raise TimeoutError('no grant')
+        self.bus.send_control_frame=no_grant
+        with patch.object(self.audio, 'recovery_delay', return_value=2):
+            self.poller.poll_once(1)
+        self.assertEqual(self.bus.sent, [])
+        self.assertTrue(self.states.call_pending(1))
+        def ended(f):
+            payload=f.payload[:4]+(99).to_bytes(4,'big')+bytes(4)
+            payload+=bytes([Service.AUDIO,Command.DATA])+event(kind=AudioEvent.CALL_ENDED).payload
+            self.poller.handle_frame(Frame(1,Node.P4,Node.PI,Service.SYSTEM,Command.EVENT_REPLY,payload))
+        self.bus.callback=ended
+        self.poller.dispatch=self.audio.handle_frame
+        with patch.object(self.audio, 'recovery_delay', return_value=0):
+            self.poller.poll_once(1)
+        self.assertFalse(self.states.call_pending(1))
+        self.assertEqual(self.poller.ack[1],99)

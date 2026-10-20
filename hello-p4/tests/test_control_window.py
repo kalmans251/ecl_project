@@ -131,8 +131,8 @@ int main(void) {
     process_plc_tx_queue(); assert(sent_count == 0);
 
     reset();mode=CALL_STATE_IDLE;recovery=true;now=PLC_IDLE_GRANT_MS*1000;
-    process_plc_tx_queue();assert(sent_count==1 && sent[0].payload[0]==AUDIO_DATA_CONTROL_WINDOW);
-    recovery=false;now=s_receive_until_us;process_plc_tx_queue();assert(sent_count==1);
+    process_plc_tx_queue();assert(sent_count==0);
+    recovery=false;now+=10000000;process_plc_tx_queue();assert(sent_count==0);
 
     reset(); mode=CALL_STATE_IDLE; recovery=true; now=PLC_IDLE_GRANT_MS*1000;
     queue[count++]=event();queue[0].payload[1]=AUDIO_EVENT_CALL_ENDED;
@@ -143,8 +143,7 @@ int main(void) {
     now=end_drained+PLC_END_TX_QUIET_MS*1000-1;
     process_plc_tx_queue();assert(sent_count==1);
     now=end_drained+PLC_END_TX_QUIET_MS*1000;
-    process_plc_tx_queue();assert(sent_count==2);
-    assert(sent[1].payload[0]==AUDIO_DATA_CONTROL_WINDOW);
+    process_plc_tx_queue();assert(sent_count==1); // idle remains silent
 
     reset(); drain_ok = false; queue[count++] = voice(); queue[count++] = voice();
     process_plc_tx_queue();

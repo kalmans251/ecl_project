@@ -4,7 +4,7 @@ import secrets
 import threading
 import time
 from contextlib import nullcontext
-from protocol import Frame, Node, Service, Command, AudioDirection
+from protocol import Frame, Node, Service, Command, AudioDirection, AudioDataType, AudioEvent
 
 LOG = logging.getLogger(__name__)
 
@@ -51,10 +51,10 @@ class EventPoller:
             states = self.railings.snapshot()
             calls = [(rid, s['call']) for rid, s in states.items()
                      if s['call']['phase'] not in ('idle', 'ended') or s['call']['active']]
-            if len(calls) > 1 or (calls and calls[0][1]['phase'] != 'active'):
+            if len(calls) > 1 or (calls and calls[0][1]["phase"] in ("starting", "ending")):
                 return False
             owner = calls[0][0] if calls else None
-            field = bool(calls and calls[0][1]['direction'] == int(AudioDirection.FIELD_TX))
+            field = bool(calls and calls[0][1]['direction'] != int(AudioDirection.CONTROL_TX))
             with getattr(self.bus, 'transaction', nullcontext)():
                 self.token = (self.token + 1) & 0xffffffff
                 token = self.token.to_bytes(4, 'big')
@@ -65,8 +65,13 @@ class EventPoller:
                     self.received = False
                 try:
                     if field:
-                        self.bus.send_control_frame(request, wait_for_window=True, timeout=0.8,
-                            grant_railing=owner, reply_budget_ms=120)
+                        try:
+                            self.bus.send_control_frame(request, wait_for_window=True, timeout=0.8,
+                                grant_railing=owner, reply_budget_ms=120)
+                        except TimeoutError:
+                            if self.audio.recovery_delay(owner)>0:
+                                return True
+                            self.bus.send_frame(request)
                     else:
                         # Finish preceding Pi audio and leave modem turnaround.
                         time.sleep(0.025)
@@ -90,7 +95,7 @@ class EventPoller:
         if (frame.src != Node.P4 or frame.dst != Node.PI or frame.service != Service.SYSTEM
                 or frame.command != Command.EVENT_REPLY):
             return False
-        if len(frame.payload) not in (14, 19):
+        if len(frame.payload) not in (14, 18, 19):
             return True
         with self.condition:
             if self.pending != (frame.railing_id, frame.payload[:4]):
@@ -100,8 +105,11 @@ class EventPoller:
             dropped = int.from_bytes(frame.payload[8:12], 'big')
             service, command = frame.payload[12:14]
             if event_id:
-                if (len(frame.payload) != 19 or service != Service.EMERGENCY
-                        or command not in (Command.START, Command.STOP)):
+                emergency = (len(frame.payload)==19 and service==Service.EMERGENCY
+                             and command in (Command.START, Command.STOP))
+                ended = (len(frame.payload)==18 and service==Service.AUDIO and command==Command.DATA
+                         and frame.payload[14]==AudioDataType.EVENT and frame.payload[15]==AudioEvent.CALL_ENDED)
+                if not (emergency or ended):
                     return True
                 if self.ack.get(rid) != event_id:
                     self.dispatch(Frame(rid, Node.P4, Node.PI, service, command, frame.payload[14:]))

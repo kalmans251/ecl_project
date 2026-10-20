@@ -29,7 +29,10 @@ class AudioManager:
         *,
         ack_timeout: float = 0.5,
         attempts: int = 3,
+        recovery_grace_seconds: float = 12.0,
     ) -> None:
+        self._recovery_baseline = time.monotonic()
+        self._recovery_grace = recovery_grace_seconds
         self._bus = bus
         self._railings = railings
         self._ack_timeout = ack_timeout
@@ -41,6 +44,12 @@ class AudioManager:
         self._keepalive_due = threading.Event()
         self._keepalive_stop = threading.Event()
         self._keepalive_thread = None
+
+    def recovery_delay(self, rail):
+        call=self._railings.snapshot(rail).get("call", {})
+        latest=max(self._recovery_baseline, call.get("started_monotonic") or 0.0,
+                   getattr(self._bus, "last_call_tx", lambda rid: 0.0)(rail))
+        return max(0.0, latest + self._recovery_grace - time.monotonic())
 
     def start_keepalive(self) -> None:
         if self._keepalive_thread is not None:
@@ -364,16 +373,14 @@ class AudioManager:
                     except TimeoutError:
                         if not self._railings.call_pending(railing_id):
                             return True
-                        # A lost START request leaves P4 idle with no grants.
-                        # Only an explicit hangup of an unconfirmed start probes
-                        # directly after waiting for a grant. Never claim success
-                        # without END; the original bus reservation stays held.
-                        if uncertain:
-                            self._bus.send_control_frame(frame, wait_for_window=False)
-                        elif attempt == self._attempts:
-                            raise
-                        else:
-                            continue
+                        # No idle grants: wait beyond the last possible P4 lease
+                        # before probing directly. Elapsed time never confirms END.
+                        with self._condition:
+                            while self._railings.call_pending(railing_id) and self.recovery_delay(railing_id)>0:
+                                self._condition.wait(min(0.1,self.recovery_delay(railing_id)))
+                        if not self._railings.call_pending(railing_id):
+                            return True
+                        self._bus.send_control_frame(frame, wait_for_window=False)
                     deadline = time.monotonic() + self._ack_timeout * 3
                     with self._condition:
                         while self._railings.call_pending(railing_id):
