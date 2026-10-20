@@ -81,7 +81,7 @@ class PollTests(unittest.TestCase):
         self.assertTrue(self.states.call_pending(1))
         def ended(f):
             payload=f.payload[:4]+(99).to_bytes(4,'big')+bytes(4)
-            payload+=bytes([Service.AUDIO,Command.DATA])+event(kind=AudioEvent.CALL_ENDED).payload
+            payload+=bytes([Service.AUDIO,Command.DATA])+event(kind=AudioEvent.CALL_ENDED, session=self.states.snapshot(1)["call"]["session_id"]).payload
             self.poller.handle_frame(Frame(1,Node.P4,Node.PI,Service.SYSTEM,Command.EVENT_REPLY,payload))
         self.bus.callback=ended
         self.poller.dispatch=self.audio.handle_frame

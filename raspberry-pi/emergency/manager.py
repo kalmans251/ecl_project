@@ -176,6 +176,8 @@ class EmergencyManager:
             + write_u32_be(seq)
         )
 
+        self._railings.reserve_call(railing_id, emergency=True)
+        payload += self._railings.snapshot(railing_id)["call"]["session_id"].to_bytes(4, "big")
         frame = Frame(
             railing_id=railing_id,
             src=Node.PI,
@@ -185,7 +187,6 @@ class EmergencyManager:
             payload=payload,
         )
 
-        self._railings.reserve_call(railing_id, emergency=True)
         try:
             self._bus.send_frame(frame)
         finally:

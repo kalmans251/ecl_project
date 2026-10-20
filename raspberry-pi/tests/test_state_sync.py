@@ -99,6 +99,7 @@ class StateSyncTests(unittest.TestCase):
             railings,
         )
 
+        railings.reserve_call(1)
         started = Frame(
             railing_id=1,
             src=Node.P4,
@@ -118,7 +119,7 @@ class StateSyncTests(unittest.TestCase):
                         AudioDirection.FIELD_TX
                     ),
                 ]
-            ),
+            ) + audio.session_bytes(1),
         )
 
         self.assertTrue(
@@ -160,7 +161,7 @@ class StateSyncTests(unittest.TestCase):
                         AudioDirection.CONTROL_TX
                     ),
                 ]
-            ),
+            ) + audio.session_bytes(1),
         )
 
         self.assertTrue(
@@ -193,7 +194,7 @@ class StateSyncTests(unittest.TestCase):
                     ),
                     0,
                 ]
-            ),
+            ) + audio.session_bytes(1),
         )
 
         self.assertTrue(
@@ -225,11 +226,11 @@ class StateSyncTests(unittest.TestCase):
                 audio.handle_frame(Frame(1, Node.P4, Node.PI, Service.AUDIO,
                     Command.DATA, bytes([AudioDataType.EVENT,
                     AudioEvent.DIRECTION_CHANGED, CallOrigin.EMERGENCY,
-                    frame.payload[0]])))
+                    frame.payload[0]])+audio.session_bytes(1)))
             elif frame.command == Command.STOP:
                 audio.handle_frame(Frame(1, Node.P4, Node.PI, Service.AUDIO,
                     Command.DATA, bytes([AudioDataType.EVENT,
-                    AudioEvent.CALL_ENDED, CallOrigin.EMERGENCY, 0])))
+                    AudioEvent.CALL_ENDED, CallOrigin.EMERGENCY, 0])+audio.session_bytes(1)))
         bus.on_control = acknowledge
 
         audio.set_direction(
@@ -250,7 +251,7 @@ class StateSyncTests(unittest.TestCase):
             int(Command.SET),
         )
         self.assertEqual(
-            bus.sent[0].payload,
+            bus.sent[0].payload[:1],
             bytes(
                 [
                     int(

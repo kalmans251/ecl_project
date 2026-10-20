@@ -838,11 +838,45 @@ END are also retained in a separate terminal slot, ahead of emergency reports,
 until acknowledged by a poll. Emergency queue overflow cannot discard this slot.
 A lease-expired P4 does not spontaneously transmit END on the shared PLC line.
 A new call clears the previous terminal slot. Poll replies carrying END have
-18 payload bytes (token, event ID, loss count, AUDIO/DATA, four-byte END event).
+22 payload bytes (token, event ID, loss count, AUDIO/DATA, eight-byte END event including session ID).
 
 If grants disappear, Pi preserves ownership and waits until 12 seconds after
 the latest actual START/emergency ACK/keepalive write or process startup before
 sending a direct recovery request. This includes the normal 10-second P4 lease
 and a 2-second allowance; delayed modem delivery or a stalled P4 is not covered
 by a hard timing guarantee. Only a received END releases ownership. Hardware
-collision/audio checks remain deferred. Per-call session IDs are still future work.
+collision/audio checks remain deferred. Pi–P4 control session IDs are implemented below; voice packet session IDs remain future work.
+
+## Pi–P4 call control session IDs
+
+Update Pi and every P4 together while calls are idle. Old untagged Pi call commands
+are rejected by updated P4; old four-byte P4 call events are ignored by updated Pi.
+WROOM/S3 control frames and Codec2 packets are unchanged in this stage.
+
+Each Pi call reservation creates a nonzero random 32-bit session ID, stored before
+transmission. Retries reuse it. Every integer below is big-endian:
+
+| Pi → P4 | Payload |
+| --- | --- |
+| AUDIO START / STOP / CALL_KEEPALIVE | session ID (4 bytes) |
+| AUDIO SET | direction (1 byte), session ID (4 bytes) |
+| EMERGENCY SET ACK | ACK (1), emergency sequence (4), session ID (4) |
+| P4 → Pi AUDIO DATA event | EVENT, event kind, origin, direction, session ID (4) |
+
+P4 rejects PTT, STOP and keepalives for a different active session. Duplicate START
+for the active session replays STARTED without restarting hardware. The most recently
+ended session cannot be reopened by a duplicate START while retained in P4 RAM.
+A STOP for an unknown session only confirms idle when P4 is already idle; it never
+ends another active session. Pi accepts STARTED/DIRECTION/ENDED only for its reserved
+session, including terminal reports retrieved by polling.
+
+The version-2 recovery journal stores railing ID and session ID. Version-1 pending
+entries migrate as unknown session zero; they cannot renew or start calls. After the
+normal recovery deadline, hangup can confirm idle with session zero. It cannot stop
+an active tagged session; the P4 lease must expire first. Do not delete a pending
+journal merely to bypass recovery.
+
+This is correlation, not authentication. P4 session history is RAM-only and does not
+provide replay protection across P4 reboot or for arbitrary older START packets.
+Voice payload tagging across Pi/P4/WROOM/S3 and intra-call PTT request sequence IDs
+are separate follow-up work. Physical PLC timing/audio verification remains deferred.

@@ -19,10 +19,10 @@ class LeaseTests(unittest.TestCase):
             bus=Bus();audio=AudioManager(bus,restored,ack_timeout=0.002)
             self.assertEqual(restored.snapshot(1)['call']['phase'],'unknown')
             audio.renew_calls();self.assertEqual(bus.sent,[])
-            audio.handle_frame(event())
+            audio.handle_frame(event(session=original.snapshot(1)["call"]["session_id"]))
             self.assertIsNone(restored.get_call_direction(1))
             with self.assertRaises(RuntimeError): restored.reserve_call(2)
-            bus.callback=lambda f: audio.handle_frame(event(kind=AudioEvent.CALL_ENDED))
+            bus.callback=lambda f: audio.handle_frame(event(kind=AudioEvent.CALL_ENDED, session=restored.snapshot(1)["call"]["session_id"]))
             self.assertTrue(audio.end_call(1))
             self.assertFalse(RailingManager(path).call_pending(1))
             restored.reserve_call(2)
@@ -47,7 +47,8 @@ class LeaseTests(unittest.TestCase):
 
     def test_renewal_uses_window_only_for_field_and_skips_unknown(self):
         states=RailingManager();bus=Bus();audio=AudioManager(bus,states)
-        audio.handle_frame(event());audio.renew_calls()
+        states.reserve_call(1)
+        audio.handle_frame(event(session=states.snapshot(1)["call"]["session_id"]));audio.renew_calls()
         self.assertEqual(bus.sent[-1][0].command,Command.CALL_KEEPALIVE)
         self.assertTrue(bus.sent[-1][1]['wait_for_window'])
         states.call_direction_changed(1,AudioDirection.CONTROL_TX);audio.renew_calls()

@@ -606,3 +606,8 @@ uint8_t emergency_manager_get_source(void)
     return
         s_source;
 }
+bool emergency_manager_ack_session(uint32_t seq, uint32_t session) {
+    if (!s_active || seq != s_active_seq) return false;
+    if (!call_manager_bind_session(session)) return false;
+    return emergency_manager_ack(seq);
+}

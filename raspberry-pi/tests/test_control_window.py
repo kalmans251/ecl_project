@@ -51,7 +51,7 @@ def grant(rail=1, duration=60):
 def direction_event(rail, direction):
     return Frame(rail, Node.P4, Node.PI, Service.AUDIO, Command.DATA,
                  bytes([AudioDataType.EVENT, AudioEvent.DIRECTION_CHANGED,
-                        CallOrigin.EMERGENCY, direction]))
+                        CallOrigin.EMERGENCY, direction])+bytes(4))
 
 
 class ControlWindowTests(unittest.TestCase):
@@ -210,7 +210,7 @@ class ConfirmedDirectionTests(unittest.TestCase):
         self.make_manager()
         self.bus.callback = lambda frame: self.audio.handle_frame(Frame(
             1, Node.P4, Node.PI, Service.AUDIO, Command.DATA,
-            bytes([AudioDataType.EVENT, AudioEvent.CALL_ENDED, CallOrigin.EMERGENCY, 0])))
+            bytes([AudioDataType.EVENT, AudioEvent.CALL_ENDED, CallOrigin.EMERGENCY, 0])+bytes(4)))
         with self.assertRaisesRegex(RuntimeError, "Call ended"):
             self.audio.set_direction(1, AudioDirection.CONTROL_TX)
 

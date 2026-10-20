@@ -94,6 +94,11 @@ static call_restore_state_t
 
 
 /* Preserve origin for idempotent STOP replies. */
+static uint32_t s_session;
+static bool s_session_ended;
+static void put_session(uint8_t *p, uint32_t id) {
+    p[0]=id>>24; p[1]=id>>16; p[2]=id>>8; p[3]=id;
+}
 static call_origin_t s_last_end_origin = CALL_ORIGIN_NORMAL;
 
 /* ============================================================
@@ -319,7 +324,8 @@ static void notify_pi_call_event(
     uint8_t direction
 )
 {
-    uint8_t payload[4];
+    uint8_t payload[8];
+    put_session(payload+4, s_session);
 
 
     payload[0] =
@@ -448,6 +454,8 @@ void call_manager_init(void)
         CALL_ORIGIN_NORMAL;
     s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
     s_last_end_origin = CALL_ORIGIN_NORMAL;
+    s_session = 0;
+    s_session_ended = false;
 
 
     ESP_LOGI(
@@ -716,8 +724,10 @@ bool call_manager_set_direction(
 
 static void notify_call_end(call_origin_t origin, bool polled_only) {
     protocol_frame_t frame={.railing_id=RAILING_ID,.src=NODE_P4,.dst=NODE_PI,
-        .service=SERVICE_AUDIO,.command=CMD_DATA,.length=4,
+        .service=SERVICE_AUDIO,.command=CMD_DATA,.length=8,
         .payload={AUDIO_DATA_EVENT,AUDIO_EVENT_CALL_ENDED,(uint8_t)origin,0}};
+    put_session(frame.payload+4, s_session);
+    s_session_ended = true;
     event_outbox_store_call_end(&frame);
     if(!polled_only)notify_pi_call_event(AUDIO_EVENT_CALL_ENDED,origin,0);
 }
@@ -941,4 +951,33 @@ void call_manager_tick(void)
         ESP_LOGW(TAG, "Pi keepalive expired; ending call");
         end_call(true);
     }
+}
+
+/* Only Pi requests use these entry points. Reject stale mutations while active. */
+bool call_manager_session_matches(uint32_t session) {
+    return session != 0 && session == s_session && call_manager_is_active();
+}
+bool call_manager_bind_session(uint32_t session) {
+    if (!session) return false;
+    if (call_manager_is_active()) {
+        if (session == s_session) {
+            notify_pi_call_event(AUDIO_EVENT_CALL_STARTED, call_manager_get_origin(),
+                                (uint8_t)call_manager_get_state());
+        }
+        return false; /* Duplicate START only replays its confirmation. */
+    }
+    if (session == s_session && s_session_ended) return false;
+    s_session = session;
+    s_session_ended = false;
+    return true;
+}
+bool call_manager_stop_session(uint32_t session) {
+    if (call_manager_is_active() && !call_manager_session_matches(session)) return false;
+    if (!call_manager_is_active() && session != s_session) {
+        /* STOP for a lost START (or a pre-session journal) confirms idle only. */
+        uint8_t payload[8] = {AUDIO_DATA_EVENT, AUDIO_EVENT_CALL_ENDED, 0, 0};
+        put_session(payload+4, session);
+        return send_frame_to_node(NODE_PI,SERVICE_AUDIO,CMD_DATA,payload,sizeof(payload));
+    }
+    return call_manager_end();
 }

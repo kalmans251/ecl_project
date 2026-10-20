@@ -92,7 +92,7 @@ static protocol_frame_t voice(void) {
 }
 static protocol_frame_t event(void) {
     protocol_frame_t f = {.railing_id=1, .src=NODE_P4, .dst=NODE_PI,
-        .service=SERVICE_AUDIO, .command=CMD_DATA, .length=4};
+        .service=SERVICE_AUDIO, .command=CMD_DATA, .length=8};
     f.payload[0] = AUDIO_DATA_EVENT;
     return f;
 }

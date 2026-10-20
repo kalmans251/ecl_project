@@ -34,7 +34,7 @@ static bool send_complete_frame(const protocol_frame_t *frame)
     int len = protocol_encode(frame, buffer, sizeof(buffer));
     if (len == 14 && frame->src == NODE_P4 && frame->dst == NODE_PI &&
         frame->service == SERVICE_AUDIO && frame->command == CMD_DATA &&
-        frame->length == 4 && frame->payload[0] == AUDIO_DATA_EVENT &&
+        frame->length == 8 && frame->payload[0] == AUDIO_DATA_EVENT &&
         frame->payload[1] == AUDIO_EVENT_CALL_ENDED) {
         char raw[14 * 3];
         for (int i = 0; i < len; ++i) {
@@ -147,9 +147,9 @@ static void process_plc_tx_queue(void)
         }
         if (frame.src == NODE_P4 && frame.dst == NODE_PI &&
             frame.service == SERVICE_AUDIO && frame.command == CMD_DATA &&
-            frame.length == 4 && frame.payload[0] == AUDIO_DATA_EVENT &&
+            frame.length == 8 && frame.payload[0] == AUDIO_DATA_EVENT &&
             frame.payload[1] == AUDIO_EVENT_CALL_ENDED) {
-            ESP_LOGI("PLC", "CALL END UART sent rail=%u bytes=14; quiet=%ums",
+            ESP_LOGI("PLC", "CALL END UART sent rail=%u bytes=18; quiet=%ums",
                      (unsigned)frame.railing_id, PLC_END_TX_QUIET_MS);
             // UART drain only confirms local transmission. Separate END from
             // the next grant so modem delivery is not one continuous burst.
