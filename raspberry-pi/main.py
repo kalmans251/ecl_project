@@ -31,8 +31,8 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument(
         "--port",
-        default="/dev/ttyAMA2",
-        help="PLC serial device (default: /dev/ttyAMA2)",
+        default="/dev/serial0",
+        help="PLC serial device (default: /dev/serial0)",
     )
 
     parser.add_argument(
