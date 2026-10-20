@@ -45,6 +45,9 @@ class AudioManager:
         self._keepalive_stop = threading.Event()
         self._keepalive_thread = None
 
+    def session_bytes(self, rail):
+        return self._railings.snapshot(rail).get("call", {}).get("session_id", 0).to_bytes(4, "big")
+
     def recovery_delay(self, rail):
         call=self._railings.snapshot(rail).get("call", {})
         latest=max(self._recovery_baseline, call.get("started_monotonic") or 0.0,
@@ -83,7 +86,7 @@ class AudioManager:
                 if call["phase"] != "active" or not call["active"]:
                     continue
                 self._bus.send_control_frame(
-                    Frame(rid, Node.PI, Node.P4, Service.AUDIO, Command.CALL_KEEPALIVE),
+                    Frame(rid, Node.PI, Node.P4, Service.AUDIO, Command.CALL_KEEPALIVE, self.session_bytes(rid)),
                     wait_for_window=call["direction"] == int(AudioDirection.FIELD_TX),
                     timeout=0.8)
             self._keepalive_due.clear()
@@ -122,6 +125,12 @@ class AudioManager:
             )
             return True
 
+        if (len(frame.payload) != 8 or not self._railings.call_pending(frame.railing_id)
+                or frame.payload[4:8] != self.session_bytes(frame.railing_id)):
+            LOG.warning("Ignoring stale/unmatched call event rail=%d", frame.railing_id)
+            return True
+
+        session_id = int.from_bytes(frame.payload[4:8], "big")
         event = frame.payload[1]
         origin = frame.payload[2]
         direction = frame.payload[3]
@@ -131,7 +140,7 @@ class AudioManager:
                     or direction not in (int(AudioDirection.FIELD_TX), int(AudioDirection.CONTROL_TX))):
                 LOG.warning("Invalid CALL STARTED event rail=%d", frame.railing_id)
                 return True
-            if not self._railings.call_started(frame.railing_id, origin, direction):
+            if not self._railings.call_started(frame.railing_id, origin, direction, session_id=session_id):
                 LOG.warning("Recovered call rail=%d requires confirmed hangup; ignoring late START", frame.railing_id)
                 return True
 
@@ -160,7 +169,7 @@ class AudioManager:
             updated = (
                 self._railings.call_direction_changed(
                     frame.railing_id,
-                    direction,
+                    direction, session_id=session_id,
                 )
             )
 
@@ -193,9 +202,8 @@ class AudioManager:
             return True
 
         if event == int(AudioEvent.CALL_ENDED):
-            self._railings.call_ended(
-                frame.railing_id
-            )
+            if not self._railings.call_ended(frame.railing_id, session_id=session_id):
+                return True
             with self._condition:
                 self._condition.notify_all()
 
@@ -245,7 +253,7 @@ class AudioManager:
         if not 1 <= railing_id <= 255:
             raise ValueError("railing_id must be 1..255")
         frame = Frame(railing_id=railing_id, src=Node.PI, dst=Node.P4,
-                      service=Service.AUDIO, command=Command.START)
+                      service=Service.AUDIO, command=Command.START, payload=self.session_bytes(railing_id))
         with self._control_lock:
             if self._railings.get_call_direction(railing_id) is not None:
                 return False
@@ -312,7 +320,7 @@ class AudioManager:
                     [
                         int(direction)
                     ]
-                ),
+                ) + self.session_bytes(railing_id),
         )
         with self._control_lock:
             if self._railings.snapshot(railing_id).get("call", {}).get("phase") != "active":
@@ -366,7 +374,7 @@ class AudioManager:
                 for attempt in range(1, self._attempts + 1):
                     if not self._railings.call_pending(railing_id):
                         return True
-                    frame = Frame(railing_id, Node.PI, Node.P4, Service.AUDIO, Command.STOP)
+                    frame = Frame(railing_id, Node.PI, Node.P4, Service.AUDIO, Command.STOP, self.session_bytes(railing_id))
                     try:
                         self._bus.send_control_frame(frame, wait_for_window=(
                             uncertain or current == int(AudioDirection.FIELD_TX)))

@@ -56,6 +56,27 @@ int main(void) {
     before=sent;call_manager_tick();call_manager_keepalive();assert(sent==before);
     assert(call_manager_start(CALL_ORIGIN_EMERGENCY));
     now+=CALL_LEASE_US;call_manager_tick();assert(!call_manager_is_active());
+    assert(call_manager_bind_session(101));
+    assert(call_manager_start(CALL_ORIGIN_NORMAL));
+    assert(last.length==8 && last.payload[7]==101);
+    before=sent;
+    assert(!call_manager_bind_session(101)); // retry START only confirms
+    assert(sent==before+1 && last.payload[1]==AUDIO_EVENT_CALL_STARTED);
+    assert(!call_manager_bind_session(202));
+    assert(!call_manager_session_matches(202));
+    assert(!call_manager_stop_session(202));
+    assert(call_manager_is_active());
+    assert(call_manager_stop_session(101));
+    assert(terminal.length==8 && terminal.payload[7]==101);
+    assert(!call_manager_bind_session(101)); // delayed START cannot reopen
+    assert(call_manager_bind_session(202));
+    assert(call_manager_start(CALL_ORIGIN_NORMAL));
+    assert(!call_manager_stop_session(101));
+    assert(call_manager_session_matches(202));
+    assert(call_manager_stop_session(202));
+    assert(call_manager_stop_session(303)); // START lost: confirm idle with requested ID
+    assert(last.payload[6]==1 && last.payload[7]==47);
+    assert(!call_manager_is_active());
     return 0;
 }
 '''

@@ -53,9 +53,9 @@ class Bus:
         if self.callback: self.callback(frame)
 
 
-def event(kind, direction=0):
+def event(kind, direction=0, session=0):
     return Frame(1, Node.P4, Node.PI, Service.AUDIO, Command.DATA,
-                 bytes([AudioDataType.EVENT, kind, CallOrigin.EMERGENCY, direction]))
+                 bytes([AudioDataType.EVENT, kind, CallOrigin.EMERGENCY, direction])+session.to_bytes(4,"big"))
 
 
 class LocalAudioTests(unittest.TestCase):
@@ -178,7 +178,7 @@ class LocalAudioTests(unittest.TestCase):
         class ConsoleBus(Bus):
             closed = False
             def set_frame_handler(self, handler): self.handler = handler
-            def open(self): self.handler(event(AudioEvent.CALL_STARTED, AudioDirection.FIELD_TX))
+            def open(self): pass
             def close(self): self.closed = True
             def send_frame(self, frame):
                 self.sent.append(frame)
@@ -189,23 +189,25 @@ class LocalAudioTests(unittest.TestCase):
                         Command.APPLY_RESULT, frame.payload[:5] + bytes([0, detail])))
             def send_control_frame(self, frame, **kwargs):
                 self.sent.append(frame)
-                if frame.command == Command.SET:
-                    self.handler(event(AudioEvent.DIRECTION_CHANGED, frame.payload[0]))
+                if frame.command == Command.START:
+                    self.handler(event(AudioEvent.CALL_STARTED, AudioDirection.FIELD_TX, int.from_bytes(frame.payload,"big")))
+                elif frame.command == Command.SET:
+                    self.handler(event(AudioEvent.DIRECTION_CHANGED, frame.payload[0], int.from_bytes(frame.payload[-4:],"big")))
                 elif frame.command == Command.STOP:
-                    self.handler(event(AudioEvent.CALL_ENDED))
+                    self.handler(event(AudioEvent.CALL_ENDED, session=int.from_bytes(frame.payload[-4:],"big")))
         bus = ConsoleBus()
         argv = ['main.py', '--local-audio', '--mic-device', '1', '--speaker-device', '0',
                 '--disable-voice-relay']
         with patch.object(sys, 'argv', argv), patch.dict(sys.modules, {'sounddevice': SD}), \
                 patch('main.PlcBus', return_value=bus), \
-                patch('builtins.input', side_effect=['led 1 basic', 'ptt 1 on', 'ptt 1 off', 'hangup 1',
+                patch('builtins.input', side_effect=['call 1', 'led 1 basic', 'ptt 1 on', 'ptt 1 off', 'hangup 1',
                     'volume 1 101', 'volume 1 10', 'led 1 basic', 'query 1 wroom', 'quit']), \
                 redirect_stdout(io.StringIO()):
             self.assertEqual(main.main(), 0)
         self.assertEqual([f.command for f in bus.sent if f.command != Command.EVENT_POLL],
-            [Command.SET, Command.SET, Command.STOP, Command.APPLY, Command.APPLY, Command.APPLY])
+            [Command.START, Command.SET, Command.SET, Command.STOP, Command.APPLY, Command.APPLY, Command.APPLY])
         commands = [f for f in bus.sent if f.command != Command.EVENT_POLL]
-        self.assertEqual(commands[3].payload[4:], bytes([Command.SET, 3, 10]))
+        self.assertEqual(commands[4].payload[4:], bytes([Command.SET, 3, 10]))
         self.assertEqual(commands[-1].dst, Node.WROOM)
         self.assertTrue(bus.closed)
 

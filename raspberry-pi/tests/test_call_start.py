@@ -10,9 +10,9 @@ from protocol import AudioDataType, AudioDirection, AudioEvent, CallOrigin, Comm
 from railing import RailingManager
 
 
-def event(railing=1, kind=AudioEvent.CALL_STARTED, src=Node.P4, direction=AudioDirection.FIELD_TX):
+def event(railing=1, kind=AudioEvent.CALL_STARTED, src=Node.P4, direction=AudioDirection.FIELD_TX, session=0):
     return Frame(railing, src, Node.PI, Service.AUDIO, Command.DATA,
-                 bytes([AudioDataType.EVENT, kind, CallOrigin.NORMAL, direction]))
+                 bytes([AudioDataType.EVENT, kind, CallOrigin.NORMAL, direction])+session.to_bytes(4,"big"))
 
 
 class Bus:
@@ -27,15 +27,16 @@ class Bus:
 class CallStartTests(unittest.TestCase):
     def setUp(self):
         self.states = RailingManager()
+        self.event = lambda **kw: event(session=self.states.snapshot(kw.get("railing",1)).get("call",{}).get("session_id",0), **kw)
         self.bus = Bus()
         self.audio = AudioManager(self.bus, self.states, ack_timeout=0.02, attempts=2)
 
     def test_confirmed_start_is_pi_to_p4_and_repeat_is_noop(self):
-        self.bus.callback = lambda frame: self.audio.handle_frame(event())
+        self.bus.callback = lambda frame: self.audio.handle_frame(self.event())
         self.assertTrue(self.audio.start_call(1))
         frame, kwargs = self.bus.sent[0]
         self.assertEqual((frame.src, frame.dst, frame.service, frame.command, frame.payload),
-                         (Node.PI, Node.P4, Service.AUDIO, Command.START, b''))
+                         (Node.PI, Node.P4, Service.AUDIO, Command.START, self.audio.session_bytes(1)))
         self.assertFalse(kwargs['wait_for_window'])
         self.assertEqual(self.states.get_call_direction(1), AudioDirection.FIELD_TX)
         self.assertFalse(self.audio.start_call(1))
@@ -47,7 +48,7 @@ class CallStartTests(unittest.TestCase):
             # reject any start request that waits for a nonexistent grant.
             if self.bus.sent[-1][1]['wait_for_window']:
                 raise TimeoutError('Idle P4 never grants a receive window')
-            self.audio.handle_frame(event())
+            self.audio.handle_frame(self.event())
         self.bus.callback = idle_p4
         self.assertTrue(self.audio.start_call(1))
         self.assertEqual(len(self.bus.sent), 1)
@@ -63,13 +64,13 @@ class CallStartTests(unittest.TestCase):
     def test_lost_request_retries(self):
         def confirm(frame):
             if len(self.bus.sent) == 2:
-                self.audio.handle_frame(event())
+                self.audio.handle_frame(self.event())
         self.bus.callback = confirm
         self.assertTrue(self.audio.start_call(1))
         self.assertEqual(len(self.bus.sent), 2)
 
     def test_other_railing_or_wrong_source_does_not_confirm(self):
-        for response in (event(railing=2), event(src=Node.WROOM), event(direction=255)):
+        for response in (self.event(railing=2), self.event(src=Node.WROOM), self.event(direction=255)):
             with self.subTest(response=response):
                 self.setUp()
                 self.bus.callback = lambda frame: self.audio.handle_frame(response)
@@ -82,7 +83,7 @@ class CallStartTests(unittest.TestCase):
         def confirm(frame):
             def receive():
                 delivered.wait(0.005)
-                self.audio.handle_frame(event())
+                self.audio.handle_frame(self.event())
             self.worker = threading.Thread(target=receive)
             self.worker.start()
         self.bus.callback = confirm
@@ -94,14 +95,14 @@ class CallStartTests(unittest.TestCase):
         def confirm(frame):
             if len(self.bus.sent) == 1:
                 raise TimeoutError('Transmission timeout')
-            self.audio.handle_frame(event())
+            self.audio.handle_frame(self.event())
         self.bus.callback = confirm
         self.assertTrue(self.audio.start_call(1))
 
     def test_call_ended_during_confirmation_is_not_success(self):
         def confirm(frame):
-            self.audio.handle_frame(event())
-            self.audio.handle_frame(event(kind=AudioEvent.CALL_ENDED))
+            self.audio.handle_frame(self.event())
+            self.audio.handle_frame(self.event(kind=AudioEvent.CALL_ENDED))
         self.bus.callback = confirm
         with self.assertRaisesRegex(RuntimeError, 'ended'):
             self.audio.start_call(1)
@@ -123,7 +124,7 @@ class CallStartTests(unittest.TestCase):
         self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
         def confirm(frame):
             self.worker = threading.Timer(0.035, lambda: self.audio.handle_frame(
-                event(kind=AudioEvent.CALL_ENDED)))
+                self.event(kind=AudioEvent.CALL_ENDED)))
             self.worker.start()
         self.bus.callback = confirm
         self.audio.end_call(1)
@@ -135,7 +136,7 @@ class CallStartTests(unittest.TestCase):
         self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
         def confirm(frame):
             if len(self.bus.sent) == 2:
-                self.audio.handle_frame(event(kind=AudioEvent.CALL_ENDED))
+                self.audio.handle_frame(self.event(kind=AudioEvent.CALL_ENDED))
         self.bus.callback = confirm
         self.audio.end_call(1)
         self.assertEqual(len(self.bus.sent), 2)
@@ -147,7 +148,7 @@ class CallStartTests(unittest.TestCase):
     def test_hangup_end_arrives_during_grant_timeout(self):
         self.states.call_started(1, CallOrigin.NORMAL, AudioDirection.FIELD_TX)
         def confirm(frame):
-            self.audio.handle_frame(event(kind=AudioEvent.CALL_ENDED))
+            self.audio.handle_frame(self.event(kind=AudioEvent.CALL_ENDED))
             raise TimeoutError('No fresh grant after end')
         self.bus.callback = confirm
         self.audio.end_call(1)
@@ -162,11 +163,11 @@ class CallStartTests(unittest.TestCase):
             def send_control_frame(self, frame, **kwargs):
                 self.sent.append((frame, kwargs))
                 if frame.command == Command.START:
-                    self.handler(event())
+                    self.handler(event(session=int.from_bytes(frame.payload[-4:],"big")))
                 elif frame.command == Command.SET:
-                    self.handler(event(kind=AudioEvent.DIRECTION_CHANGED, direction=frame.payload[0]))
+                    self.handler(event(session=int.from_bytes(frame.payload[-4:],"big"), kind=AudioEvent.DIRECTION_CHANGED, direction=frame.payload[0]))
                 elif frame.command == Command.STOP:
-                    self.handler(event(kind=AudioEvent.CALL_ENDED))
+                    self.handler(event(session=int.from_bytes(frame.payload[-4:],"big"), kind=AudioEvent.CALL_ENDED))
         bus = ConsoleBus()
         output = io.StringIO()
         with patch.object(sys, 'argv', ['main.py', '--disable-voice-relay']), \

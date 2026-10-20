@@ -31,9 +31,10 @@ int main(void){
  memset(poll.payload+4,0,4);event_outbox_reply(&poll,&reply);assert(get32(reply.payload+8)==1);
  f.command=CMD_DATA;assert(!event_outbox_capture(&f)); // requested ACKED response stays direct
  protocol_frame_t end={.railing_id=1,.src=NODE_P4,.dst=NODE_PI,.service=SERVICE_AUDIO,
-    .command=CMD_DATA,.length=4,.payload={AUDIO_DATA_EVENT,AUDIO_EVENT_CALL_ENDED,0,0}};
+    .command=CMD_DATA,.length=8,.payload={AUDIO_DATA_EVENT,AUDIO_EVENT_CALL_ENDED,0,0,1,2,3,4}};
  event_outbox_store_call_end(&end);event_outbox_reply(&poll,&reply);
- assert(reply.length==18 && reply.payload[12]==SERVICE_AUDIO && count==CAPACITY);
+ assert(reply.length==22 && reply.payload[12]==SERVICE_AUDIO && count==CAPACITY);
+ assert(get32(reply.payload+18)==0x01020304);
  uint32_t terminal_token=get32(reply.payload+4);
  event_outbox_store_call_end(&end);event_outbox_reply(&poll,&reply);
  assert(get32(reply.payload+4)==terminal_token); // duplicate STOP shares terminal report

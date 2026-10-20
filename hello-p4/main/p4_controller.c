@@ -1861,7 +1861,8 @@ static void handle_audio(
 )
 {
     if (frame->command == CMD_CALL_KEEPALIVE) {
-        if (frame->src == NODE_PI && frame->length == 0)
+        if (frame->src == NODE_PI && frame->length == 4 &&
+            call_manager_session_matches(read_u32_be(frame->payload)))
             call_manager_keepalive();
         return;
     }
@@ -1877,9 +1878,9 @@ static void handle_audio(
 
         case CMD_START:
         {
-            call_manager_start(
-                CALL_ORIGIN_NORMAL
-            );
+            if (frame->src == NODE_PI && frame->length == 4 &&
+                call_manager_bind_session(read_u32_be(frame->payload)))
+                call_manager_start(CALL_ORIGIN_NORMAL);
 
 
             break;
@@ -1892,7 +1893,8 @@ static void handle_audio(
 
         case CMD_STOP:
         {
-            call_manager_end();
+            if (frame->src == NODE_PI && frame->length == 4)
+                call_manager_stop_session(read_u32_be(frame->payload));
 
 
             break;
@@ -1924,9 +1926,9 @@ static void handle_audio(
                 frame->payload[0];
 
 
-            call_manager_set_direction(
-                direction
-            );
+            if (frame->src == NODE_PI && frame->length == 5 &&
+                call_manager_session_matches(read_u32_be(frame->payload+1)))
+                call_manager_set_direction(direction);
 
 
             break;
@@ -2056,8 +2058,7 @@ static void handle_emergency(
             );
 
 
-        emergency_manager_ack(
-            seq
-        );
+        if (frame->length == 9)
+            emergency_manager_ack_session(seq, read_u32_be(frame->payload+5));
     }
 }

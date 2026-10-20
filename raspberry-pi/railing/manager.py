@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import secrets
 import json
 import os
 import tempfile
@@ -18,11 +19,19 @@ class RailingManager:
         if self._state_file is not None:
             if self._state_file.exists():
                 data = json.loads(self._state_file.read_text())
-                if not isinstance(data, dict) or data.get("version") != 1 or not isinstance(data.get("pending"), list):
+                if not isinstance(data, dict) or data.get("version") not in (1, 2) or not isinstance(data.get("pending"), list):
                     raise ValueError("Invalid call recovery journal")
-                for rid in data["pending"]:
+                for entry in data["pending"]:
+                    if data["version"] == 2 and (not isinstance(entry, dict) or
+                            "railing_id" not in entry or "session_id" not in entry):
+                        raise ValueError("Invalid call recovery entry")
+                    rid = entry if data["version"] == 1 else entry["railing_id"]
+                    session = 0 if data["version"] == 1 else entry["session_id"]
+                    if type(session) is not int or not 0 <= session <= 0xffffffff:
+                        raise ValueError("Invalid call session")
                     if type(rid) is not int or not 1 <= rid <= 255:
                         raise ValueError("Invalid railing ID in call recovery journal")
+                    self._get_or_create_locked(rid).call.session_id = session
                     self._get_or_create_locked(rid).call.phase = "unknown"
                     self._get_or_create_locked(rid).call.recovered = True
             self._save_calls_locked()
@@ -30,14 +39,14 @@ class RailingManager:
     def _save_calls_locked(self) -> None:
         if self._state_file is None:
             return
-        pending = [rid for rid, state in self._states.items()
+        pending = [{"railing_id": rid, "session_id": state.call.session_id} for rid, state in self._states.items()
                    if state.call.active or state.call.phase not in ("idle", "ended")]
         path = self._state_file
         path.parent.mkdir(parents=True, exist_ok=True)
         fd, temporary = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
         try:
             with os.fdopen(fd, "w") as stream:
-                json.dump({"version": 1, "pending": sorted(pending)}, stream)
+                json.dump({"version": 2, "pending": sorted(pending, key=lambda e: e["railing_id"])}, stream)
                 stream.flush()
                 os.fsync(stream.fileno())
             os.replace(temporary, path)
@@ -180,6 +189,7 @@ class RailingManager:
                     raise RuntimeError(f"Another or unresolved call owns PLC rail={rid}; hangup first")
                 if not emergency and state.emergency.active:
                     raise RuntimeError("An emergency is active; use ack for the emergency call")
+            self._get_or_create_locked(railing_id).call.session_id = secrets.randbelow(0xffffffff) + 1
             self._get_or_create_locked(railing_id).call.recovered = False
             self._get_or_create_locked(railing_id).call.phase = "starting"
             self._save_calls_locked()
@@ -205,6 +215,7 @@ class RailingManager:
         railing_id: int,
         origin: int,
         direction: int,
+        *, session_id: int | None = None,
     ) -> bool:
         from time import monotonic
 
@@ -213,6 +224,9 @@ class RailingManager:
                 railing_id
             )
 
+            if session_id is not None and (state.call.session_id != session_id or
+                    state.call.phase not in ("starting", "unknown", "active")):
+                return False
             if state.call.recovered:
                 return False
             state.mark_seen()
@@ -229,6 +243,7 @@ class RailingManager:
         self,
         railing_id: int,
         direction: int,
+        *, session_id: int | None = None,
     ) -> bool:
         with self._lock:
             state = self._states.get(
@@ -238,6 +253,7 @@ class RailingManager:
             if (
                 state is None
                 or not state.call.active
+                or (session_id is not None and state.call.session_id != session_id)
             ):
                 return False
 
@@ -249,13 +265,14 @@ class RailingManager:
     def call_ended(
         self,
         railing_id: int,
+        *, session_id: int | None = None,
     ) -> bool:
         with self._lock:
             state = self._states.get(
                 railing_id
             )
 
-            if state is None:
+            if state is None or (session_id is not None and state.call.session_id != session_id):
                 return False
 
             state.mark_seen()

@@ -29,3 +29,4 @@ bool emergency_manager_is_active(void);
 uint32_t emergency_manager_get_seq(void);
 
 uint8_t emergency_manager_get_source(void);
+bool emergency_manager_ack_session(uint32_t seq, uint32_t session);

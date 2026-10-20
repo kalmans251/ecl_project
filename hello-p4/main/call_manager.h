@@ -92,3 +92,8 @@ bool call_manager_end_recovery_active(void);
 /* Controller task only; keepalives cannot start an idle call. */
 void call_manager_keepalive(void);
 void call_manager_tick(void);
+
+/* Pi call session binding, accessed by the controller task only. */
+bool call_manager_bind_session(uint32_t session);
+bool call_manager_session_matches(uint32_t session);
+bool call_manager_stop_session(uint32_t session);

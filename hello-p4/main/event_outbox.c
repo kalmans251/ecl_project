@@ -57,7 +57,7 @@ void event_outbox_reply(const protocol_frame_t *poll, protocol_frame_t *reply) {
     if(terminal_id){
         put32(reply->payload+4,terminal_id);
         reply->payload[12]=SERVICE_AUDIO;reply->payload[13]=CMD_DATA;
-        memcpy(reply->payload+14,terminal.payload,4);reply->length=18;
+        memcpy(reply->payload+14,terminal.payload,8);reply->length=22;
     } else if(count){
         put32(reply->payload+4,entries[head].id);
         reply->payload[12]=SERVICE_EMERGENCY;reply->payload[13]=entries[head].command;

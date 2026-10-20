@@ -15,6 +15,7 @@ class EmergencyState:
 
 @dataclass(slots=True)
 class CallState:
+    session_id: int = 0
     phase: str = "idle"
     recovered: bool = False
     active: bool = False
