@@ -66,6 +66,35 @@ class ControlWindowTests(unittest.TestCase):
     def tearDown(self):
         self.bus.close()
 
+    def test_foreign_poll_uses_only_owner_grant(self):
+        poll=Frame(2,Node.PI,Node.P4,Service.SYSTEM,Command.EVENT_POLL,bytes(8))
+        errors=[]
+        def send():
+            try:
+                self.bus.send_control_frame(poll,wait_for_window=True,timeout=0.5,
+                    grant_railing=1,reply_budget_ms=120)
+            except Exception as exc: errors.append(exc)
+        thread=threading.Thread(target=send);thread.start()
+        deadline=time.monotonic()+0.2
+        while not self.bus._pending and time.monotonic()<deadline: time.sleep(0.001)
+        self.bus._dispatch_control_window(grant(2,200))
+        self.assertEqual(self.serial.writes,[])
+        self.bus._dispatch_control_window(grant(1,100))
+        self.assertEqual(self.serial.writes,[]) # insufficient reply budget
+        self.bus._dispatch_control_window(grant(1,200))
+        thread.join(1)
+        self.assertEqual(errors,[])
+        self.assertEqual(self.serial.writes,[poll])
+
+    def test_transaction_blocks_other_pi_transmission(self):
+        entered=threading.Event()
+        with self.bus.transaction():
+            thread=threading.Thread(target=lambda:(entered.set(),self.bus.send_frame(control())))
+            thread.start();entered.wait(0.2)
+            self.assertEqual(self.serial.writes,[])
+        thread.join(1)
+        self.assertEqual(len(self.serial.writes),1)
+
     def pending_command(self, timeout=0.2):
         results = []
         def send():

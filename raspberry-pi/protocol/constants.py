@@ -52,6 +52,8 @@ class Command(IntEnum):
     APPLY = 0x28
     APPLY_RESULT = 0x29
     CALL_KEEPALIVE = 0x2A
+    EVENT_POLL = 0x2B
+    EVENT_REPLY = 0x2C
 
 
 class EmergencySource(IntEnum):

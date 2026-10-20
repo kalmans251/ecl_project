@@ -20,6 +20,8 @@ class _ControlWrite:
     deadline: float
     done: threading.Event = field(default_factory=threading.Event)
     error: Exception | None = None
+    grant_railing: int | None = None
+    reply_budget_ms: int = 0
 
 
 class PlcBus:
@@ -38,11 +40,16 @@ class PlcBus:
         self._serial: serial.Serial | None = None
         self._parser = FrameParser()
         self._tx_lock = threading.Lock()
+        self._transaction_lock = threading.RLock()
         self._stop_event = threading.Event()
         self._reader_thread: threading.Thread | None = None
         self._frame_handler: Callable[[Frame], None] | None = None
         self._pending_lock = threading.Lock()
         self._pending: list[_ControlWrite] = []
+
+    def transaction(self):
+        """Serialize a complete request/reply exchange against other Pi TX."""
+        return self._transaction_lock
 
     def set_frame_handler(
         self,
@@ -104,7 +111,15 @@ class PlcBus:
         LOG.info("PLC closed")
 
     def send_control_frame(self, frame: Frame, *, wait_for_window: bool,
-                           timeout: float = 1.0) -> None:
+                           timeout: float = 1.0, grant_railing: int | None = None,
+                           reply_budget_ms: int = 0) -> None:
+        with self._transaction_lock:
+            self._send_control_frame(frame, wait_for_window=wait_for_window,
+                timeout=timeout, grant_railing=grant_railing, reply_budget_ms=reply_budget_ms)
+
+    def _send_control_frame(self, frame: Frame, *, wait_for_window: bool,
+                           timeout: float, grant_railing: int | None,
+                           reply_budget_ms: int) -> None:
         """A single short command per fresh P4 receive grant.
 
         Call from the console/control thread, never from the RX callback.
@@ -115,7 +130,8 @@ class PlcBus:
             return
         if self._serial is None:
             raise RuntimeError("PLC serial port is not open")
-        request = _ControlWrite(frame, time.monotonic() + timeout)
+        request = _ControlWrite(frame, time.monotonic() + timeout,
+                                grant_railing=grant_railing, reply_budget_ms=reply_budget_ms)
         with self._pending_lock:
             self._pending.append(request)
         if not request.done.wait(timeout):
@@ -149,13 +165,13 @@ class PlcBus:
             return
         with self._pending_lock:
             request = next((r for r in self._pending
-                            if r.frame.railing_id == grant.railing_id
+                            if (r.grant_railing if r.grant_railing is not None else r.frame.railing_id) == grant.railing_id
                             and r.deadline > time.monotonic()), None)
             if request is None:
                 return
             # Reserve 20 ms turnaround + 20 ms propagation/scheduling margin.
             duration_ms = len(request.frame.encode()) * 10 * 1000 / self.baudrate
-            if duration_ms + 40 > window_ms:
+            if duration_ms + 40 + request.reply_budget_ms > window_ms:
                 return
             if not self._tx_lock.acquire(blocking=False):
                 return
@@ -177,6 +193,10 @@ class PlcBus:
             request.done.set()
 
     def send_frame(self, frame: Frame) -> None:
+        with self._transaction_lock:
+            self._send_frame(frame)
+
+    def _send_frame(self, frame: Frame) -> None:
         raw = frame.encode()
 
         serial_port = self._serial
