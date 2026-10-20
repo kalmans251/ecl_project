@@ -8,6 +8,8 @@
 #include "microphone_codec2.h"
 
 
+static uint32_t s_session;
+
 static bool
     s_active =
         false;
@@ -131,7 +133,8 @@ bool audio_session_field_tx_enabled(void)
 bool audio_session_send_codec2(
     const uint8_t *data,
     uint8_t frame_count,
-    uint16_t sequence
+    uint16_t sequence,
+    uint32_t session_id
 )
 {
     if (
@@ -144,7 +147,7 @@ bool audio_session_send_codec2(
         frame_count >
         CODEC2_MAX_FRAMES_PER_PACKET
         ||
-        !audio_session_field_tx_enabled()
+        (!audio_session_field_tx_enabled() || !session_id || session_id != s_session)
     )
     {
         return false;
@@ -207,6 +210,11 @@ bool audio_session_send_codec2(
         CODEC2_2400_BYTES_PER_FRAME;
 
 
+    frame.payload[7]=session_id>>24;
+    frame.payload[8]=session_id>>16;
+    frame.payload[9]=session_id>>8;
+    frame.payload[10]=session_id;
+
     memcpy(
         &frame.payload[
             AUDIO_CODEC2_META_SIZE
@@ -220,4 +228,22 @@ bool audio_session_send_codec2(
         ble_send_frame(
             &frame
         );
+}
+
+uint32_t audio_session_id(void) { return s_session; }
+bool audio_session_control(const protocol_frame_t *f) {
+    if(f->src!=NODE_P4)return false;
+    unsigned offset=f->command==CMD_SET?1:0;
+    if(f->length!=offset+4)return false;
+    const uint8_t *p=f->payload+offset;
+    uint32_t id=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+    if(!id)return false;
+    if(f->command==CMD_START){
+        if(id==s_session)return s_active;
+        audio_session_stop();s_session=id;audio_session_start();return true;
+    }
+    if(id!=s_session || !s_active)return false;
+    if(f->command==CMD_STOP){audio_session_stop();return true;}
+    if(f->command==CMD_SET)return audio_session_set_direction(f->payload[0]);
+    return false;
 }

@@ -134,6 +134,7 @@ static void process_plc_tx_queue(void)
         ) == pdTRUE
     )
     {
+        if (!call_manager_voice_allowed(&frame)) continue;
         bool voice = frame.service == SERVICE_AUDIO && frame.command == CMD_DATA
             && frame.length > 0 && frame.payload[0] == AUDIO_DATA_CODEC2;
         if (voice && call_manager_get_state() != CALL_STATE_FIELD_TX) {

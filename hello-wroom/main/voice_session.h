@@ -29,3 +29,6 @@ bool voice_session_handle_codec2(
 
 /* Only for a direction command from P4, which validates the active call. */
 bool voice_session_sync_direction(audio_direction_t direction);
+
+bool voice_session_control(const protocol_frame_t *frame);
+bool voice_session_forward_allowed(const protocol_frame_t *frame);

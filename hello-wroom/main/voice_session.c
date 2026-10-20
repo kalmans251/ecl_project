@@ -19,7 +19,10 @@ static const char *TAG = "VOICE_SESSION";
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool s_active, s_output_busy;
 static audio_direction_t s_direction = AUDIO_DIR_FIELD_TX;
-static uint32_t s_generation;
+static uint32_t s_generation, s_session;
+static uint32_t session_id(const uint8_t *p) {
+    return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+}
 static QueueHandle_t s_packets;
 static TaskHandle_t s_task;
 
@@ -290,7 +293,8 @@ bool voice_session_handle_codec2(const uint8_t *payload, size_t length)
         .sequence=((uint16_t)payload[3] << 8) | payload[4], .frames=payload[5]};
     bool session_active = s_active;
     audio_direction_t session_direction = s_direction;
-    bool active = session_active && session_direction == AUDIO_DIR_CONTROL_TX;
+    bool active = session_active && session_direction == AUDIO_DIR_CONTROL_TX
+        && s_session && session_id(payload+7)==s_session;
     portEXIT_CRITICAL(&s_lock);
     if (!active) {
         ESP_LOGW(TAG, "Reject Codec2 session active=%d session_dir=%u packet_dir=%u seq=%u",
@@ -303,4 +307,38 @@ bool voice_session_handle_codec2(const uint8_t *payload, size_t length)
         return false;
     }
     return true;
+}
+
+/* P4 owns call state; repeated START for the same active session is a no-op. */
+bool voice_session_control(const protocol_frame_t *f) {
+    if (f->src != NODE_P4) return false;
+    unsigned offset=f->cmd==CMD_SET?1:0;
+    if (f->payload_len != offset+4) return false;
+    uint32_t id=session_id(f->payload+offset);
+    if (!id) return false;
+    portENTER_CRITICAL(&s_lock);
+    bool same=id==s_session, active=s_active;
+    if(f->cmd==CMD_START && !same) {s_session=id; ++s_generation;}
+    portEXIT_CRITICAL(&s_lock);
+    if(f->cmd==CMD_START) {
+        if(same)return active; /* reject an ended session's duplicate START */
+        voice_session_start();return true;
+    }
+    if(!same || !active)return false;
+    if(f->cmd==CMD_STOP){voice_session_stop();return true;}
+    if(f->cmd==CMD_SET)return voice_session_set_direction((audio_direction_t)f->payload[0]);
+    return false;
+}
+bool voice_session_forward_allowed(const protocol_frame_t *f) {
+    if(f->service!=SERVICE_AUDIO || f->cmd!=CMD_DATA || !f->payload_len ||
+       f->payload[0]!=AUDIO_DATA_CODEC2)return true;
+    if(f->src!=NODE_S3 || f->dst!=NODE_PI || f->payload_len<AUDIO_CODEC2_META_SIZE ||
+       f->payload[1]!=CODEC2_MODE_2400 || f->payload[2]!=AUDIO_DIR_FIELD_TX ||
+       !f->payload[5] || f->payload[5]>CODEC2_MAX_FRAMES_PER_PACKET ||
+       f->payload[6]!=6 || f->payload_len!=AUDIO_CODEC2_META_SIZE+f->payload[5]*6)return false;
+    portENTER_CRITICAL(&s_lock);
+    bool allowed=s_active && s_direction==AUDIO_DIR_FIELD_TX && s_session &&
+        session_id(f->payload+7)==s_session;
+    portEXIT_CRITICAL(&s_lock);
+    return allowed;
 }

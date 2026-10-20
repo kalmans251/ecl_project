@@ -61,6 +61,7 @@ def make_packet(
         sequence=sequence,
         frame_count=8,
         bytes_per_frame=6,
+        session_id=1,
         data=bytes(
             range(48)
         ),
@@ -68,6 +69,11 @@ def make_packet(
 
 
 class VoicePacketTests(unittest.TestCase):
+    def setUp(self):
+        from unittest.mock import patch
+        patcher=patch("railing.manager.secrets.randbelow",return_value=0)
+        patcher.start();self.addCleanup(patcher.stop)
+
     def test_network_round_trip(self) -> None:
         packet = make_packet(
             AudioDirection.CONTROL_TX
@@ -124,6 +130,7 @@ class VoicePacketTests(unittest.TestCase):
     ) -> None:
         bus = FakeBus()
         railings = RailingManager()
+        railings.reserve_call(1)
 
         railings.call_started(
             1,
@@ -179,6 +186,7 @@ class VoicePacketTests(unittest.TestCase):
     ) -> None:
         bus = FakeBus()
         railings = RailingManager()
+        railings.reserve_call(1)
 
         railings.call_started(
             1,
@@ -234,6 +242,7 @@ class VoicePacketTests(unittest.TestCase):
     ) -> None:
         bus = FakeBus()
         railings = RailingManager()
+        railings.reserve_call(1)
 
         railings.call_started(
             1,

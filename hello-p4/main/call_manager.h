@@ -97,3 +97,5 @@ void call_manager_tick(void);
 bool call_manager_bind_session(uint32_t session);
 bool call_manager_session_matches(uint32_t session);
 bool call_manager_stop_session(uint32_t session);
+
+bool call_manager_voice_allowed(const protocol_frame_t *frame);

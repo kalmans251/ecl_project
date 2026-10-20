@@ -305,55 +305,14 @@ void controller_handle(
 // AUDIO
 // ============================================================
 
-static void handle_audio(
-    const protocol_frame_t *frame
-)
+static void handle_audio(const protocol_frame_t *frame)
 {
-    switch (
-        frame->command
-    )
-    {
+    switch(frame->command) {
         case CMD_START:
-        {
-            audio_session_start();
-            break;
-        }
-
-
         case CMD_STOP:
-        {
-            audio_session_stop();
-            break;
-        }
-
-
         case CMD_SET:
-        {
-            if (
-                frame->length <
-                1
-            )
-            {
-                break;
-            }
-
-
-            if (
-                !audio_session_set_direction(
-                    frame->payload[0]
-                )
-            )
-            {
-                Serial.printf(
-                    "[AUDIO] Invalid direction=%u\n",
-                    frame->payload[0]
-                );
-            }
-
-
+            if(!audio_session_control(frame)) Serial.println("[AUDIO] Rejected call session");
             break;
-        }
-
 
         case CMD_STATUS_REQUEST:
         {

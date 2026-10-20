@@ -1,4 +1,5 @@
 #include "router.h"
+#include "voice_session.h"
 
 #include "controller.h"
 #include "p4_task.h"
@@ -140,6 +141,7 @@ static void router_task(
             case NODE_P4:
             case NODE_PI:
             {
+                if(!voice_session_forward_allowed(&frame)) break;
                 if (
                     !p4_task_enqueue_tx(
                         &frame

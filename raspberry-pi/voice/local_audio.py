@@ -78,7 +78,7 @@ class LocalAudio:
         if packet.railing_id != self.railing_id or self.stop.is_set():
             return
         token = self._token(AudioDirection.FIELD_TX)
-        if token is None:
+        if token is None or packet.session_id != token[1]:
             return
         try:
             self.field.put_nowait((token, packet))
@@ -147,7 +147,7 @@ class LocalAudio:
             encoded.extend(self.encoder.encode(downsample(pcm, self.rate)))
             if len(encoded) == 48:
                 packet = VoicePacket(self.railing_id, int(AudioDirection.CONTROL_TX),
-                    int(Codec2Mode.MODE_2400), sequence, 8, 6, bytes(encoded))
+                    int(Codec2Mode.MODE_2400), sequence, 8, 6, bytes(encoded), session_id=token[1])
                 if self.relay.forward_control_packet(packet, token=token):
                     self.sent_packets += 1
                     sequence = (sequence + 1) & 0xffff

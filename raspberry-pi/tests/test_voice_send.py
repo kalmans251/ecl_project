@@ -33,7 +33,7 @@ class SendTests(unittest.TestCase):
         thread=threading.Thread(target=read); thread.start()
         try:
             script=Path(__file__).resolve().parents[1]/'tools'/'voice_send.py'
-            result=subprocess.run([sys.executable,str(script),'--tone','--seconds','0.34','--port',str(server.getsockname()[1])],capture_output=True,text=True,timeout=5)
+            result=subprocess.run([sys.executable,str(script),'--session-id','123','--tone','--seconds','0.34','--port',str(server.getsockname()[1])],capture_output=True,text=True,timeout=5)
             self.assertEqual(result.returncode,0,result.stderr)
             thread.join(4)
             self.assertFalse(thread.is_alive())
@@ -45,6 +45,7 @@ class SendTests(unittest.TestCase):
             try:
                 for packet in packets:
                     self.assertEqual(packet.frame_count,8)
+                    self.assertEqual(packet.session_id,123)
                     self.assertEqual(packet.direction,2)
                     self.assertEqual(len(decoder.decode(packet.data)),2560)
             finally: decoder.close()
