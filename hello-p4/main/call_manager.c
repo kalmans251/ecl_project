@@ -94,7 +94,7 @@ static call_restore_state_t
 
 
 /* Preserve origin for idempotent STOP replies. */
-static uint32_t s_session;
+static uint32_t s_session, s_ptt_request;
 static bool s_session_ended;
 static void put_session(uint8_t *p, uint32_t id) {
     p[0]=id>>24; p[1]=id>>16; p[2]=id>>8; p[3]=id;
@@ -282,8 +282,9 @@ static void request_audio_direction(
     audio_direction_t direction
 )
 {
-    uint8_t payload[5];
+    uint8_t payload[9];
     put_session(payload+1, s_session);
+    put_session(payload+5, s_ptt_request);
 
 
     payload[0] =
@@ -327,8 +328,9 @@ static void notify_pi_call_event(
     uint8_t direction
 )
 {
-    uint8_t payload[8];
+    uint8_t payload[12];
     put_session(payload+4, s_session);
+    put_session(payload+8, s_ptt_request);
 
 
     payload[0] =
@@ -353,7 +355,7 @@ static void notify_pi_call_event(
             SERVICE_AUDIO,
             CMD_DATA,
             payload,
-            sizeof(payload)
+            event == AUDIO_EVENT_DIRECTION_CHANGED ? 12 : 8
         )
     )
     {
@@ -458,6 +460,7 @@ void call_manager_init(void)
     s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
     s_last_end_origin = CALL_ORIGIN_NORMAL;
     s_session = 0;
+    s_ptt_request = 0;
     s_session_ended = false;
 
 
@@ -971,6 +974,7 @@ bool call_manager_bind_session(uint32_t session) {
     }
     if (session == s_session && s_session_ended) return false;
     s_session = session;
+    s_ptt_request = 0;
     s_session_ended = false;
     return true;
 }
@@ -1002,4 +1006,13 @@ bool call_manager_voice_allowed(const protocol_frame_t *f) {
           f->src==NODE_PI && f->dst==NODE_WROOM));
     unlock_manager();
     return valid;
+}
+
+bool call_manager_set_direction_ordered(uint32_t session, uint32_t request, audio_direction_t direction) {
+    if (!call_manager_session_matches(session) || !request || request < s_ptt_request ||
+        (direction != AUDIO_DIRECTION_FIELD_TX && direction != AUDIO_DIRECTION_CONTROL_TX)) return false;
+    if (request == s_ptt_request && (uint8_t)call_manager_get_state() != (uint8_t)direction) return false;
+    s_ptt_request = request;
+    /* Same-ID retries replay downstream SET and Pi confirmation without changing generation. */
+    return call_manager_set_direction(direction);
 }

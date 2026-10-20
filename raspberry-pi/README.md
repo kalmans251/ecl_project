@@ -860,9 +860,9 @@ transmission. Retries reuse it. Every integer below is big-endian:
 | Pi → P4 | Payload |
 | --- | --- |
 | AUDIO START / STOP / CALL_KEEPALIVE | session ID (4 bytes) |
-| AUDIO SET | direction (1 byte), session ID (4 bytes) |
+| AUDIO SET | direction (1 byte), session ID (4 bytes), PTT request ID (4 bytes) |
 | EMERGENCY SET ACK | ACK (1), emergency sequence (4), session ID (4) |
-| P4 → Pi AUDIO DATA event | EVENT, event kind, origin, direction, session ID (4) |
+| P4 → Pi AUDIO DATA event | EVENT, event kind, origin, direction, session ID (4); DIRECTION_CHANGED also appends request ID (4) |
 
 P4 rejects PTT, STOP and keepalives for a different active session. Duplicate START
 for the active session replays STARTED without restarting hardware. The most recently
@@ -879,8 +879,7 @@ journal merely to bypass recovery.
 
 This is correlation, not authentication. P4 session history is RAM-only and does not
 provide replay protection across P4 reboot or for arbitrary older START packets.
-Voice payload tagging is implemented below; intra-call PTT request sequence IDs
-remain separate follow-up work. Physical PLC timing/audio verification remains deferred.
+Voice payload tagging is implemented below; PTT request sequencing is implemented below. Physical PLC timing/audio verification remains deferred.
 
 ## End-to-end voice sessions (update Pi, P4, WROOM and S3 together)
 
@@ -896,7 +895,7 @@ never stamp old received audio with the latest call ID. Future monitoring client
 must learn the confirmed call.session_id via the control/state channel.
 
 P4 sends the same session ID in downstream START/STOP (4 bytes) and direction SET
-(direction + 4 bytes). WROOM/S3 reject mismatched STOP/SET and ended-session START.
+(direction + session ID + request ID, 9 bytes). WROOM/S3 reject mismatched STOP/SET and ended-session START.
 A new authoritative P4 START resets local audio generation. P4 checks voice at
 routing and TX dequeue; WROOM checks FIELD forwarding and CONTROL decoding. S3
 preserves the ID from capture in each queued packet. Pi gates both directions and
@@ -914,5 +913,35 @@ Do not run it against a railing reserved by local-audio mode. `voice_test_client
 
 A downstream board that rebooted/missed START must receive a new call START;
 a bare direction command no longer recreates an unbound session. End/restart the
-call if needed. PTT sequencing within one call and persistent firmware replay
+call if needed. PTT voice-packet epochs and persistent firmware replay
 protection remain separate work. Session IDs are correlation, not authentication.
+
+## Ordered PTT requests
+
+Every new PTT operation increments a 32-bit request ID within its call session.
+Retries use the same ID. AUDIO SET is now 9 payload bytes: direction (1), session
+ID (4), request ID (4), all integers big-endian. Pi starts at request 1 and refuses
+to wrap at UINT32_MAX; hangup/new call resets the counter. Restart recovery never
+resumes PTT on an old call, so no request counter is reused after Pi restart.
+
+P4 rejects older requests and same-ID/different-direction requests. A same-ID
+retry resends downstream commands and the confirmation. P4→WROOM/S3 SET carries
+the same nine bytes; each endpoint also rejects stale SETs. Initial FIELD_TX SET
+uses request zero only inside the firmware chain, following START. DIRECTION_CHANGED
+contains EVENT, event kind, origin, direction, session ID, request ID (12 bytes).
+STARTED and ENDED retain their eight-byte format; Codec2/TCP audio formats do not
+change in this step.
+
+Pi accepts only the outstanding session/request/direction triple. During a request,
+call.phase is switching and audio is gated. An unconfirmed request leaves direction
+unknown, stops renewal, and retains bus ownership. Use hangup to resolve it; a late
+PTT reply cannot reactivate audio. A duplicate STARTED cannot overwrite an already
+established direction. END still takes precedence over a racing PTT confirmation.
+CLI commands and automatic request numbering need no user-supplied option.
+
+Update Pi/P4/WROOM/S3 together. This confirms P4's control state, not downstream
+microphone/speaker readiness; downstream application acknowledgment is the next
+separate feature. Voice packets are session-tagged but not PTT-epoch-tagged, so this
+change does not claim to reject every delayed audio packet across on/off/on within
+one call. Firmware replay protection across reboot and physical bus verification
+remain outstanding.

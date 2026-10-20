@@ -10,6 +10,7 @@
 
 
 static std::atomic<uint32_t> s_session{0};
+static uint32_t s_ptt_request;
 
 static bool
     s_active =
@@ -235,16 +236,23 @@ uint32_t audio_session_id(void) { return s_session; }
 bool audio_session_control(const protocol_frame_t *f) {
     if(f->src!=NODE_P4)return false;
     unsigned offset=f->command==CMD_SET?1:0;
-    if(f->length!=offset+4)return false;
+    if(f->length!=(f->command==CMD_SET?9:4))return false;
     const uint8_t *p=f->payload+offset;
     uint32_t id=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
     if(!id)return false;
     if(f->command==CMD_START){
         if(id==s_session)return s_active;
-        audio_session_stop();s_session=id;audio_session_start();return true;
+        audio_session_stop();s_session=id;s_ptt_request=0;audio_session_start();return true;
     }
     if(id!=s_session || !s_active)return false;
     if(f->command==CMD_STOP){audio_session_stop();return true;}
-    if(f->command==CMD_SET)return audio_session_set_direction(f->payload[0]);
+    if(f->command==CMD_SET) {
+        p=f->payload+5;
+        uint32_t request=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+        if(request<s_ptt_request)return false;
+        if(request==s_ptt_request)return f->payload[0]==s_direction;
+        if(!audio_session_set_direction(f->payload[0]))return false;
+        s_ptt_request=request;return true;
+    }
     return false;
 }

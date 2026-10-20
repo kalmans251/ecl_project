@@ -20,7 +20,7 @@ static const char *TAG = "VOICE_SESSION";
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool s_active, s_output_busy;
 static audio_direction_t s_direction = AUDIO_DIR_FIELD_TX;
-static uint32_t s_generation, s_session;
+static uint32_t s_generation, s_session, s_ptt_request;
 static uint32_t session_id(const uint8_t *p) {
     return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
 }
@@ -314,12 +314,12 @@ bool voice_session_handle_codec2(const uint8_t *payload, size_t length)
 bool voice_session_control(const protocol_frame_t *f) {
     if (f->src != NODE_P4 || f->railing_id != RAILING_ID) return false;
     unsigned offset=f->cmd==CMD_SET?1:0;
-    if (f->payload_len != offset+4) return false;
+    if (f->payload_len != (f->cmd==CMD_SET?9:4)) return false;
     uint32_t id=session_id(f->payload+offset);
     if (!id) return false;
     portENTER_CRITICAL(&s_lock);
     bool same=id==s_session, active=s_active;
-    if(f->cmd==CMD_START && !same) {s_session=id; ++s_generation;}
+    if(f->cmd==CMD_START && !same) {s_session=id; s_ptt_request=0; ++s_generation;}
     portEXIT_CRITICAL(&s_lock);
     if(f->cmd==CMD_START) {
         if(same)return active; /* reject an ended session's duplicate START */
@@ -327,7 +327,13 @@ bool voice_session_control(const protocol_frame_t *f) {
     }
     if(!same || !active)return false;
     if(f->cmd==CMD_STOP){voice_session_stop();return true;}
-    if(f->cmd==CMD_SET)return voice_session_set_direction((audio_direction_t)f->payload[0]);
+    if(f->cmd==CMD_SET) {
+        uint32_t request=session_id(f->payload+5);
+        if(request<s_ptt_request)return false;
+        if(request==s_ptt_request)return f->payload[0]==voice_session_get_direction();
+        if(!voice_session_set_direction((audio_direction_t)f->payload[0]))return false;
+        s_ptt_request=request;return true;
+    }
     return false;
 }
 bool voice_session_forward_allowed(const protocol_frame_t *f) {

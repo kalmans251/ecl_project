@@ -51,7 +51,7 @@ def grant(rail=1, duration=60):
 def direction_event(rail, direction):
     return Frame(rail, Node.P4, Node.PI, Service.AUDIO, Command.DATA,
                  bytes([AudioDataType.EVENT, AudioEvent.DIRECTION_CHANGED,
-                        CallOrigin.EMERGENCY, direction])+bytes(4))
+                        CallOrigin.EMERGENCY, direction])+bytes(4)+(1).to_bytes(4,"big"))
 
 
 class ControlWindowTests(unittest.TestCase):
@@ -204,7 +204,8 @@ class ConfirmedDirectionTests(unittest.TestCase):
             direction_event(2, AudioDirection.CONTROL_TX))
         with self.assertRaises(TimeoutError):
             self.audio.set_direction(1, AudioDirection.CONTROL_TX)
-        self.assertEqual(self.railings.get_call_direction(1), AudioDirection.FIELD_TX)
+        self.assertIsNone(self.railings.get_call_direction(1))
+        self.assertEqual(self.railings.snapshot(1)["call"]["phase"],"unknown")
 
     def test_call_end_interrupts_confirmation_wait(self):
         self.make_manager()

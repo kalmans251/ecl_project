@@ -164,9 +164,9 @@ class StateSyncTests(unittest.TestCase):
             ) + audio.session_bytes(1),
         )
 
-        self.assertTrue(
-            audio.handle_frame(direction)
-        )
+        from dataclasses import replace
+        bus.on_control=lambda f: audio.handle_frame(replace(direction, payload=direction.payload+f.payload[5:]))
+        audio.set_direction(1, AudioDirection.CONTROL_TX)
 
         state = railings.snapshot(1)
 
@@ -226,7 +226,7 @@ class StateSyncTests(unittest.TestCase):
                 audio.handle_frame(Frame(1, Node.P4, Node.PI, Service.AUDIO,
                     Command.DATA, bytes([AudioDataType.EVENT,
                     AudioEvent.DIRECTION_CHANGED, CallOrigin.EMERGENCY,
-                    frame.payload[0]])+audio.session_bytes(1)))
+                    frame.payload[0]])+audio.session_bytes(1)+frame.payload[5:]))
             elif frame.command == Command.STOP:
                 audio.handle_frame(Frame(1, Node.P4, Node.PI, Service.AUDIO,
                     Command.DATA, bytes([AudioDataType.EVENT,

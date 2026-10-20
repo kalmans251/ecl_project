@@ -1926,9 +1926,9 @@ static void handle_audio(
                 frame->payload[0];
 
 
-            if (frame->src == NODE_PI && frame->length == 5 &&
-                call_manager_session_matches(read_u32_be(frame->payload+1)))
-                call_manager_set_direction(direction);
+            if (frame->src == NODE_PI && frame->length == 9)
+                call_manager_set_direction_ordered(read_u32_be(frame->payload+1),
+                    read_u32_be(frame->payload+5), direction);
 
 
             break;

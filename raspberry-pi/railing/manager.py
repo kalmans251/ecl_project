@@ -194,6 +194,17 @@ class RailingManager:
             self._get_or_create_locked(railing_id).call.phase = "starting"
             self._save_calls_locked()
 
+    def call_direction_pending(self, railing_id):
+        with self._lock:
+            self._get_or_create_locked(railing_id).call.phase = "switching"
+
+    def call_direction_unknown(self, railing_id, session):
+        with self._lock:
+            call = self._get_or_create_locked(railing_id).call
+            if call.session_id == session and call.phase not in ("idle", "ended"):
+                call.phase = "unknown"
+                call.direction = None
+
     def call_request_failed(self, railing_id: int) -> None:
         with self._lock:
             call = self._get_or_create_locked(railing_id).call
@@ -259,6 +270,7 @@ class RailingManager:
 
             state.mark_seen()
             state.call.direction = direction
+            state.call.phase = "active"
 
             return True
 

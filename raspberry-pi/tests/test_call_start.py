@@ -10,9 +10,9 @@ from protocol import AudioDataType, AudioDirection, AudioEvent, CallOrigin, Comm
 from railing import RailingManager
 
 
-def event(railing=1, kind=AudioEvent.CALL_STARTED, src=Node.P4, direction=AudioDirection.FIELD_TX, session=0):
+def event(railing=1, kind=AudioEvent.CALL_STARTED, src=Node.P4, direction=AudioDirection.FIELD_TX, session=0, request=1):
     return Frame(railing, src, Node.PI, Service.AUDIO, Command.DATA,
-                 bytes([AudioDataType.EVENT, kind, CallOrigin.NORMAL, direction])+session.to_bytes(4,"big"))
+                 bytes([AudioDataType.EVENT, kind, CallOrigin.NORMAL, direction])+session.to_bytes(4,"big") + (request.to_bytes(4,"big") if kind==AudioEvent.DIRECTION_CHANGED else b""))
 
 
 class Bus:
@@ -165,7 +165,7 @@ class CallStartTests(unittest.TestCase):
                 if frame.command == Command.START:
                     self.handler(event(session=int.from_bytes(frame.payload[-4:],"big")))
                 elif frame.command == Command.SET:
-                    self.handler(event(session=int.from_bytes(frame.payload[-4:],"big"), kind=AudioEvent.DIRECTION_CHANGED, direction=frame.payload[0]))
+                    self.handler(event(session=int.from_bytes(frame.payload[1:5],"big"), request=int.from_bytes(frame.payload[5:],"big"), kind=AudioEvent.DIRECTION_CHANGED, direction=frame.payload[0]))
                 elif frame.command == Command.STOP:
                     self.handler(event(session=int.from_bytes(frame.payload[-4:],"big"), kind=AudioEvent.CALL_ENDED))
         bus = ConsoleBus()

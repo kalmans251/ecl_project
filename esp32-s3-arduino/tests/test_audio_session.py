@@ -32,9 +32,14 @@ int main(){
  c.payload[3]=8;assert(audio_session_control(&c));assert(mic);
  assert(!audio_session_send_codec2(bits,8,2,7)); // captured under old session
  assert(audio_session_send_codec2(bits,8,0,8));assert(sent.payload[10]==8);
- c.command=CMD_SET;c.length=5;c.payload[0]=AUDIO_DIRECTION_CONTROL_TX;c.payload[3]=0;c.payload[4]=8;
+ c.command=CMD_SET;c.length=9;c.payload[0]=AUDIO_DIRECTION_CONTROL_TX;c.payload[3]=0;c.payload[4]=8;c.payload[8]=1;
  assert(audio_session_control(&c));assert(!mic);
  assert(!audio_session_send_codec2(bits,8,1,8));
+ c.payload[0]=AUDIO_DIRECTION_FIELD_TX;assert(!audio_session_control(&c)); // same ID/different value
+ c.payload[8]=2;assert(audio_session_control(&c));assert(mic);
+ c.payload[0]=AUDIO_DIRECTION_CONTROL_TX;c.payload[8]=1;
+ assert(!audio_session_control(&c));assert(mic);
+ c.payload[0]=AUDIO_DIRECTION_FIELD_TX;c.payload[8]=2;assert(audio_session_control(&c));
  c.src=NODE_PI;assert(!audio_session_control(&c));
 }
 ''')
