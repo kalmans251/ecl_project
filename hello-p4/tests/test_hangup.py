@@ -73,6 +73,18 @@ int main(void) {
     assert(call_manager_start(CALL_ORIGIN_NORMAL));
     assert(!call_manager_stop_session(101));
     assert(call_manager_session_matches(202));
+    protocol_frame_t voice={.railing_id=RAILING_ID,.src=NODE_S3,.dst=NODE_PI,
+      .service=SERVICE_AUDIO,.command=CMD_DATA,.length=59,
+      .payload={AUDIO_DATA_CODEC2,1,AUDIO_DIRECTION_FIELD_TX,0,0,8,6,0,0,0,202}};
+    assert(call_manager_voice_allowed(&voice));
+    voice.payload[10]=101;assert(!call_manager_voice_allowed(&voice));
+    voice.payload[10]=202;voice.railing_id=2;assert(!call_manager_voice_allowed(&voice));
+    voice.railing_id=RAILING_ID;voice.length=55;assert(!call_manager_voice_allowed(&voice));
+    voice.length=59;
+    assert(call_manager_set_direction(AUDIO_DIRECTION_CONTROL_TX));
+    assert(!call_manager_voice_allowed(&voice));
+    voice.src=NODE_PI;voice.dst=NODE_WROOM;voice.payload[2]=AUDIO_DIRECTION_CONTROL_TX;
+    assert(call_manager_voice_allowed(&voice));
     assert(call_manager_stop_session(202));
     assert(call_manager_stop_session(303)); // START lost: confirm idle with requested ID
     assert(last.payload[6]==1 && last.payload[7]==47);

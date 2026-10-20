@@ -7,6 +7,7 @@
 #include "protocol_parser.h"
 
 #include "router.h"
+#include "call_manager.h"
 
 
 /* ============================================================
@@ -56,6 +57,7 @@ static void process_wroom_tx_queue(void)
         ) == pdTRUE
     )
     {
+        if (!call_manager_voice_allowed(&frame)) continue;
         int tx_len =
             protocol_encode(
                 &frame,

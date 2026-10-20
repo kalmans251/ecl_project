@@ -89,11 +89,10 @@ class VoiceRelay:
             if self._transitioning:
                 return None
             epoch = self._epoch
-        if self._railings.snapshot(railing_id).get("call", {}).get("phase") != "active":
+        call = self._railings.snapshot(railing_id).get("call", {})
+        if call.get("phase") != "active" or call.get("direction") != int(direction):
             return None
-        if self._railings.get_call_direction(railing_id) != int(direction):
-            return None
-        return epoch
+        return (epoch, call["session_id"])
 
     @contextmanager
     def control_transition(self):
@@ -292,6 +291,10 @@ class VoiceRelay:
             self.dropped_packets += 1
             return True
 
+        if not self.packet_session_matches(packet):
+            self.dropped_packets += 1
+            return True
+
         self.field_packets += 1
         handler = self._field_handler
         if handler is not None:
@@ -319,8 +322,15 @@ class VoiceRelay:
 
         return True
 
+    def packet_session_matches(self, packet):
+        call = self._railings.snapshot(packet.railing_id).get("call", {})
+        return packet.session_id != 0 and call.get("phase") == "active" and call.get("session_id") == packet.session_id
+
     def forward_control_packet(self, packet: VoicePacket, *, token=None) -> bool:
         with self._send_lock:
+            if not self.packet_session_matches(packet):
+                self.dropped_packets += 1
+                return False
             if packet.railing_id == self._local_source and token is None:
                 self.dropped_packets += 1
                 return False

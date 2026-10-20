@@ -20,6 +20,7 @@ static_assert(MIC_GAIN > 0, "Microphone gain must be positive");
 
 struct Packet {
     uint32_t generation;
+    uint32_t session_id;
     TickType_t captured;
     uint16_t sequence;
     uint8_t data[kBytesPerFrame * kFramesPerPacket];
@@ -106,6 +107,7 @@ void capture_task(void *) {
         }
         if (!running) {
             generation = requested;
+            packet.session_id = audio_session_id();
             codec = codec2_create(CODEC2_MODE_2400);
             if (codec == nullptr || codec2_samples_per_frame(codec) != kSamples
                 || codec2_bits_per_frame(codec) != 48) {
@@ -221,7 +223,7 @@ void microphone_codec2_process() {
         if (enabled && packet.generation == generation
             && xTaskGetTickCount() - packet.captured <= pdMS_TO_TICKS(kMaxAgeMs)
             && audio_session_field_tx_enabled() && ble_link_is_connected()) {
-            if (audio_session_send_codec2(packet.data, kFramesPerPacket, packet.sequence))
+            if (audio_session_send_codec2(packet.data, kFramesPerPacket, packet.sequence, packet.session_id))
                 ++s_sent;
             else ++s_send_drops;
         } else ++s_send_drops;

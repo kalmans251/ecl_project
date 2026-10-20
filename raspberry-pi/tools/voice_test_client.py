@@ -75,7 +75,11 @@ def parse_args() -> argparse.Namespace:
         help="Seconds between dummy packets",
     )
 
-    return parser.parse_args()
+    parser.add_argument("--session-id", type=lambda s:int(s,0), default=0)
+    args=parser.parse_args()
+    if args.send_control and not 1 <= args.session_id <= 0xffffffff:
+        parser.error("--session-id is required for sending")
+    return args
 
 
 def receive_loop(
@@ -157,6 +161,7 @@ def main() -> int:
                 frame_count=8,
                 bytes_per_frame=6,
                 data=data,
+                session_id=args.session_id,
             )
 
             sock.sendall(

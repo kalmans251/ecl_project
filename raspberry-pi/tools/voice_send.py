@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=9100)
     parser.add_argument('--railing', type=int, default=1)
+    parser.add_argument('--session-id', type=lambda value: int(value, 0), help='current call.session_id from status; required for sending')
     parser.add_argument('--device', help='input device number/name')
     parser.add_argument('--list-devices', action='store_true')
     parser.add_argument('--rate', type=int, choices=[8000, 16000, 48000], default=48000)
@@ -39,6 +40,8 @@ def main():
     if args.list_devices:
         print(sd.query_devices())
         return
+    if args.session_id is None or not 1 <= args.session_id <= 0xffffffff:
+        parser.error('--session-id must be the current nonzero call session ID')
     device = int(args.device) if args.device and args.device.isdecimal() else args.device
     capture = queue.Queue(maxsize=24)
     dropped = input_overflows = 0
@@ -82,7 +85,7 @@ def main():
                 encoded.extend(encoder.encode(pcm))
                 if len(encoded) == 48:
                     packet = VoicePacket(args.railing, int(AudioDirection.CONTROL_TX),
-                                         int(Codec2Mode.MODE_2400), sequence, 8, 6, bytes(encoded))
+                                         int(Codec2Mode.MODE_2400), sequence, 8, 6, bytes(encoded), session_id=args.session_id)
                     sock.sendall(packet.encode_network())
                     encoded.clear()
                     packets += 1

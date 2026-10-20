@@ -226,12 +226,13 @@ static bool send_frame_to_node(
 
 static void request_audio_start(void)
 {
+    uint8_t session[4]; put_session(session, s_session);
     send_frame_to_node(
         NODE_WROOM,
         SERVICE_AUDIO,
         CMD_START,
-        NULL,
-        0
+        session,
+        sizeof(session)
     );
 
 
@@ -239,8 +240,8 @@ static void request_audio_start(void)
         NODE_S3,
         SERVICE_AUDIO,
         CMD_START,
-        NULL,
-        0
+        session,
+        sizeof(session)
     );
 }
 
@@ -251,12 +252,13 @@ static void request_audio_start(void)
 
 static void request_audio_stop(void)
 {
+    uint8_t session[4]; put_session(session, s_session);
     send_frame_to_node(
         NODE_S3,
         SERVICE_AUDIO,
         CMD_STOP,
-        NULL,
-        0
+        session,
+        sizeof(session)
     );
 
 
@@ -264,8 +266,8 @@ static void request_audio_stop(void)
         NODE_WROOM,
         SERVICE_AUDIO,
         CMD_STOP,
-        NULL,
-        0
+        session,
+        sizeof(session)
     );
 }
 
@@ -280,7 +282,8 @@ static void request_audio_direction(
     audio_direction_t direction
 )
 {
-    uint8_t payload[1];
+    uint8_t payload[5];
+    put_session(payload+1, s_session);
 
 
     payload[0] =
@@ -980,4 +983,23 @@ bool call_manager_stop_session(uint32_t session) {
         return send_frame_to_node(NODE_PI,SERVICE_AUDIO,CMD_DATA,payload,sizeof(payload));
     }
     return call_manager_end();
+}
+
+bool call_manager_voice_allowed(const protocol_frame_t *f) {
+    if (f->service != SERVICE_AUDIO || f->command != CMD_DATA || !f->length ||
+        f->payload[0] != AUDIO_DATA_CODEC2) return true;
+    if (f->railing_id != RAILING_ID || f->length < AUDIO_CODEC2_META_SIZE ||
+        f->payload[1] != CODEC2_MODE_2400 || f->payload[5] == 0 ||
+        f->payload[5] > CODEC2_MAX_FRAMES_PER_PACKET || f->payload[6] != 6 ||
+        f->length != AUDIO_CODEC2_META_SIZE + f->payload[5]*6) return false;
+    uint32_t id=((uint32_t)f->payload[7]<<24)|((uint32_t)f->payload[8]<<16)|
+                ((uint32_t)f->payload[9]<<8)|f->payload[10];
+    lock_manager();
+    bool valid=id && id==s_session &&
+        ((s_call_state==CALL_STATE_FIELD_TX && f->payload[2]==AUDIO_DIRECTION_FIELD_TX &&
+          f->src==NODE_S3 && f->dst==NODE_PI) ||
+         (s_call_state==CALL_STATE_CONTROL_TX && f->payload[2]==AUDIO_DIRECTION_CONTROL_TX &&
+          f->src==NODE_PI && f->dst==NODE_WROOM));
+    unlock_manager();
+    return valid;
 }

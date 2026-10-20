@@ -532,62 +532,20 @@ static void handle_music(
  * AUDIO / CALL SESSION
  * ============================================================ */
 
-static void handle_audio(
-    const protocol_frame_t *frame
-)
+static void handle_audio(const protocol_frame_t *frame)
 {
-    switch (
-        frame->cmd
-    )
-    {
+    switch (frame->cmd) {
         case CMD_START:
-        {
-            voice_session_start();
-            break;
-        }
-
-
         case CMD_STOP:
-        {
-            voice_session_stop();
-            break;
-        }
-
-
         case CMD_SET:
-        {
-            if (
-                frame->payload_len <
-                1
-            )
-            {
-                break;
-            }
-
-
-            audio_direction_t direction = (audio_direction_t)frame->payload[0];
-            bool accepted = frame->src == NODE_P4
-                ? voice_session_sync_direction(direction)
-                : voice_session_set_direction(direction);
-            if (!accepted)
-            {
-                ESP_LOGW(
-                    TAG,
-                    "Invalid audio direction=%u",
-                    (unsigned)
-                    frame->payload[0]
-                );
-            }
-
-
+            if (!voice_session_control(frame))
+                ESP_LOGW(TAG, "Rejected call control session");
             break;
-        }
-
 
         case CMD_DATA:
         {
             if (
-                !voice_session_handle_codec2(
+                frame->src != NODE_PI || !voice_session_handle_codec2(
                     frame->payload,
                     frame->payload_len
                 )

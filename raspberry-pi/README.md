@@ -236,11 +236,11 @@ python main.py \
   --voice-port 9100
 ```
 
-The TCP stream uses a separate 12-byte binary envelope:
+The TCP stream uses a separate 16-byte binary envelope:
 
 ```text
 2 bytes  magic       "RV"
-1 byte   version     1
+1 byte   version     2
 1 byte   railing_id
 1 byte   direction
 1 byte   codec mode
@@ -248,6 +248,7 @@ The TCP stream uses a separate 12-byte binary envelope:
 1 byte   frame count
 1 byte   bytes/frame
 2 bytes  data length big-endian
+4 bytes  session ID  big-endian
 N bytes  Codec2 data
 ```
 
@@ -851,7 +852,7 @@ collision/audio checks remain deferred. Pi–P4 control session IDs are implemen
 
 Update Pi and every P4 together while calls are idle. Old untagged Pi call commands
 are rejected by updated P4; old four-byte P4 call events are ignored by updated Pi.
-WROOM/S3 control frames and Codec2 packets are unchanged in this stage.
+WROOM/S3 and Codec2 formats are extended in the end-to-end voice section below.
 
 Each Pi call reservation creates a nonzero random 32-bit session ID, stored before
 transmission. Retries reuse it. Every integer below is big-endian:
@@ -878,5 +879,40 @@ journal merely to bypass recovery.
 
 This is correlation, not authentication. P4 session history is RAM-only and does not
 provide replay protection across P4 reboot or for arbitrary older START packets.
-Voice payload tagging across Pi/P4/WROOM/S3 and intra-call PTT request sequence IDs
-are separate follow-up work. Physical PLC timing/audio verification remains deferred.
+Voice payload tagging is implemented below; intra-call PTT request sequence IDs
+remain separate follow-up work. Physical PLC timing/audio verification remains deferred.
+
+## End-to-end voice sessions (update Pi, P4, WROOM and S3 together)
+
+Codec2 metadata is now 11 bytes: type, mode, direction, sequence (2), frame count,
+bytes per frame, session ID (4, big-endian), followed by the unchanged encoded
+frames. Eight 6-byte frames make a 59-byte payload and a 69-byte UART frame.
+That adds about 4.17 ms at 9600 baud / 8N1 compared with the old packet. This fits
+the modem's 128-byte limit, but hardware timing and audio continuity remain unverified.
+
+TCP RV version 2 adds a big-endian uint32 session ID after data_length, making its
+header 16 bytes. Version 1 is rejected. Consumers must preserve the session ID;
+never stamp old received audio with the latest call ID. Future monitoring clients
+must learn the confirmed call.session_id via the control/state channel.
+
+P4 sends the same session ID in downstream START/STOP (4 bytes) and direction SET
+(direction + 4 bytes). WROOM/S3 reject mismatched STOP/SET and ended-session START.
+A new authoritative P4 START resets local audio generation. P4 checks voice at
+routing and TX dequeue; WROOM checks FIELD forwarding and CONTROL decoding. S3
+preserves the ID from capture in each queued packet. Pi gates both directions and
+includes session in local microphone/AUX tokens. Already-written I2S/DMA samples
+cannot be recalled by these software checks.
+
+The integrated command remains:
+`python main.py --local-audio --audio-railing 1 --mic-device 0 --speaker-device 1`
+(device indexes must match `--list-audio-devices`). After `call 1` and `ptt 1 on`,
+integrated USB capture automatically uses the confirmed session. A separate test
+sender now requires the numeric call.session_id displayed by `status 1`:
+`python tools/voice_send.py --railing 1 --session-id <ID> --tone --seconds 10`.
+Do not run it against a railing reserved by local-audio mode. `voice_test_client.py
+--send-control` likewise requires `--session-id`.
+
+A downstream board that rebooted/missed START must receive a new call START;
+a bare direction command no longer recreates an unbound session. End/restart the
+call if needed. PTT sequencing within one call and persistent firmware replay
+protection remain separate work. Session IDs are correlation, not authentication.

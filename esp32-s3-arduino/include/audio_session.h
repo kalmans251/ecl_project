@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "protocol.h"
 
 void audio_session_init(void);
 
@@ -30,5 +31,9 @@ bool audio_session_field_tx_enabled(void);
 bool audio_session_send_codec2(
     const uint8_t *data,
     uint8_t frame_count,
-    uint16_t sequence
+    uint16_t sequence,
+    uint32_t session_id
 );
+
+uint32_t audio_session_id(void);
+bool audio_session_control(const protocol_frame_t *frame);

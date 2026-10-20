@@ -10,6 +10,8 @@ CODEC2_SRC = os.environ.get('ECL_TEST_CODEC2_SRC')
 CODEC2_LIB = os.environ.get('ECL_TEST_CODEC2_LIB') or ctypes.util.find_library('codec2')
 MAIN = Path(__file__).resolve().parents[1] / 'main'
 HEADERS = {
+'driver/uart.h': '#pragma once\n',
+'driver/spi_master.h': '#pragma once\n',
 'esp_heap_caps.h': '''#pragma once
 #define MALLOC_CAP_8BIT 1
 ''',
@@ -108,8 +110,9 @@ bool audio_output_write(const int16_t *pcm, size_t n) {
     return true;
 }
 int main(void) {
-    uint8_t payload[55]={AUDIO_DATA_CODEC2, 1, AUDIO_DIR_CONTROL_TX, 0, 1, 8, 6};
+    uint8_t payload[59]={AUDIO_DATA_CODEC2, 1, AUDIO_DIR_CONTROL_TX, 0, 1, 8, 6, 0, 0, 0, 1};
     voice_session_init();
+    s_session=1;
     s_active=true; s_direction=AUDIO_DIR_CONTROL_TX;
     int16_t ramp[160];
     for (unsigned i=0; i<160; ++i) ramp[i]=(int16_t)(i*200-16000);
@@ -125,21 +128,21 @@ int main(void) {
     assert(!voice_session_handle_codec2(payload, sizeof(payload)));
     assert(voice_session_sync_direction(AUDIO_DIR_CONTROL_TX));
     assert(!voice_session_handle_codec2(payload, 54));
-    assert(voice_session_handle_codec2(payload, 55));
+    assert(voice_session_handle_codec2(payload, 59));
     uint32_t old=s_generation;
     assert(voice_session_sync_direction(AUDIO_DIR_CONTROL_TX));
     assert(old==s_generation && count==1); // retries must not flush audio
-    for (unsigned i=1; i<12; ++i) assert(voice_session_handle_codec2(payload, 55));
-    assert(!voice_session_handle_codec2(payload, 55));
+    for (unsigned i=1; i<12; ++i) assert(voice_session_handle_codec2(payload, 59));
+    assert(!voice_session_handle_codec2(payload, 59));
     worker_started=true;
     if (setjmp(finished)==0) worker(NULL);
     assert(writes==8 && released==1 && !voice_session_is_active());
-    assert(!voice_session_handle_codec2(payload, 55));
+    assert(!voice_session_handle_codec2(payload, 59));
     writes=released=0;
     music_playing=true;
     voice_session_start();
     assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
-    assert(voice_session_handle_codec2(payload, 55));
+    assert(voice_session_handle_codec2(payload, 59));
     worker_started=true;
     if (setjmp(finished)==0) worker(NULL);
     assert(writes==8 && released==1 && music_paused && restored_rate==44100);
@@ -168,11 +171,28 @@ FAILURE_MAIN = r'''
 static unsigned rounds;
 static bool transitioned;
 static void enqueue_audio(void) {
-    uint8_t payload[55]={AUDIO_DATA_CODEC2,1,AUDIO_DIR_CONTROL_TX,0,1,8,6};
-    for(unsigned i=0;i<8;++i) assert(voice_session_handle_codec2(payload,55));
+    uint8_t payload[59]={AUDIO_DATA_CODEC2,1,AUDIO_DIR_CONTROL_TX,0,1,8,6,0,0,0,1};
+    for(unsigned i=0;i<8;++i) assert(voice_session_handle_codec2(payload,59));
 }
 int main(void) {
     voice_session_init();
+    protocol_frame_t control={.railing_id=RAILING_ID,.src=NODE_P4,.cmd=CMD_START,.payload_len=4,.payload={0,0,0,7}};
+    assert(voice_session_control(&control));
+    control.cmd=CMD_SET;control.payload_len=5;control.payload[0]=AUDIO_DIR_CONTROL_TX;
+    control.payload[3]=0;control.payload[4]=7;assert(voice_session_control(&control));
+    uint8_t tagged[59]={AUDIO_DATA_CODEC2,1,AUDIO_DIR_CONTROL_TX,0,1,8,6,0,0,0,7};
+    assert(voice_session_handle_codec2(tagged,59));
+    uint32_t generation=s_generation;
+    control.cmd=CMD_STOP;control.payload_len=4;control.payload[0]=0;control.payload[3]=6;
+    assert(!voice_session_control(&control));assert(control_active(generation));
+    control.payload[3]=7;assert(voice_session_control(&control));
+    control.cmd=CMD_START;assert(!voice_session_control(&control));
+    control.payload[3]=8;assert(voice_session_control(&control));
+    control.cmd=CMD_SET;control.payload_len=5;control.payload[0]=AUDIO_DIR_CONTROL_TX;
+    control.payload[3]=0;control.payload[4]=8;assert(voice_session_control(&control));
+    assert(!control_active(generation));assert(!voice_session_handle_codec2(tagged,59));
+    tagged[10]=8;assert(voice_session_handle_codec2(tagged,59));
+    voice_session_stop();s_session=1;
     music_playing=true;
     voice_session_start();assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
     enqueue_audio();
@@ -196,8 +216,8 @@ class VoiceInitializationFailureTests(unittest.TestCase):
             transitioned=true;
             assert(voice_session_set_direction(AUDIO_DIR_FIELD_TX));
             assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
-            uint8_t payload[55]={AUDIO_DATA_CODEC2,1,AUDIO_DIR_CONTROL_TX,0,1,8,6};
-            for(unsigned i=0;i<8;++i) assert(voice_session_handle_codec2(payload,55));
+            uint8_t payload[59]={AUDIO_DATA_CODEC2,1,AUDIO_DIR_CONTROL_TX,0,1,8,6,0,0,0,1};
+            for(unsigned i=0;i<8;++i) assert(voice_session_handle_codec2(payload,59));
         } else longjmp(finished,1);
     }''')
         harness=harness.replace('bool audio_output_init_voice(void) { return true; }',

@@ -3,6 +3,7 @@
 #include "p4_uart.h"
 #include "protocol_parser.h"
 #include "router.h"
+#include "voice_session.h"
 
 #include "esp_log.h"
 
@@ -144,7 +145,7 @@ static void p4_tx_task(
         )
         {
             if (
-                !p4_uart_send_frame(
+                !voice_session_forward_allowed(&frame) || !p4_uart_send_frame(
                     &frame
                 )
             )

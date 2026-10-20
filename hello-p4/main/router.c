@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "router.h"
+#include "call_manager.h"
 #include "event_outbox.h"
 
 
@@ -84,6 +85,7 @@ void router_task(void *arg)
         }
 
 
+        if (!call_manager_voice_allowed(&frame)) continue;
         switch (frame.dst)
         {
             /* ================================================

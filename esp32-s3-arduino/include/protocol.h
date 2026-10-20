@@ -151,7 +151,7 @@ int protocol_encode(
 
 #define CODEC2_2400_BYTES_PER_FRAME     6
 #define CODEC2_MAX_FRAMES_PER_PACKET    8
-#define AUDIO_CODEC2_META_SIZE          7
+#define AUDIO_CODEC2_META_SIZE          11
 
 // ============================================================
 // DETECTION EVENT

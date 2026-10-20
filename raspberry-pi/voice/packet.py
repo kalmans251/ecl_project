@@ -16,11 +16,11 @@ from protocol.constants import (
 
 
 VOICE_MAGIC = b"RV"
-VOICE_VERSION = 1
+VOICE_VERSION = 2
 
 # magic, version, railing_id, direction, mode,
 # sequence, frame_count, bytes_per_frame, data_length
-_NETWORK_HEADER = struct.Struct("!2sBBBBHBBH")
+_NETWORK_HEADER = struct.Struct("!2sBBBBHBBHI")
 
 
 class VoicePacketError(ValueError):
@@ -36,8 +36,11 @@ class VoicePacket:
     frame_count: int
     bytes_per_frame: int
     data: bytes
+    session_id: int = 0
 
     def __post_init__(self) -> None:
+        if not 0 <= self.session_id <= 0xffffffff:
+            raise VoicePacketError("session_id must be uint32")
         if not 1 <= self.railing_id <= 0xFF:
             raise VoicePacketError(
                 "railing_id must be 1..255"
@@ -114,7 +117,7 @@ class VoicePacket:
                 self.frame_count,
                 self.bytes_per_frame,
             ]
-        ) + self.data
+        ) + self.session_id.to_bytes(4, "big") + self.data
 
     @classmethod
     def from_audio_payload(
@@ -144,7 +147,8 @@ class VoicePacket:
             ),
             frame_count=payload[5],
             bytes_per_frame=payload[6],
-            data=bytes(payload[7:]),
+            session_id=int.from_bytes(payload[7:11], "big"),
+            data=bytes(payload[11:]),
         )
 
     def encode_network(self) -> bytes:
@@ -158,6 +162,7 @@ class VoicePacket:
             self.frame_count,
             self.bytes_per_frame,
             len(self.data),
+            self.session_id,
         )
 
         return header + self.data
@@ -182,6 +187,7 @@ class VoicePacket:
             frame_count,
             bytes_per_frame,
             data_length,
+            session_id,
         ) = _NETWORK_HEADER.unpack(
             data[:_NETWORK_HEADER.size]
         )
@@ -215,6 +221,7 @@ class VoicePacket:
             sequence=sequence,
             frame_count=frame_count,
             bytes_per_frame=bytes_per_frame,
+            session_id=session_id,
             data=bytes(
                 data[_NETWORK_HEADER.size:]
             ),
@@ -270,6 +277,7 @@ class VoiceStreamParser:
                     frame_count,
                     bytes_per_frame,
                     data_length,
+                    session_id,
                 ) = _NETWORK_HEADER.unpack(
                     self._buffer[
                         :_NETWORK_HEADER.size

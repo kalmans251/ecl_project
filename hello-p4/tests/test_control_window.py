@@ -54,6 +54,7 @@ static bool drain_ok, recovery;
 
 int64_t esp_timer_get_time(void) { return now; }
 call_state_t call_manager_get_state(void) { return mode; }
+bool call_manager_voice_allowed(const protocol_frame_t *f){(void)f;return true;}
 bool call_manager_end_recovery_active(void) { return recovery; }
 int xQueueReceive(QueueHandle_t q, void *out, TickType_t timeout) {
     (void)timeout;

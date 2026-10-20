@@ -53,7 +53,7 @@ class Bus:
         if self.callback: self.callback(frame)
 
 
-def event(kind, direction=0, session=0):
+def event(kind, direction=0, session=1):
     return Frame(1, Node.P4, Node.PI, Service.AUDIO, Command.DATA,
                  bytes([AudioDataType.EVENT, kind, CallOrigin.EMERGENCY, direction])+session.to_bytes(4,"big"))
 
@@ -61,12 +61,15 @@ def event(kind, direction=0, session=0):
 class LocalAudioTests(unittest.TestCase):
     def setUp(self):
         self.states = RailingManager()
+        patcher=patch("railing.manager.secrets.randbelow",return_value=0)
+        patcher.start();self.addCleanup(patcher.stop)
+        self.states.reserve_call(1)
         self.bus = Bus()
         self.relay = VoiceRelay(self.bus, self.states)
         self.states.call_started(1, CallOrigin.EMERGENCY, AudioDirection.CONTROL_TX)
 
     def test_transition_blocks_external_source_and_invalidates_local_token(self):
-        packet = VoicePacket(1, AudioDirection.CONTROL_TX, 1, 0, 8, 6, bytes(48))
+        packet = VoicePacket(1, AudioDirection.CONTROL_TX, 1, 0, 8, 6, bytes(48), session_id=1)
         token = self.relay.audio_token(1, AudioDirection.CONTROL_TX)
         self.assertTrue(self.relay.forward_control_packet(packet))
         with self.relay.control_transition():
@@ -88,7 +91,7 @@ class LocalAudioTests(unittest.TestCase):
             entered.set()
             self.assertTrue(release.wait(2))
         self.bus.send_frame = slow_write
-        packet = VoicePacket(1, AudioDirection.CONTROL_TX, 1, 0, 8, 6, bytes(48))
+        packet = VoicePacket(1, AudioDirection.CONTROL_TX, 1, 0, 8, 6, bytes(48), session_id=1)
         sender = threading.Thread(target=self.relay.forward_control_packet, args=(packet,))
         sender.start()
         self.assertTrue(entered.wait(1))
