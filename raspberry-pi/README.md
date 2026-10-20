@@ -691,7 +691,7 @@ Power source selection is confirmed before START; failure stops the remaining st
 - Rejected / execution failed / timeout (unknown): never displayed as applied.
 
 LED completion confirms task-side setting changes, not optical feedback or completion
-of music-policy side effects. Relay confirmation uses GPIO readback, not load sensing.
+of music-policy side effects. Relay confirmation checks the controller’s recorded output state after calling the output driver; it does not measure the GPIO pin or connected load.
 CCTV event success confirms P4 acceptance; rejected duplicate/stale/wrong-mode events
 are not reported as applied. Successful WROOM replies are forwarded with their original source and request ID. Existing call/PTT/hangup and emergency ACK
 protocols remain unchanged; locally-idle hangup is not proof of a remote response.

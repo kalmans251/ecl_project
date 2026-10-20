@@ -63,7 +63,7 @@ int main(void){
  f=req(SERVICE_POWER,CMD_START);state.power_mode=POWER_MODE_AUTO;handle_general_apply(&f);assert(result[5]==1);
  f=req(SERVICE_POWER,CMD_SET);f.length=6;f.payload[5]=POWER_MODE_AC;handle_general_apply(&f);assert(result[5]==0);
  f=req(SERVICE_POWER,CMD_START);handle_general_apply(&f);assert(result[5]==0);
- f=req(SERVICE_POWER,CMD_STOP);handle_general_apply(&f);assert(result[5]==2); /* stuck GPIO */
+ f=req(SERVICE_POWER,CMD_STOP);handle_general_apply(&f);assert(result[5]==2); /* output driver reports enabled */
  return 0;
 }
 '''
