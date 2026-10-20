@@ -4,7 +4,7 @@ Raspberry Pi side of the smart-railing communication stack.
 
 Current scope:
 
-- PLC UART: `/dev/ttyAMA2`, 9600 baud, 8N1
+- PLC UART: `/dev/serial0`, 9600 baud, 8N1
 - application protocol compatible with the P4 firmware
 - CRC-16/CCITT-FALSE
 - streaming frame parser with resynchronization
@@ -51,13 +51,13 @@ Log out and back in after changing group membership.
 ## Run
 
 ```bash
-python main.py --port /dev/ttyAMA2
+python main.py --port /dev/serial0
 ```
 
 For verbose protocol logs:
 
 ```bash
-python main.py --port /dev/ttyAMA2 --log-level DEBUG
+python main.py --port /dev/serial0 --log-level DEBUG
 ```
 
 ## Interactive commands
@@ -230,7 +230,7 @@ Run:
 
 ```bash
 python main.py \
-  --port /dev/ttyAMA2 \
+  --port /dev/serial0 \
   --log-level DEBUG \
   --voice-host 0.0.0.0 \
   --voice-port 9100
@@ -360,7 +360,7 @@ python tools/voice_listen.py --list-devices
 터미널 1 (기존 main.py가 실행 중이면 중복 실행하지 말고 그 콘솔 사용):
 ```bash
 source .venv/bin/activate
-python main.py --port /dev/ttyAMA2 --voice-host 127.0.0.1
+python main.py --port /dev/serial0 --voice-host 127.0.0.1
 ```
 현장 비상 호출을 연결한 뒤 Pi 콘솔에서 `ptt 1 off`로 FIELD_TX를 확인합니다.
 `--disable-voice-relay`는 사용하지 않습니다. 외부 PC 접속도 필요하면 기존
@@ -650,3 +650,28 @@ Pi의 `PLC RX raw`는 여러 줄로 나뉠 수 있으므로 P4의 한 프레임�
 P4 송신 원본도 CRC가 다르면 인코딩/실행 중인 펌웨어를 확인합니다.
 P4 원본이 정상인데 Pi 수신이 다르면 UART/모뎀/전력선 전달 구간을 확인합니다.
 이 로그만으로 해당 구간 안의 어느 장치에서 변형됐는지까지는 알 수 없습니다.
+
+## PLC UART selection (Raspberry Pi 4B)
+
+The default port is `/dev/serial0`, matching the configured GPIO14 TX (physical pin 8)
+and GPIO15 RX (physical pin 10) UART. This change only selects the serial device;
+it does not configure Linux overlays or move wiring. Enable the UART and disable
+its serial login console before use. In the configured PL011 setup, verify
+`ls -l /dev/serial0` resolves to `ttyAMA0` after reboot.
+The same port handles TX and RX at 9600 baud, 8N1.
+To use the previous UART explicitly: `python main.py --port /dev/ttyAMA2`.
+
+### Which commands confirm device responses?
+
+| Commands | Confirmation behavior |
+|---|---|
+| `call 1`, `ptt 1 on/off` | Wait for fresh P4 call/direction events; up to 3 attempts. Already-active call can return without a new request. |
+| `hangup 1` during an active call | Send STOP and wait for P4 CALL_ENDED; up to 3 attempts. If locally idle, returns without sending STOP. |
+| `music 1 stop`, `volume 1 20` | Wait for WROOM APPLY_RESULT matching railing, request ID, operation and expected detail; 3-second timeout, no automatic retry. |
+| `ack 1` | Send emergency acknowledgment, then asynchronously match P4 ACKED to the active emergency sequence. ACK sent is not confirmation. |
+| `ping 1`, `query 1 p4/wroom/s3` | Send request; receive handling exists, but no per-request wait/timeout success decision in the CLI. |
+| Other general controls | Transmission only; device application not confirmed. |
+| `status 1`, `voice-status` | Local cached state/counters, no live device query. |
+
+These confirmation mechanisms do not establish that the pending field hangup issue
+is resolved. Capture `--log-level DEBUG` output to compare raw RX and P4 END TX.

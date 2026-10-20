@@ -25,7 +25,7 @@ class _ControlWrite:
 class PlcBus:
     def __init__(
         self,
-        port: str = "/dev/ttyAMA2",
+        port: str = "/dev/serial0",
         baudrate: int = 9600,
         read_timeout: float = 0.05,
         tx_guard_seconds: float = 0.0,
