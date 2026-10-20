@@ -53,9 +53,9 @@ class Bus:
         if self.callback: self.callback(frame)
 
 
-def event(kind, direction=0, session=1):
+def event(kind, direction=0, session=1, request=1):
     return Frame(1, Node.P4, Node.PI, Service.AUDIO, Command.DATA,
-                 bytes([AudioDataType.EVENT, kind, CallOrigin.EMERGENCY, direction])+session.to_bytes(4,"big"))
+                 bytes([AudioDataType.EVENT, kind, CallOrigin.EMERGENCY, direction])+session.to_bytes(4,"big") + (request.to_bytes(4,"big") if kind==AudioEvent.DIRECTION_CHANGED else b""))
 
 
 class LocalAudioTests(unittest.TestCase):
@@ -137,7 +137,7 @@ class LocalAudioTests(unittest.TestCase):
         audio = AudioManager(self.bus, self.states, ack_timeout=0.05)
         def confirm(frame):
             self.assertIsNone(self.relay.audio_token(1, AudioDirection.CONTROL_TX))
-            audio.handle_frame(event(AudioEvent.DIRECTION_CHANGED, frame.payload[0]))
+            audio.handle_frame(event(AudioEvent.DIRECTION_CHANGED, frame.payload[0], request=int.from_bytes(frame.payload[5:],"big")))
             self.relay.state_changed()
         self.bus.callback = confirm
         with self.relay.control_transition():
@@ -195,7 +195,7 @@ class LocalAudioTests(unittest.TestCase):
                 if frame.command == Command.START:
                     self.handler(event(AudioEvent.CALL_STARTED, AudioDirection.FIELD_TX, int.from_bytes(frame.payload,"big")))
                 elif frame.command == Command.SET:
-                    self.handler(event(AudioEvent.DIRECTION_CHANGED, frame.payload[0], int.from_bytes(frame.payload[-4:],"big")))
+                    self.handler(event(AudioEvent.DIRECTION_CHANGED, frame.payload[0], int.from_bytes(frame.payload[1:5],"big"), int.from_bytes(frame.payload[5:],"big")))
                 elif frame.command == Command.STOP:
                     self.handler(event(AudioEvent.CALL_ENDED, session=int.from_bytes(frame.payload[-4:],"big")))
         bus = ConsoleBus()

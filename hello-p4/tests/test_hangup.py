@@ -81,7 +81,16 @@ int main(void) {
     voice.payload[10]=202;voice.railing_id=2;assert(!call_manager_voice_allowed(&voice));
     voice.railing_id=RAILING_ID;voice.length=55;assert(!call_manager_voice_allowed(&voice));
     voice.length=59;
-    assert(call_manager_set_direction(AUDIO_DIRECTION_CONTROL_TX));
+    assert(call_manager_set_direction_ordered(202,2,AUDIO_DIRECTION_CONTROL_TX));
+    assert(last.length==12 && last.payload[11]==2);
+    assert(!call_manager_set_direction_ordered(202,1,AUDIO_DIRECTION_FIELD_TX));
+    assert(!call_manager_set_direction_ordered(202,2,AUDIO_DIRECTION_FIELD_TX));
+    assert(!call_manager_set_direction_ordered(101,3,AUDIO_DIRECTION_FIELD_TX));
+    before=sent;
+    assert(call_manager_set_direction_ordered(202,2,AUDIO_DIRECTION_CONTROL_TX));
+    assert(sent==before+3); // downstream SETs and same request confirmation
+    assert(!call_manager_set_direction_ordered(202,0,AUDIO_DIRECTION_FIELD_TX));
+    assert(call_manager_get_state()==CALL_STATE_CONTROL_TX);
     assert(!call_manager_voice_allowed(&voice));
     voice.src=NODE_PI;voice.dst=NODE_WROOM;voice.payload[2]=AUDIO_DIRECTION_CONTROL_TX;
     assert(call_manager_voice_allowed(&voice));

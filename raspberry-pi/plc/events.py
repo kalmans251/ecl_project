@@ -51,7 +51,7 @@ class EventPoller:
             states = self.railings.snapshot()
             calls = [(rid, s['call']) for rid, s in states.items()
                      if s['call']['phase'] not in ('idle', 'ended') or s['call']['active']]
-            if len(calls) > 1 or (calls and calls[0][1]["phase"] in ("starting", "ending")):
+            if len(calls) > 1 or (calls and calls[0][1]["phase"] in ("starting", "ending", "switching")):
                 return False
             owner = calls[0][0] if calls else None
             field = bool(calls and calls[0][1]['direction'] != int(AudioDirection.CONTROL_TX))

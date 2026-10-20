@@ -41,6 +41,8 @@ class AudioManager:
         self._control_lock = threading.Lock()
         self._direction_revision: dict[int, int] = {}
         self._start_revision: dict[int, int] = {}
+        self._ptt_serial = {}
+        self._pending_ptt = {}
         self._keepalive_due = threading.Event()
         self._keepalive_stop = threading.Event()
         self._keepalive_thread = None
@@ -125,7 +127,8 @@ class AudioManager:
             )
             return True
 
-        if (len(frame.payload) != 8 or not self._railings.call_pending(frame.railing_id)
+        expected_length = 12 if frame.payload[1] == int(AudioEvent.DIRECTION_CHANGED) else 8
+        if (len(frame.payload) != expected_length or not self._railings.call_pending(frame.railing_id)
                 or frame.payload[4:8] != self.session_bytes(frame.railing_id)):
             LOG.warning("Ignoring stale/unmatched call event rail=%d", frame.railing_id)
             return True
@@ -136,6 +139,8 @@ class AudioManager:
         direction = frame.payload[3]
 
         if event == int(AudioEvent.CALL_STARTED):
+            if self._railings.snapshot(frame.railing_id).get("call", {}).get("active"):
+                return True  # a delayed START must not roll back an established direction
             if (origin not in (int(CallOrigin.NORMAL), int(CallOrigin.EMERGENCY))
                     or direction not in (int(AudioDirection.FIELD_TX), int(AudioDirection.CONTROL_TX))):
                 LOG.warning("Invalid CALL STARTED event rail=%d", frame.railing_id)
@@ -166,25 +171,14 @@ class AudioManager:
             return True
 
         if event == int(AudioEvent.DIRECTION_CHANGED):
-            updated = (
-                self._railings.call_direction_changed(
-                    frame.railing_id,
-                    direction, session_id=session_id,
-                )
-            )
-
-            if not updated:
-                LOG.warning(
-                    "CALL direction event without active call "
-                    "rail=%d direction=%s",
-                    frame.railing_id,
-                    self._direction_name(direction),
-                )
-                return True
-
+            request_id = int.from_bytes(frame.payload[8:12], "big")
             with self._condition:
-                self._direction_revision[frame.railing_id] = (
-                    self._direction_revision.get(frame.railing_id, 0) + 1)
+                if self._pending_ptt.get(frame.railing_id) != (session_id, request_id, direction):
+                    LOG.warning("Ignoring stale PTT confirmation rail=%d request=%d", frame.railing_id, request_id)
+                    return True
+                if not self._railings.call_direction_changed(frame.railing_id, direction, session_id=session_id):
+                    return True
+                self._direction_revision[frame.railing_id] = request_id
                 self._condition.notify_all()
 
             LOG.info(
@@ -205,6 +199,7 @@ class AudioManager:
             if not self._railings.call_ended(frame.railing_id, session_id=session_id):
                 return True
             with self._condition:
+                self._direction_revision.pop(frame.railing_id, None)
                 self._condition.notify_all()
 
             LOG.info(
@@ -297,68 +292,65 @@ class AudioManager:
                 LOG.warning("No P4 call-start confirmation rail=%d attempt=%d", railing_id, attempt)
             raise TimeoutError("Call start was not confirmed by P4; the remote call may have started")
 
-    def set_direction(
-        self,
-        railing_id: int,
-        direction: AudioDirection,
-    ) -> None:
-        if direction not in (
-            AudioDirection.FIELD_TX,
-            AudioDirection.CONTROL_TX,
-        ):
-            raise ValueError(
-                f"invalid audio direction: {direction}"
-            )
-
-        frame = Frame(
-                railing_id=railing_id,
-                src=Node.PI,
-                dst=Node.P4,
-                service=Service.AUDIO,
-                command=Command.SET,
-                payload=bytes(
-                    [
-                        int(direction)
-                    ]
-                ) + self.session_bytes(railing_id),
-        )
+    def set_direction(self, railing_id: int, direction: AudioDirection) -> None:
+        if direction not in (AudioDirection.FIELD_TX, AudioDirection.CONTROL_TX):
+            raise ValueError(f"invalid audio direction: {direction}")
         with self._control_lock:
-            if self._railings.snapshot(railing_id).get("call", {}).get("phase") != "active":
+            call = self._railings.snapshot(railing_id).get("call", {})
+            if call.get("phase") != "active":
                 raise RuntimeError("No confirmed active call; hangup unresolved call first")
-            for attempt in range(1, self._attempts + 1):
-                current = self._railings.get_call_direction(railing_id)
-                if current is None:
-                    raise RuntimeError("No confirmed active call for this railing")
-                with self._condition:
-                    revision = self._direction_revision.get(railing_id, 0)
-                LOG.info("CALL direction request rail=%d direction=%s attempt=%d/%d",
-                         railing_id, self._direction_name(int(direction)),
-                         attempt, self._attempts)
-                try:
-                    self._bus.send_control_frame(
-                        frame, wait_for_window=(current == int(AudioDirection.FIELD_TX)))
-                except TimeoutError:
-                    if attempt == self._attempts:
-                        raise
-                    continue
-                deadline = time.monotonic() + self._ack_timeout
-                with self._condition:
-                    while True:
-                        confirmed = self._railings.get_call_direction(railing_id)
-                        if confirmed is None:
-                            raise RuntimeError("Call ended before PTT confirmation")
-                        if (self._direction_revision.get(railing_id, 0) > revision
-                                and confirmed == int(direction)):
-                            LOG.info("PTT confirmed rail=%d direction=%s", railing_id,
+            session = call["session_id"]
+            prior_session, prior_request = self._ptt_serial.get(railing_id, (None, 0))
+            request = (prior_request if prior_session == session else 0) + 1
+            if request > 0xffffffff:
+                raise RuntimeError("PTT sequence exhausted; hangup and start a new call")
+            self._ptt_serial[railing_id] = (session, request)
+            frame = Frame(railing_id, Node.PI, Node.P4, Service.AUDIO, Command.SET,
+                          bytes([int(direction)]) + session.to_bytes(4, "big") + request.to_bytes(4, "big"))
+            with self._condition:
+                self._pending_ptt[railing_id] = (session, request, int(direction))
+                self._direction_revision[railing_id] = 0
+                self._railings.call_direction_pending(railing_id)
+            try:
+                for attempt in range(1, self._attempts + 1):
+                    with self._condition:
+                        if self._direction_revision.get(railing_id) == request:
+                            return
+                    current = self._railings.get_call_direction(railing_id)
+                    if current is None:
+                        raise RuntimeError("Call ended before PTT confirmation")
+                    LOG.info("CALL direction request rail=%d direction=%s request=%d attempt=%d/%d",
+                             railing_id, self._direction_name(int(direction)), request, attempt, self._attempts)
+                    try:
+                        self._bus.send_control_frame(frame, wait_for_window=current == int(AudioDirection.FIELD_TX))
+                    except TimeoutError:
+                        with self._condition:
+                            if self._direction_revision.get(railing_id) == request:
+                                return
+                        if attempt == self._attempts:
+                            raise
+                        continue
+                    deadline = time.monotonic() + self._ack_timeout
+                    with self._condition:
+                        while self._direction_revision.get(railing_id) != request:
+                            if self._railings.get_call_direction(railing_id) is None:
+                                raise RuntimeError("Call ended before PTT confirmation")
+                            remaining = deadline - time.monotonic()
+                            if remaining <= 0:
+                                break
+                            self._condition.wait(remaining)
+                        if self._direction_revision.get(railing_id) == request:
+                            LOG.info("PTT confirmed rail=%d request=%d direction=%s", railing_id, request,
                                      self._direction_name(int(direction)))
                             return
-                        remaining = deadline - time.monotonic()
-                        if remaining <= 0:
-                            break
-                        self._condition.wait(remaining)
-                LOG.warning("No P4 direction confirmation rail=%d attempt=%d",
-                            railing_id, attempt)
-            raise TimeoutError("PTT direction was not confirmed by P4")
+                    LOG.warning("No P4 direction confirmation rail=%d request=%d attempt=%d", railing_id, request, attempt)
+                raise TimeoutError("PTT direction was not confirmed by P4; hangup unresolved call")
+            finally:
+                with self._condition:
+                    confirmed = self._direction_revision.get(railing_id) == request
+                    self._pending_ptt.pop(railing_id, None)
+                    if not confirmed:
+                        self._railings.call_direction_unknown(railing_id, session)
 
     def end_call(self, railing_id: int) -> bool:
         """Return True only after remote END; False means locally idle/no request."""
