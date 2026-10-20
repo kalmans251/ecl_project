@@ -38,6 +38,45 @@ class AudioManager:
         self._control_lock = threading.Lock()
         self._direction_revision: dict[int, int] = {}
         self._start_revision: dict[int, int] = {}
+        self._keepalive_stop = threading.Event()
+        self._keepalive_thread = None
+
+    def start_keepalive(self) -> None:
+        if self._keepalive_thread is not None:
+            return
+        self._keepalive_stop.clear()
+        self._keepalive_thread = threading.Thread(target=self._keepalive_loop,
+            name="call-keepalive", daemon=True)
+        self._keepalive_thread.start()
+
+    def close(self) -> None:
+        self._keepalive_stop.set()
+        if self._keepalive_thread is not None:
+            self._keepalive_thread.join(timeout=2.0)
+            self._keepalive_thread = None
+
+    def _keepalive_loop(self) -> None:
+        while not self._keepalive_stop.wait(1.0):
+            try:
+                self.renew_calls()
+            except Exception:
+                LOG.exception("Call keepalive failed; P4 lease may expire")
+
+    def renew_calls(self) -> None:
+        # Yield to explicit PTT/hangup; never renew recovered/unknown calls.
+        if not self._control_lock.acquire(blocking=False):
+            return
+        try:
+            for rid, state in self._railings.snapshot().items():
+                call = state["call"]
+                if call["phase"] != "active" or not call["active"]:
+                    continue
+                self._bus.send_control_frame(
+                    Frame(rid, Node.PI, Node.P4, Service.AUDIO, Command.CALL_KEEPALIVE),
+                    wait_for_window=call["direction"] == int(AudioDirection.FIELD_TX),
+                    timeout=0.8)
+        finally:
+            self._control_lock.release()
 
     def handle_frame(
         self,
@@ -80,11 +119,9 @@ class AudioManager:
                     or direction not in (int(AudioDirection.FIELD_TX), int(AudioDirection.CONTROL_TX))):
                 LOG.warning("Invalid CALL STARTED event rail=%d", frame.railing_id)
                 return True
-            self._railings.call_started(
-                frame.railing_id,
-                origin,
-                direction,
-            )
+            if not self._railings.call_started(frame.railing_id, origin, direction):
+                LOG.warning("Recovered call rail=%d requires confirmed hangup; ignoring late START", frame.railing_id)
+                return True
 
             with self._condition:
                 self._start_revision[frame.railing_id] = (

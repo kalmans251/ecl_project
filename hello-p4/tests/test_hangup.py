@@ -41,6 +41,16 @@ int main(void) {
     assert(call_manager_start(CALL_ORIGIN_NORMAL));
     assert(!call_manager_end_recovery_active());
     assert(call_manager_end());assert(last.payload[2]==CALL_ORIGIN_NORMAL);
+    assert(call_manager_start(CALL_ORIGIN_NORMAL));
+    now+=CALL_LEASE_US-1;call_manager_tick();assert(call_manager_is_active());
+    call_manager_keepalive();
+    now+=CALL_LEASE_US-1;call_manager_tick();assert(call_manager_is_active());
+    now+=1;call_manager_keepalive(); // cannot revive an expired lease
+    call_manager_tick();assert(!call_manager_is_active());
+    assert(last.payload[1]==AUDIO_EVENT_CALL_ENDED);
+    before=sent;call_manager_tick();call_manager_keepalive();assert(sent==before);
+    assert(call_manager_start(CALL_ORIGIN_EMERGENCY));
+    now+=CALL_LEASE_US;call_manager_tick();assert(!call_manager_is_active());
     return 0;
 }
 '''

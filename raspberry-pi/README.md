@@ -733,14 +733,52 @@ cause collision or timeout. Only CALL_ENDED releases the reservation. Failed
 hangup remains unknown and must be retried. A locally idle hangup explicitly
 reports that it sent nothing instead of claiming remote completion.
 
-This is Pi-side recovery using the current P4's idempotent STOP/END support;
-no new firmware protocol is introduced. State is in memory and is lost if Pi
-restarts. Startup reconciliation, session IDs in call events, expiring transmit
-leases, and multi-node event arbitration remain separate work. Do not restart
-Pi as a substitute for ending a remote call.
+Unresolved calls are now persisted as described below. Session IDs in call
+events and multi-node event arbitration remain separate work. Do not restart
+Pi as a substitute for confirming remote call termination.
 
 Bench check: suppress only CALL_STARTED replies after P4 starts; verify status
 unknown, call/ACK for another rail blocked, and hangup sends STOP and waits for
 END. Repeat with START itself dropped (idle P4), then with END replies dropped;
 in the last case unknown must remain until a later confirmed hangup. Finally
 verify a waiting emergency can be acknowledged after the original call ends.
+
+## Restart recovery and P4 call lease (update Pi and P4 together)
+
+Pi saves unresolved railing IDs before transmitting a start/ACK. Default journal:
+`~/.local/state/ecl-railing/calls.json`; override with `--call-state-file PATH`
+or `ECL_CALL_STATE_FILE`. Use the same user/path after reboot or under systemd.
+Atomic replacement plus file/directory fsync protects completed writes. A corrupt
+or unwritable journal prevents startup/start rather than silently forgetting
+ownership. Do not delete the journal to bypass an unresolved call.
+
+Recovered entries appear as `phase=unknown`, `recovered=true`, with audio disabled.
+Late START events cannot reactivate them. Use `hangup <id>` to confirm END, or
+receive the P4's automatic END after lease expiration. The Pi never assumes that
+a timer alone proves remote termination. It does not discover calls missing from
+the journal, persist pending emergency notifications, or prevent multiple Pi
+processes using different journals. Run one controlling Pi process per bus.
+
+Pi sends AUDIO/CALL_KEEPALIVE (0x2A, empty payload) about once per second only
+for active confirmed calls. FIELD_TX uses existing receive windows; CONTROL_TX
+uses serialized Pi transmission. Explicit PTT/hangup takes precedence. The P4
+starts a 10-second lease for normal and emergency calls and renews it only on a
+valid Pi keepalive while still active. Late keepalives never restart idle/expired
+calls. Its controller checks expiry at most every 100ms when not busy, and runs
+the normal call-end restoration path. This is a deadline, not a 10-second sleep.
+Task stalls or output-queue congestion can delay cleanup; this is not an
+independent hardware watchdog. Keepalive is not a round-trip link test.
+
+Update Pi and P4 together with calls ended: new P4 plus old Pi will end calls
+after 10 seconds; new Pi plus old P4 cannot enforce expiration. WROOM/S3 have no
+protocol changes in this step. `quit` stops renewal, leaves the journal intact,
+and lets P4 expire any active call; explicit hangup before quit is preferable.
+
+Bench tests:
+1. Keep a call active for over 30 seconds in both PTT directions; it must not expire.
+2. Kill the Pi process or disconnect PLC; after the last renewal plus about 10s,
+   check P4 logs for `Pi keepalive expired; ending call`, WROOM stop and S3 stop.
+3. Restart Pi using the same journal before expiry: no microphone/audio renewal,
+   other calls blocked, and `hangup` or an incoming END releases the reservation.
+4. Restart after expiry with the END lost: journal stays unknown until a fresh
+   `hangup` receives P4's idempotent END. Do not infer END just from elapsed time.

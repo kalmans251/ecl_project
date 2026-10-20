@@ -88,3 +88,7 @@ call_state_t call_manager_get_state(void);
 call_origin_t call_manager_get_origin(void);
 /* Bounded idle receive windows so a lost hangup confirmation can be retried. */
 bool call_manager_end_recovery_active(void);
+
+/* Controller task only; keepalives cannot start an idle call. */
+void call_manager_keepalive(void);
+void call_manager_tick(void);

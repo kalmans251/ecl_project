@@ -649,11 +649,12 @@ void p4_controller_task(
 
     while (1)
     {
+        call_manager_tick();
         if (
             xQueueReceive(
                 p4_controller_queue,
                 &frame,
-                portMAX_DELAY
+                pdMS_TO_TICKS(100)
             ) != pdTRUE
         )
         {
@@ -1859,6 +1860,11 @@ static void handle_audio(
     const protocol_frame_t *frame
 )
 {
+    if (frame->command == CMD_CALL_KEEPALIVE) {
+        if (frame->src == NODE_PI && frame->length == 0)
+            call_manager_keepalive();
+        return;
+    }
     switch (
         frame->command
     )

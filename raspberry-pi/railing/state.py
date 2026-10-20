@@ -16,6 +16,7 @@ class EmergencyState:
 @dataclass(slots=True)
 class CallState:
     phase: str = "idle"
+    recovered: bool = False
     active: bool = False
     origin: int | None = None
     direction: int | None = None

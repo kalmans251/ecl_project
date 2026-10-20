@@ -5,6 +5,7 @@ import json
 import logging
 import sys
 import time
+import os
 
 from audio import AudioManager
 from device_control import DeviceControls, HELP as DEVICE_HELP, device_status
@@ -85,6 +86,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--speaker-device', default='bcm2835 Headphones',
                         help='AUX output index/name (default: bcm2835 Headphones)')
     parser.add_argument('--list-audio-devices', action='store_true')
+    parser.add_argument('--call-state-file', default=os.environ.get(
+        'ECL_CALL_STATE_FILE', '~/.local/state/ecl-railing/calls.json'),
+        help='Durable unresolved-call journal; keep the same path across restarts')
     args = parser.parse_args()
     if not 1 <= args.audio_railing <= 255:
         parser.error('--audio-railing must be 1..255')
@@ -126,7 +130,11 @@ def main() -> int:
         print(sd.query_devices())
         return 0
 
-    railings = RailingManager()
+    try:
+        railings = RailingManager(state_file=args.call_state_file)
+    except (OSError, ValueError):
+        LOG.exception("Cannot load/save call recovery journal; refusing to start")
+        return 1
 
     bus = PlcBus(
         port=args.port,
@@ -237,6 +245,7 @@ def main() -> int:
             LOG.exception('Failed to start local audio; check devices and requirements-playback.txt')
             return 1
 
+    audio.start_keepalive()
     try:
         if args.no_console:
             while True:
@@ -433,6 +442,7 @@ def main() -> int:
         print()
 
     finally:
+        audio.close()
         if local_audio:
             local_audio.close()
         voice.close()
