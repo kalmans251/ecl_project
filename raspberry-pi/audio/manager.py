@@ -324,6 +324,9 @@ class AudioManager:
                     try:
                         self._bus.send_control_frame(frame, wait_for_window=current == int(AudioDirection.FIELD_TX))
                     except TimeoutError:
+                        with self._condition:
+                            if self._direction_revision.get(railing_id) == request:
+                                return
                         if attempt == self._attempts:
                             raise
                         continue

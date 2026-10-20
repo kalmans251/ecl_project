@@ -67,3 +67,12 @@ class PttOrderTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'ended'):
             self.audio.set_direction(1,AudioDirection.CONTROL_TX)
         self.assertFalse(self.states.call_pending(1))
+
+    def test_confirmation_arriving_with_write_timeout_still_succeeds(self):
+        self.audio._attempts=1
+        def confirm(f):
+            self.audio.handle_frame(self.response(f))
+            raise TimeoutError('transport completion raced reply')
+        self.bus.callback=confirm
+        self.audio.set_direction(1,AudioDirection.CONTROL_TX)
+        self.assertEqual(self.states.snapshot(1)['call']['phase'],'active')
