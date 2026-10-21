@@ -295,3 +295,77 @@ void codec2_decode(struct CODEC2 *decoder,short *pcm,const unsigned char *bits) 
                     '-DDMA_OK='+str(dma_ok),'-I',str(root),'-I',str(MAIN),
                     str(source),'-o',str(binary)],check=True)
                 subprocess.run([str(binary)],check=True,timeout=5)
+
+
+class VoicePreinitializationTests(unittest.TestCase):
+    def test_prepares_without_packets_and_releases_on_stop(self):
+        harness = HARNESS[:HARNESS.index('int main(void)')]
+        start = harness.index('int xQueueReceive(')
+        end = harness.index('bool music_eq_suspend', start)
+        harness = harness[:start] + r'''static unsigned polls, initialized, destroyed;
+int xQueueReceive(QueueHandle_t q, void *p, unsigned ticks) {
+    (void)q; (void)p;
+    assert(ticks==20); // no busy spin while awaiting first packet
+    assert(writes==0); // no silence/underflow before first packet
+    if (released) {
+        assert(voice_session_output_state()==VOICE_OUTPUT_IDLE);
+        longjmp(finished,1);
+    }
+    assert(initialized==1);
+    assert(voice_session_output_state()==VOICE_OUTPUT_READY);
+    if (++polls==3) voice_session_stop();
+    return 0;
+}
+''' + harness[end:]
+        harness += r'''
+struct CODEC2 *voice_decoder_create(void) { ++initialized;return (struct CODEC2 *)1; }
+void voice_decoder_destroy(struct CODEC2 *decoder) { assert(decoder);++destroyed; }
+int codec2_samples_per_frame(struct CODEC2 *decoder) { (void)decoder;return 160; }
+int codec2_bits_per_frame(struct CODEC2 *decoder) { (void)decoder;return 48; }
+void codec2_decode(struct CODEC2 *decoder,short *pcm,const unsigned char *bits) {
+    (void)decoder;(void)pcm;(void)bits;assert(0);
+}
+int main(void) {
+    voice_session_init();s_session=1;
+    voice_session_start();
+    assert(voice_session_set_direction(AUDIO_DIR_CONTROL_TX));
+    assert(voice_session_output_state()==VOICE_OUTPUT_PREPARING);
+    if(setjmp(finished)==0) worker(NULL);
+    assert(initialized==1 && destroyed==1 && released==1 && polls==3);
+    assert(!voice_session_is_active());
+    return 0;
+}
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            for name,text in HEADERS.items():
+                p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
+            source=root/'preinit.c';source.write_text(harness)
+            binary=root/'preinit'
+            subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror',
+                '-I',str(root),'-I',str(MAIN),str(source),'-o',str(binary)],check=True)
+            subprocess.run([str(binary)],check=True,timeout=5)
+
+
+class VoiceWorkerStubTests(unittest.TestCase):
+    def test_first_packet_playback_and_music_restore(self):
+        # Exercise the real worker with deterministic decoded PCM on every host.
+        harness=HARNESS.replace('real Codec2 decode', 'stub PCM decode').replace('int main(void)', r'''
+struct CODEC2 *voice_decoder_create(void) { return (struct CODEC2 *)1; }
+void voice_decoder_destroy(struct CODEC2 *decoder) { assert(decoder); }
+int codec2_samples_per_frame(struct CODEC2 *decoder) { (void)decoder;return 160; }
+int codec2_bits_per_frame(struct CODEC2 *decoder) { (void)decoder;return 48; }
+void codec2_decode(struct CODEC2 *decoder,short *pcm,const unsigned char *bits) {
+    (void)decoder;(void)bits;
+    for (unsigned i=0;i<160;++i) pcm[i]=(short)(i*100);
+}
+int main(void)''')
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            for name,text in HEADERS.items():
+                p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text)
+            source=root/'worker.c';source.write_text(harness)
+            binary=root/'worker'
+            subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror',
+                '-I',str(root),'-I',str(MAIN),str(source),'-o',str(binary)],check=True)
+            subprocess.run([str(binary)],check=True,timeout=5)

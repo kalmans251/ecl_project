@@ -59,3 +59,23 @@ Hardware: flash WROOM, start music, then Pi `call 1`, `ptt 1 on`, `ptt 1 off`, `
 EQ workspace is now allocated by the EQ worker and returned on call START. The controller waits for release completion before returning from voice_session_start; PCM producers never allocate or free it. The persistent EQ task retains its 3 KB stack, but the analyzer and two mono mailboxes (about 8 KB) are freed for voice playback. STOP re-enables lazy allocation. Allocation failure skips EQ and is retried on the next reset/resume rather than every frame. Transport tests check lifetime, release/reallocation, allocation failure, and producer ownership.
 
 After flashing WROOM, run Pi `call 1` then `ptt 1 on`. If music had allocated EQ state, expect `MUSIC_EQ: Released EQ memory for call: ... bytes`, then a higher decoder-before heap diagnostic, `dma=4 x 160`, `Codec2 playback ... ready` and `Codec2 PLAY`. Repeat PTT changes and hangup; verify music and its EQ return without clicks or lost state. Also call directly from boot, with no music played. Failures now explicitly distinguish `Voice I2S DMA initialization failed`, `Codec2 decoder allocation failed`, and `Codec2 decoder format mismatch`. Real board memory and audio continuity remain hardware checks.
+
+
+### PTT output preparation
+
+`voice_session.c` now prepares the voice DMA profile and Codec2 decoder on
+CONTROL_TX, before receiving audio. The first packet still starts the bounded
+600 ms jitter-buffer wait. Waiting for that first packet does not count as an
+underflow. Initialization/ownership failures are latched for that generation;
+a fresh PTT direction transition is required to retry.
+
+`voice_session_output_state()` exposes IDLE/PREPARING/READY/STOPPING/FAILED
+locally. This is output state only, not a complete call acknowledgement. No
+wire format or P4/Pi success criterion changes in this prerequisite patch.
+Endpoint acknowledgements and aggregation by P4 remain follow-up work.
+
+Host tests cover preparation without packets, release before any playback,
+failed DMA/decoder initialization, first-packet playback with deterministic
+PCM, and music-rate restoration. Real Codec2 integration tests additionally
+require `ECL_TEST_CODEC2_SRC` and the Codec2 library. Hardware validation is
+intentionally deferred.

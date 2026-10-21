@@ -19,6 +19,7 @@ static const char *TAG = "VOICE_SESSION";
 #define VOICE_TASK_STACK_BYTES (32 * 1024)
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static bool s_active, s_output_busy;
+static voice_output_state_t s_output_state = VOICE_OUTPUT_IDLE;
 static audio_direction_t s_direction = AUDIO_DIR_FIELD_TX;
 static uint32_t s_generation, s_session, s_ptt_request;
 static uint32_t session_id(const uint8_t *p) {
@@ -47,7 +48,25 @@ static void output_busy(bool busy)
 {
     portENTER_CRITICAL(&s_lock);
     s_output_busy = busy;
+    if (!busy && s_output_state == VOICE_OUTPUT_STOPPING)
+        s_output_state = VOICE_OUTPUT_IDLE;
     portEXIT_CRITICAL(&s_lock);
+}
+
+/* Publish only for the generation that actually acquired/released the device. */
+static void output_state(uint32_t generation, voice_output_state_t state)
+{
+    portENTER_CRITICAL(&s_lock);
+    if (generation == s_generation) s_output_state = state;
+    portEXIT_CRITICAL(&s_lock);
+}
+
+voice_output_state_t voice_session_output_state(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    voice_output_state_t state = s_output_state;
+    portEXIT_CRITICAL(&s_lock);
+    return state;
 }
 
 /* 8kHz Codec2 -> 16kHz I2S: hold each sample twice, duplicate L/R.
@@ -87,23 +106,19 @@ static void playback_task(void *arg)
             audio_output_release();
             output_busy(false);
         }
-        if (xQueueReceive(s_packets, &packet, decoder ? 0 : pdMS_TO_TICKS(20)) != pdTRUE) {
-            if (decoder) {
-                ++underflows;
-                write_frame(NULL, generation);
-                if (underflows == 1 || underflows % 50 == 0)
-                    ESP_LOGW(TAG, "Voice buffer empty blocks=%u", underflows);
-            }
-            continue;
-        }
-        if (!control_active(packet.generation)) continue;
-        /* Retry only after a fresh PTT direction/session generation. */
-        if (init_failed && packet.generation == failed_generation) continue;
-        if (!decoder) {
-            generation = packet.generation;
+        portENTER_CRITICAL(&s_lock);
+        uint32_t desired_generation = s_generation;
+        bool prepare = s_active && s_direction == AUDIO_DIR_CONTROL_TX;
+        portEXIT_CRITICAL(&s_lock);
+        /* PTT prepares output before the sender is allowed to send audio. */
+        if (!decoder && prepare && !(init_failed && desired_generation == failed_generation)) {
+            generation = desired_generation;
             output_busy(true);
             if (!audio_output_claim()) {
                 output_busy(false);
+                init_failed = true;
+                failed_generation = generation;
+                output_state(generation, VOICE_OUTPUT_FAILED);
                 continue;
             }
             restore_rate = music_player_is_playing() ? audio_output_get_sample_rate() : 0;
@@ -114,6 +129,9 @@ static void playback_task(void *arg)
             if (!stopped || (music_player_is_playing() && !music_player_is_paused()) || emergency_alert_is_active()
                     || !control_active(generation)) {
                 ESP_LOGW(TAG, "Voice output unavailable: previous audio did not stop");
+                init_failed = true;
+                failed_generation = generation;
+                output_state(generation, VOICE_OUTPUT_FAILED);
                 audio_output_release();
                 output_busy(false);
                 continue;
@@ -138,6 +156,7 @@ static void playback_task(void *arg)
                 if (restore_rate) audio_output_init(restore_rate);
                 init_failed = true;
                 failed_generation = generation;
+                output_state(generation, VOICE_OUTPUT_FAILED);
                 audio_output_release();
                 output_busy(false);
                 ESP_LOGE(TAG, "Codec2/I2S initialization failed; retry with PTT off/on heap_free=%u largest=%u",
@@ -148,11 +167,27 @@ static void playback_task(void *arg)
             init_failed = false;
             have_sequence = false;
             packets = missing = underflows = 0;
-            /* Hold first packet until two more arrive, or 600ms elapses. */
+            output_state(generation, VOICE_OUTPUT_READY);
+            ESP_LOGI(TAG, "Codec2 playback decode=8000Hz output=16000Hz stereo I2S ready");
+        }
+        if (xQueueReceive(s_packets, &packet,
+                          decoder && have_sequence ? 0 : pdMS_TO_TICKS(20)) != pdTRUE) {
+            /* Waiting for first audio is normal, not a playback underflow. */
+            if (decoder && have_sequence) {
+                ++underflows;
+                write_frame(NULL, generation);
+                if (underflows == 1 || underflows % 50 == 0)
+                    ESP_LOGW(TAG, "Voice buffer empty blocks=%u", underflows);
+            }
+            continue;
+        }
+        if (!decoder || packet.generation != generation || !control_active(generation)) continue;
+        if (!have_sequence) {
+            /* Start the jitter-buffer deadline at the first packet, not PTT. */
             for (unsigned i = 0; i < 60 && uxQueueMessagesWaiting(s_packets) < 2
                     && control_active(generation); ++i)
                 vTaskDelay(pdMS_TO_TICKS(10));
-            ESP_LOGI(TAG, "Codec2 playback decode=8000Hz output=16000Hz stereo I2S ready");
+            if (!control_active(generation)) continue;
         }
         uint16_t delta = (uint16_t)(packet.sequence - previous);
         if (have_sequence && (delta == 0 || delta >= 0x8000)) continue;
@@ -204,7 +239,12 @@ static void change_session(bool active, audio_direction_t direction)
     bool changed = s_active != active || s_direction != direction;
     s_active = active;
     s_direction = direction;
-    if (changed) ++s_generation;
+    if (changed) {
+        ++s_generation;
+        s_output_state = active && direction == AUDIO_DIR_CONTROL_TX
+            ? VOICE_OUTPUT_PREPARING
+            : (s_output_busy ? VOICE_OUTPUT_STOPPING : VOICE_OUTPUT_IDLE);
+    }
     portEXIT_CRITICAL(&s_lock);
     if (changed && s_packets) xQueueReset(s_packets);
     if (direction != AUDIO_DIR_CONTROL_TX || !active) {

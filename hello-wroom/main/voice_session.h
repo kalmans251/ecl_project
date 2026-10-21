@@ -32,3 +32,13 @@ bool voice_session_sync_direction(audio_direction_t direction);
 
 bool voice_session_control(const protocol_frame_t *frame);
 bool voice_session_forward_allowed(const protocol_frame_t *frame);
+
+/* Output readiness only; not yet an end-to-end P4/Pi call acknowledgement. */
+typedef enum {
+    VOICE_OUTPUT_IDLE,
+    VOICE_OUTPUT_PREPARING,
+    VOICE_OUTPUT_READY,
+    VOICE_OUTPUT_STOPPING,
+    VOICE_OUTPUT_FAILED,
+} voice_output_state_t;
+voice_output_state_t voice_session_output_state(void);
