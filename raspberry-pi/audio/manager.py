@@ -295,11 +295,16 @@ class AudioManager:
                 LOG.info("CALL start request rail=%d attempt=%d/%d",
                          railing_id, attempt, self._attempts)
                 try:
-                    # P4 emits receive grants only during FIELD_TX calls. A
-                    # normal call starts from idle, so use the existing guarded
-                    # direct-control path; waiting for a grant would deadlock.
-                    self._bus.send_control_frame(frame, wait_for_window=False)
+                    # Only the first request is known to start from idle. After
+                    # a write attempt P4 may already be preparing or streaming
+                    # FIELD_TX, even if its confirmation was lost.
+                    self._bus.send_control_frame(frame, wait_for_window=attempt > 1)
                 except TimeoutError:
+                    with self._condition:
+                        if self._start_revision.get(railing_id, 0) > revision:
+                            if self._railings.get_call_direction(railing_id) is None:
+                                raise RuntimeError("Call ended before start confirmation")
+                            return True
                     if attempt == self._attempts:
                         raise
                     continue
@@ -351,7 +356,8 @@ class AudioManager:
                     LOG.info("CALL direction request rail=%d direction=%s request=%d attempt=%d/%d",
                              railing_id, self._direction_name(int(direction)), request, attempt, self._attempts)
                     try:
-                        self._bus.send_control_frame(frame, wait_for_window=current == int(AudioDirection.FIELD_TX))
+                        self._bus.send_control_frame(frame, wait_for_window=(
+                            attempt > 1 or current == int(AudioDirection.FIELD_TX)))
                     except TimeoutError:
                         with self._condition:
                             if self._direction_revision.get(railing_id) == request:
@@ -402,7 +408,7 @@ class AudioManager:
                     frame = Frame(railing_id, Node.PI, Node.P4, Service.AUDIO, Command.STOP, self.session_bytes(railing_id))
                     try:
                         self._bus.send_control_frame(frame, wait_for_window=(
-                            uncertain or current == int(AudioDirection.FIELD_TX)))
+                            attempt > 1 or uncertain or current == int(AudioDirection.FIELD_TX)))
                     except TimeoutError:
                         if not self._railings.call_pending(railing_id):
                             return True

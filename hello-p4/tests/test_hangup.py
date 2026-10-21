@@ -40,6 +40,7 @@ int main(void) {
     assert(call_manager_bind_session(101));
     assert(call_manager_start(CALL_ORIGIN_EMERGENCY));
     assert(s_preparing && sent==2 && last.dst!=NODE_PI);
+    assert(call_manager_control_grants_enabled());
     protocol_frame_t voice={.railing_id=RAILING_ID,.src=NODE_S3,.dst=NODE_PI,
       .service=SERVICE_AUDIO,.command=CMD_DATA,.length=59,
       .payload={AUDIO_DATA_CODEC2,1,AUDIO_DIRECTION_FIELD_TX,0,0,8,6,0,0,0,101}};
@@ -58,9 +59,11 @@ int main(void) {
     both();assert(call_manager_set_direction_ordered(101,1,AUDIO_DIRECTION_CONTROL_TX));
     assert(last.payload[1]==AUDIO_EVENT_DIRECTION_CHANGED && last.payload[11]==1);
     assert(call_manager_get_state()==CALL_STATE_CONTROL_TX);
+    assert(!call_manager_control_grants_enabled());
     voice.src=NODE_PI;voice.dst=NODE_WROOM;voice.payload[2]=AUDIO_DIRECTION_CONTROL_TX;
     assert(call_manager_voice_allowed(&voice));
     assert(call_manager_set_direction_ordered(101,2,AUDIO_DIRECTION_FIELD_TX));
+    assert(call_manager_get_state()==CALL_STATE_CONTROL_TX && call_manager_control_grants_enabled());
     // Delayed report from the prior PTT cannot complete this operation.
     protocol_frame_t old={.railing_id=RAILING_ID,.src=NODE_S3,.dst=NODE_P4,
         .service=SERVICE_AUDIO,.command=CMD_DATA,.length=12,
@@ -74,6 +77,7 @@ int main(void) {
     assert(!call_manager_stop_session(101));assert(removes==m && terminal_count==0);
     report(NODE_S3,1);assert(call_manager_stop_session(101));
     assert(!call_manager_is_active() && removes==m+1 && terminal_count==1);
+    assert(!call_manager_control_grants_enabled());
     assert(last.payload[1]==AUDIO_EVENT_CALL_ENDED && last.payload[2]==CALL_ORIGIN_EMERGENCY);
     before=sent;m=removes;assert(call_manager_stop_session(101));assert(sent==before+1 && removes==m);
     assert(!call_manager_bind_session(101));

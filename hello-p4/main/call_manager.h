@@ -103,3 +103,6 @@ bool call_manager_voice_allowed(const protocol_frame_t *frame);
 bool call_manager_set_direction_ordered(uint32_t session, uint32_t request, audio_direction_t direction);
 
 void call_manager_handle_readiness(const protocol_frame_t *frame);
+
+/* Only the active owner grants during preparation, regardless of prior direction. */
+bool call_manager_control_grants_enabled(void);
