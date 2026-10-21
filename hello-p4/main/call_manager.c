@@ -104,12 +104,18 @@ static call_origin_t s_last_end_origin = CALL_ORIGIN_NORMAL;
 /* Controller-owned preparation transaction. Voice readers use s_mutex. */
 static uint8_t s_operation, s_target, s_ready_mask, s_failed_node, s_failed_reason;
 static bool s_preparing;
+static bool s_health_pending, s_fault_stopping;
+static uint32_t s_health_token;
+static uint8_t s_health_mask;
+static int64_t s_health_due, s_health_deadline, s_health_retry;
+static void handle_health(const protocol_frame_t *f);
 static int64_t s_prepare_deadline, s_next_probe;
 static bool end_call(bool polled_only);
 static void lock_manager(void);
 static void unlock_manager(void);
 static void begin_prepare(uint8_t operation, uint8_t direction) {
     lock_manager();
+    s_health_pending=false;
     s_operation=operation;s_target=direction;s_ready_mask=0;
     s_failed_node=s_failed_reason=0;s_preparing=true;
     s_prepare_deadline=esp_timer_get_time()+4000000;
@@ -479,6 +485,7 @@ void call_manager_init(void)
     s_ptt_request = 0;
     s_session_ended = false;
     s_operation=0;s_preparing=false;s_ready_mask=0;s_failed_node=0;
+    s_health_pending=false;s_fault_stopping=false;s_health_token=0;s_health_due=0;
 
 
     ESP_LOGI(
@@ -614,6 +621,7 @@ bool call_manager_start(
      * WROOM / S3 통화모드 시작
      * ======================================================== */
 
+    s_fault_stopping=false;
     begin_prepare(CMD_START,AUDIO_DIRECTION_FIELD_TX);
     request_audio_start();
 
@@ -645,6 +653,7 @@ static bool finish_prepare(void) {
     if(s_operation!=CMD_STOP){
         s_preparing=false;
         s_call_state=(call_state_t)s_target;
+        s_health_due=esp_timer_get_time()+1000000;
     }
     unlock_manager();
     return true;
@@ -776,6 +785,8 @@ static bool finalize_end(bool polled_only)
 
 
     s_last_end_origin = origin;
+    s_fault_stopping=false;
+    s_health_pending=false;
 
     s_call_state =
         CALL_STATE_IDLE;
@@ -823,6 +834,7 @@ static bool end_call(bool polled_only) {
 }
 
 void call_manager_handle_readiness(const protocol_frame_t *f) {
+    if(f->length && f->payload[0]==AUDIO_DATA_HEALTH){handle_health(f);return;}
     if(f->railing_id!=RAILING_ID || f->dst!=NODE_P4 || f->service!=SERVICE_AUDIO ||
        f->command!=CMD_DATA || f->length!=12 || f->payload[0]!=AUDIO_DATA_READY ||
        (f->src!=NODE_WROOM && f->src!=NODE_S3) || !s_preparing)return;
@@ -903,14 +915,56 @@ bool call_manager_end_recovery_active(void) { return false; }
 void call_manager_keepalive(void)
 {
     lock_manager();
-    if (s_call_state != CALL_STATE_IDLE && esp_timer_get_time() < s_call_lease_until_us)
+    if (s_call_state != CALL_STATE_IDLE && s_operation!=CMD_STOP && esp_timer_get_time() < s_call_lease_until_us)
         s_call_lease_until_us = esp_timer_get_time() + CALL_LEASE_US;
     unlock_manager();
 }
 
+static void endpoint_failed(uint8_t node, uint8_t reason) {
+    protocol_frame_t f={.railing_id=RAILING_ID,.src=NODE_P4,.dst=NODE_PI,
+        .service=SERVICE_AUDIO,.command=CMD_DATA,.length=10,
+        .payload={AUDIO_DATA_EVENT,AUDIO_EVENT_ENDPOINT_FAILED,(uint8_t)s_call_origin,0}};
+    put_session(f.payload+4,s_session);f.payload[8]=node;f.payload[9]=reason;
+    ESP_LOGW(TAG,"Call endpoint failed node=%u reason=%u; stopping",node,reason);
+    s_fault_stopping=true;
+    end_call(true); /* sets preparing before any further voice can be routed */
+    event_outbox_store_call_fault(&f);
+}
+static void handle_health(const protocol_frame_t *f) {
+    if(!s_health_pending || s_preparing || !call_manager_is_active() ||
+       f->railing_id!=RAILING_ID || f->dst!=NODE_P4 || f->service!=SERVICE_AUDIO ||
+       f->command!=CMD_DATA || f->length!=16 ||
+       (f->src!=NODE_WROOM && f->src!=NODE_S3) || f->payload[1]!=CMD_SET ||
+       f->payload[2]!=s_target || f->payload[3]>2)return;
+    uint8_t expected[12];put_session(expected,s_session);put_session(expected+4,s_ptt_request);
+    put_session(expected+8,s_health_token);
+    if(memcmp(f->payload+4,expected,sizeof(expected)))return;
+    if(f->payload[3]!=1){endpoint_failed(f->src,2);return;}
+    s_health_mask|=f->src==NODE_WROOM?1:2;
+    if(s_health_mask==3){s_health_pending=false;s_health_due=esp_timer_get_time()+1000000;}
+}
+static void health_tick(int64_t now) {
+    if(s_preparing || !call_manager_is_active())return;
+    if(s_health_pending) {
+        if(now>=s_health_deadline){endpoint_failed((s_health_mask&1)?NODE_S3:NODE_WROOM,3);return;}
+        if(now<s_health_retry)return;
+    } else {
+        if(now<s_health_due)return;
+        if(++s_health_token==0)++s_health_token;
+        s_health_mask=0;s_health_pending=true;s_health_deadline=now+3000000;
+    }
+    s_health_retry=now+500000;
+    uint8_t payload[13]={(uint8_t)s_target};
+    put_session(payload+1,s_session);put_session(payload+5,s_ptt_request);
+    put_session(payload+9,s_health_token);
+    if(!(s_health_mask&1))send_frame_to_node(NODE_WROOM,SERVICE_AUDIO,CMD_CALL_HEALTH,payload,sizeof(payload));
+    if(!(s_health_mask&2))send_frame_to_node(NODE_S3,SERVICE_AUDIO,CMD_CALL_HEALTH,payload,sizeof(payload));
+}
 void call_manager_tick(void)
 {
     int64_t now=esp_timer_get_time();
+    health_tick(now);
+    if(s_fault_stopping && s_operation==CMD_STOP && s_ready_mask==3)end_call(true);
     if(s_preparing && s_ready_mask!=3 && !s_failed_node && now>=s_prepare_deadline) {
         s_failed_node=(s_ready_mask&1)?NODE_S3:NODE_WROOM;s_failed_reason=3;
     }
@@ -999,7 +1053,9 @@ bool call_manager_set_direction_ordered(uint32_t session, uint32_t request, audi
 bool call_manager_control_grants_enabled(void) {
     lock_manager();
     bool enabled=s_call_state!=CALL_STATE_IDLE &&
-        (s_preparing || s_call_state==CALL_STATE_FIELD_TX);
+        (s_call_state==CALL_STATE_FIELD_TX || (s_preparing && !s_fault_stopping));
+    /* During a CONTROL_TX fault Pi still owns TX until it polls the fault.
+     * Do not inject grants into that stream; unknown Pi uses lease recovery. */
     unlock_manager();
     return enabled;
 }

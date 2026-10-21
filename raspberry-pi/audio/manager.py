@@ -141,7 +141,7 @@ class AudioManager:
             )
             return True
 
-        expected_length = {int(AudioEvent.DIRECTION_CHANGED): 12, int(AudioEvent.PREPARATION_FAILED): 14}.get(frame.payload[1], 8)
+        expected_length = {int(AudioEvent.DIRECTION_CHANGED): 12, int(AudioEvent.PREPARATION_FAILED): 14, int(AudioEvent.ENDPOINT_FAILED): 10}.get(frame.payload[1], 8)
         if (len(frame.payload) != expected_length or not self._railings.call_pending(frame.railing_id)
                 or frame.payload[4:8] != self.session_bytes(frame.railing_id)):
             LOG.warning("Ignoring stale/unmatched call event rail=%d", frame.railing_id)
@@ -151,6 +151,16 @@ class AudioManager:
         event = frame.payload[1]
         origin = frame.payload[2]
         direction = frame.payload[3]
+
+        if event == int(AudioEvent.ENDPOINT_FAILED):
+            if direction != 0 or frame.payload[8] not in (int(Node.WROOM), int(Node.S3)) or frame.payload[9] not in (2, 3):
+                return True
+            with self._condition:
+                self._railings.call_direction_unknown(frame.railing_id, session_id)
+                self._pending_ptt.pop(frame.railing_id, None)
+                self._condition.notify_all()
+            LOG.error("CALL endpoint failed rail=%d node=%d reason=%d; voice paused, waiting for confirmed END", frame.railing_id, frame.payload[8], frame.payload[9])
+            return True
 
         if event == int(AudioEvent.PREPARATION_FAILED):
             request = int.from_bytes(frame.payload[8:12], "big")

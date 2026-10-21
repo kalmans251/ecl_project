@@ -260,6 +260,14 @@ bool audio_session_control(const protocol_frame_t *f) {
 }
 
 void audio_session_report_readiness(const protocol_frame_t *f) {
+    const protocol_frame_t *original=f;
+    protocol_frame_t query={};
+    bool health=f->command==CMD_CALL_HEALTH;
+    if(health) {
+        if(f->src!=NODE_P4 || f->dst!=NODE_S3 || f->service!=SERVICE_AUDIO ||
+           f->railing_id!=RAILING_ID || f->length!=13)return;
+        query=*f;query.command=CMD_SET;query.length=9;f=&query;
+    }
     if(f->src!=NODE_P4 || f->railing_id!=RAILING_ID ||
        (f->command!=CMD_START && f->command!=CMD_SET && f->command!=CMD_STOP) ||
        f->length!=(f->command==CMD_SET?9:4))return;
@@ -278,5 +286,9 @@ void audio_session_report_readiness(const protocol_frame_t *f) {
     reply.payload[2]=direction;reply.payload[3]=match && target?microphone_codec2_readiness():2;
     memcpy(reply.payload+4,f->payload+(f->command==CMD_SET?1:0),4);
     if(f->command==CMD_SET)memcpy(reply.payload+8,f->payload+5,4);
+    if(health) {
+        reply.payload[0]=AUDIO_DATA_HEALTH;
+        memcpy(reply.payload+12,original->payload+9,4);reply.length=16;
+    }
     ble_send_frame(&reply);
 }

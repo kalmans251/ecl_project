@@ -42,6 +42,16 @@ int main(void){
  assert(reply.length==19 && reply.payload[12]==SERVICE_EMERGENCY); // new call removes old END
  event_outbox_store_call_end(&end);put32(poll.payload+4,terminal_id);
  event_outbox_reply(&poll,&reply);assert(terminal_id==0 && count==CAPACITY);
+ protocol_frame_t fault={.length=10,.payload={AUDIO_DATA_EVENT,AUDIO_EVENT_ENDPOINT_FAILED,0,0,1,2,3,4,NODE_S3,3}};
+ event_outbox_store_call_end(&end);event_outbox_store_call_fault(&fault);
+ memset(poll.payload+4,0,4);event_outbox_reply(&poll,&reply);
+ assert(reply.length==24 && reply.payload[22]==NODE_S3 && count==CAPACITY);
+ uint32_t fault_token=get32(reply.payload+4);
+ event_outbox_store_call_fault(&fault);event_outbox_reply(&poll,&reply);
+ assert(get32(reply.payload+4)==fault_token);
+ put32(poll.payload+4,fault_token);event_outbox_reply(&poll,&reply);
+ assert(reply.length==22 && terminal_id && !fault_id);
+ put32(poll.payload+4,terminal_id);event_outbox_reply(&poll,&reply);assert(reply.length==19);
  return 0;
 }
 '''

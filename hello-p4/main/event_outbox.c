@@ -8,7 +8,8 @@ static portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 static struct { uint32_t id; uint8_t command, payload[5]; } entries[CAPACITY];
 static unsigned head, count;
 static uint32_t next_id, dropped, terminal_id;
-static protocol_frame_t terminal;
+static protocol_frame_t terminal, fault;
+static uint32_t fault_id;
 static void put32(uint8_t *p, uint32_t n) {
     p[0]=n>>24;p[1]=n>>16;p[2]=n>>8;p[3]=n;
 }
@@ -41,8 +42,16 @@ void event_outbox_store_call_end(const protocol_frame_t *f) {
     terminal=*f;
     portEXIT_CRITICAL(&mux);
 }
+void event_outbox_store_call_fault(const protocol_frame_t *f) {
+    uint32_t seed=esp_random();
+    portENTER_CRITICAL(&mux);
+    if(!next_id)next_id=seed?seed:1;
+    if(!fault_id){if(++next_id==0)++next_id;fault_id=next_id;}
+    fault=*f;
+    portEXIT_CRITICAL(&mux);
+}
 void event_outbox_clear_call_end(void) {
-    portENTER_CRITICAL(&mux);terminal_id=0;portEXIT_CRITICAL(&mux);
+    portENTER_CRITICAL(&mux);terminal_id=0;fault_id=0;portEXIT_CRITICAL(&mux);
 }
 void event_outbox_reply(const protocol_frame_t *poll, protocol_frame_t *reply) {
     memset(reply,0,sizeof(*reply));
@@ -51,10 +60,15 @@ void event_outbox_reply(const protocol_frame_t *poll, protocol_frame_t *reply) {
     memcpy(reply->payload,poll->payload,4);
     portENTER_CRITICAL(&mux);
     uint32_t ack=get32(poll->payload+4);
+    if(fault_id && ack==fault_id)fault_id=0;
     if(terminal_id && ack==terminal_id)terminal_id=0;
     if(count && ack==entries[head].id){head=(head+1)%CAPACITY;--count;}
     put32(reply->payload+8,dropped);
-    if(terminal_id){
+    if(fault_id){
+        put32(reply->payload+4,fault_id);
+        reply->payload[12]=SERVICE_AUDIO;reply->payload[13]=CMD_DATA;
+        memcpy(reply->payload+14,fault.payload,10);reply->length=24;
+    } else if(terminal_id){
         put32(reply->payload+4,terminal_id);
         reply->payload[12]=SERVICE_AUDIO;reply->payload[13]=CMD_DATA;
         memcpy(reply->payload+14,terminal.payload,8);reply->length=22;

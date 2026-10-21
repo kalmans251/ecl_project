@@ -95,7 +95,7 @@ class EventPoller:
         if (frame.src != Node.P4 or frame.dst != Node.PI or frame.service != Service.SYSTEM
                 or frame.command != Command.EVENT_REPLY):
             return False
-        if len(frame.payload) not in (14, 22, 19):
+        if len(frame.payload) not in (14, 22, 19, 24):
             return True
         with self.condition:
             if self.pending != (frame.railing_id, frame.payload[:4]):
@@ -109,7 +109,9 @@ class EventPoller:
                              and command in (Command.START, Command.STOP))
                 ended = (len(frame.payload)==22 and service==Service.AUDIO and command==Command.DATA
                          and frame.payload[14]==AudioDataType.EVENT and frame.payload[15]==AudioEvent.CALL_ENDED)
-                if not (emergency or ended):
+                fault = (len(frame.payload)==24 and service==Service.AUDIO and command==Command.DATA
+                         and frame.payload[14]==AudioDataType.EVENT and frame.payload[15]==AudioEvent.ENDPOINT_FAILED)
+                if not (emergency or ended or fault):
                     return True
                 if self.ack.get(rid) != event_id:
                     self.dispatch(Frame(rid, Node.P4, Node.PI, service, command, frame.payload[14:]))

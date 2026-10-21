@@ -308,6 +308,9 @@ void controller_handle(
 static void handle_audio(const protocol_frame_t *frame)
 {
     switch(frame->command) {
+        case CMD_CALL_HEALTH:
+            audio_session_report_readiness(frame);
+            break;
         case CMD_START:
         case CMD_STOP:
         case CMD_SET:

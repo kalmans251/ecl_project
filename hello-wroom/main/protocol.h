@@ -390,3 +390,7 @@ typedef enum
 
 /* Endpoint preparation report, 12 bytes; internal P4/WROOM/S3 only. */
 #define AUDIO_DATA_READY 0x04
+
+/* Read-only endpoint health probe; never starts or changes a call. */
+#define CMD_CALL_HEALTH 0x2B
+#define AUDIO_DATA_HEALTH 0x05

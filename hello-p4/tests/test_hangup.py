@@ -13,6 +13,8 @@ static int64_t now;
 static unsigned sent, restores, removes;
 static protocol_frame_t last, terminal;
 static unsigned terminal_count;
+static protocol_frame_t fault;
+void event_outbox_store_call_fault(const protocol_frame_t *f){fault=*f;}
 void event_outbox_store_call_end(const protocol_frame_t *f){terminal=*f;terminal_count++;}
 void event_outbox_clear_call_end(void){terminal_count=0;}
 QueueHandle_t router_queue=(void *)1;
