@@ -393,6 +393,16 @@ bool voice_session_forward_allowed(const protocol_frame_t *f) {
 }
 
 bool voice_session_readiness(const protocol_frame_t *f, protocol_frame_t *reply) {
+    if(f->cmd==CMD_CALL_HEALTH) {
+        if(f->src!=NODE_P4 || f->dst!=NODE_WROOM || f->service!=SERVICE_AUDIO ||
+           f->railing_id!=RAILING_ID || f->payload_len!=13)return false;
+        protocol_frame_t query=*f;
+        query.cmd=CMD_SET;query.payload_len=9;
+        if(!voice_session_readiness(&query,reply))return false;
+        reply->payload[0]=AUDIO_DATA_HEALTH;
+        memcpy(reply->payload+12,f->payload+9,4);reply->payload_len=16;
+        return true;
+    }
     if(f->src!=NODE_P4 || f->railing_id!=RAILING_ID ||
        (f->cmd!=CMD_START && f->cmd!=CMD_STOP && f->cmd!=CMD_SET) ||
        f->payload_len!=(f->cmd==CMD_SET?9:4)) return false;

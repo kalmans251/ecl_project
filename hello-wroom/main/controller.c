@@ -535,11 +535,12 @@ static void handle_music(
 static void handle_audio(const protocol_frame_t *frame)
 {
     switch (frame->cmd) {
+        case CMD_CALL_HEALTH:
         case CMD_START:
         case CMD_STOP:
         case CMD_SET:
         {
-            if (!voice_session_control(frame))
+            if (frame->cmd!=CMD_CALL_HEALTH && !voice_session_control(frame))
                 ESP_LOGW(TAG, "Rejected call control session");
             protocol_frame_t report;
             if (voice_session_readiness(frame, &report))

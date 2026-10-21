@@ -319,6 +319,13 @@ int xQueueReceive(QueueHandle_t q, void *p, unsigned ticks) {
     assert(reply.dst==NODE_P4 && reply.payload[3]==1 && reply.payload[7]==1);
     request.payload[8]=9;assert(voice_session_readiness(&request,&reply));
     assert(reply.payload[3]==2); // wrong PTT request cannot report ready
+    request.cmd=CMD_CALL_HEALTH;request.dst=NODE_WROOM;request.service=SERVICE_AUDIO;
+    request.payload_len=13;request.payload[8]=0;request.payload[12]=99;
+    assert(voice_session_readiness(&request,&reply));
+    assert(reply.payload_len==16 && reply.payload[0]==AUDIO_DATA_HEALTH && reply.payload[3]==1 && reply.payload[15]==99);
+    assert(initialized==1 && voice_session_output_state()==VOICE_OUTPUT_READY);
+    request.payload[4]=2;assert(voice_session_readiness(&request,&reply));
+    assert(reply.payload[3]==2 && initialized==1 && s_session==1);
     if (++polls==3) voice_session_stop();
     return 0;
 }

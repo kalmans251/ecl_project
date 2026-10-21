@@ -48,6 +48,14 @@ int main(){
  assert(!audio_session_control(&c));assert(mic);
  c.payload[0]=AUDIO_DIRECTION_FIELD_TX;c.payload[8]=2;assert(audio_session_control(&c));
  c.src=NODE_PI;assert(!audio_session_control(&c));
+ c.src=NODE_P4;c.dst=NODE_S3;c.service=SERVICE_AUDIO;c.command=CMD_CALL_HEALTH;c.length=13;c.payload[12]=99;
+ audio_session_report_readiness(&c);
+ assert(sent.length==16 && sent.payload[0]==AUDIO_DATA_HEALTH && sent.payload[3]==1 && sent.payload[15]==99);
+ assert(mic && audio_session_id()==8);
+ c.payload[8]=3;audio_session_report_readiness(&c);assert(sent.payload[3]==2 && mic);
+ c.payload[8]=2;audio_session_stop();audio_session_report_readiness(&c);
+ assert(sent.payload[3]==2 && !mic && !audio_session_is_active()); // query never restarts disconnected mic
+
 }
 ''')
             subprocess.run(['c++','-std=c++11','-Wall','-Wextra','-Werror','-I',str(root),'-I',str(ROOT/'include'),'-I',str(ROOT/'src'),str(root/'test.cpp'),'-o',str(root/'test')],check=True)

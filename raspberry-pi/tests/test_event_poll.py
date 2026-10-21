@@ -26,6 +26,32 @@ class PollTests(unittest.TestCase):
         self.poller=EventPoller(self.bus,self.states,self.audio,[1,2],self.events.append)
         self.bus.callback=lambda f:self.poller.handle_frame(response(f))
 
+    def test_endpoint_fault_mutes_until_confirmed_end(self):
+        from test_call_start import event
+        from protocol import AudioEvent, AudioDataType
+        self.states.reserve_call(1)
+        sid=self.states.snapshot(1)['call']['session_id']
+        self.audio.handle_frame(event(session=sid))
+        self.poller.dispatch=self.audio.handle_frame
+        fault=bytes([AudioDataType.EVENT,AudioEvent.ENDPOINT_FAILED,0,0])+sid.to_bytes(4,'big')+bytes([Node.S3,3])
+        def deliver(request, payload, token):
+            envelope=request.payload[:4]+token.to_bytes(4,'big')+bytes(4)+bytes([Service.AUDIO,Command.DATA])+payload
+            self.poller.handle_frame(Frame(1,Node.P4,Node.PI,Service.SYSTEM,Command.EVENT_REPLY,envelope))
+        stale=fault[:4]+(sid^1).to_bytes(4,'big')+fault[8:]
+        self.bus.callback=lambda f:deliver(f,stale,90)
+        self.poller.poll_once(1)
+        self.assertEqual(self.states.snapshot(1)['call']['phase'],'active')
+        self.bus.callback=lambda f:deliver(f,fault,91)
+        self.poller.poll_once(1)
+        self.assertEqual(self.states.snapshot(1)['call']['phase'],'unknown')
+        self.assertIsNone(self.states.get_call_direction(1))
+        with self.assertRaises(RuntimeError):self.states.reserve_call(2)
+        before=len(self.bus.sent);self.audio.renew_calls();self.assertEqual(len(self.bus.sent),before)
+        self.poller.poll_once(1);self.assertEqual(self.poller.ack[1],91)
+        self.bus.callback=lambda f:deliver(f,event(kind=AudioEvent.CALL_ENDED,session=sid).payload,92)
+        self.poller.poll_once(1);self.assertFalse(self.states.call_pending(1))
+        self.states.reserve_call(2)
+
     def test_delivery_duplicate_and_ack_on_next_poll(self):
         self.assertTrue(self.poller.poll_once(2));self.assertEqual(len(self.events),1)
         self.assertEqual(self.events[0].payload,bytes([1,0,0,0,123]))
