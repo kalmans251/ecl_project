@@ -79,4 +79,36 @@ class PortalTest {
   assertEquals(200,b.request("/api/portal/sites/site-01/contacts/"+URLEncoder.encode("경찰서",java.nio.charset.StandardCharsets.UTF_8),"PUT",Map.of("phone","01000000000"),true).statusCode());
   assertEquals(503,b.request("/api/portal/sites/site-01/sms","POST",Map.of("request_id",UUID.randomUUID(),"label","경찰서","rail_id",rail),true).statusCode());assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM sms_requests",Integer.class));
  }
+ @Test void liveCallFaultDoesNotReleaseOwnershipOrAcceptLatePtt()throws Exception {
+  String owner=newUser("health","OPERATOR");var browser=new Browser(owner);String rid=rail();
+  try(var device=new Device()) {
+   assertEquals(200,browser.request("/api/portal/commands","POST",command(rid,"call.start",null),true).statusCode());
+   var start=json.readTree(device.next());device.ack(start.path("message_id").asText(),"APPLIED");
+   String cid=start.path("call_id").asText();
+   var state=new HashMap<String,Object>();state.put("version",1);state.put("type","call_state");state.put("call_id",cid);
+   state.put("railing_id",1);state.put("session_id",123L);state.put("sequence",1);state.put("phase","active");state.put("direction","FIELD_TX");state.put("error","");
+   device.ws.sendText(json.writeValueAsString(state),true).join();
+   long until=System.nanoTime()+2_000_000_000L;
+   while(db.queryForObject("SELECT device_session FROM calls WHERE id=?",Long.class,cid)==null && System.nanoTime()<until)Thread.sleep(10);
+   assertEquals(123L,db.queryForObject("SELECT device_session FROM calls WHERE id=?",Long.class,cid));
+   assertEquals(200,browser.request("/api/portal/commands","POST",command(rid,"ptt.on",null),true).statusCode());
+   var ptt=json.readTree(device.next());assertEquals("SWITCHING",db.queryForObject("SELECT status FROM calls WHERE id=?",String.class,cid));
+   state.put("sequence",2);state.put("phase","unknown");state.put("direction","");state.put("error","S3_TIMEOUT");
+   device.ws.sendText(json.writeValueAsString(state),true).join();
+   until=System.nanoTime()+2_000_000_000L;
+   while(!db.queryForObject("SELECT status FROM calls WHERE id=?",String.class,cid).equals("UNKNOWN") && System.nanoTime()<until)Thread.sleep(10);
+   device.ack(ptt.path("message_id").asText(),"APPLIED");
+   assertEquals("UNKNOWN",db.queryForObject("SELECT status FROM calls WHERE id=?",String.class,cid));
+   assertEquals(409,browser.request("/api/portal/commands","POST",command(rid,"call.start",null),true).statusCode());
+   var page=json.readTree(browser.request("/api/portal/sites/site-01/state","GET",null,false).body());
+   assertEquals("S3_TIMEOUT",page.path("calls").get(0).path("DETAIL").asText());
+   assertEquals(200,browser.request("/api/portal/commands","POST",command(rid,"call.end",null),true).statusCode());
+   var end=json.readTree(device.next());
+   state.put("phase","ended");state.put("error","");state.put("session_id",124L);
+   commands.callState("gateway-01",json.valueToTree(state));assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls WHERE id=?",Integer.class,cid));
+   state.put("session_id",123L);commands.callState("gateway-01",json.valueToTree(state));
+   assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls WHERE id=?",Integer.class,cid));
+   device.ack(end.path("message_id").asText(),"APPLIED");
+  }
+ }
 }

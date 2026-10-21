@@ -190,6 +190,7 @@ class RailingManager:
                 if not emergency and state.emergency.active:
                     raise RuntimeError("An emergency is active; use ack for the emergency call")
             self._get_or_create_locked(railing_id).call.session_id = secrets.randbelow(0xffffffff) + 1
+            self._get_or_create_locked(railing_id).call.error = ""
             self._get_or_create_locked(railing_id).call.recovered = False
             self._get_or_create_locked(railing_id).call.phase = "starting"
             self._save_calls_locked()
@@ -198,12 +199,14 @@ class RailingManager:
         with self._lock:
             self._get_or_create_locked(railing_id).call.phase = "switching"
 
-    def call_direction_unknown(self, railing_id, session):
+    def call_direction_unknown(self, railing_id, session, *, error=""):
         with self._lock:
             call = self._get_or_create_locked(railing_id).call
             if call.session_id == session and call.phase not in ("idle", "ended"):
                 call.phase = "unknown"
                 call.direction = None
+                if error: call.error = error
+                if error == "GATEWAY_OFFLINE": call.recovered = True
 
     def call_request_failed(self, railing_id: int) -> None:
         with self._lock:
@@ -264,6 +267,7 @@ class RailingManager:
             if (
                 state is None
                 or not state.call.active
+                or state.call.recovered
                 or (session_id is not None and state.call.session_id != session_id)
             ):
                 return False
@@ -290,6 +294,7 @@ class RailingManager:
             state.mark_seen()
 
             state.call.recovered = False
+            state.call.error = ""
             state.call.phase = "ended"
             state.call.active = False
             state.call.origin = None
@@ -311,6 +316,7 @@ class RailingManager:
             if (
                 state is None
                 or not state.call.active
+                or state.call.recovered
                 or state.call.direction is None
             ):
                 return None

@@ -679,8 +679,8 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                 <div class="ptt-control-wrap">
                     <button class="ptt-main-btn" id="btnPttTalk" onpointerdown="startPttTalk(event)" onpointerup="stopPttTalk()" onpointercancel="stopPttTalk()" onlostpointercapture="stopPttTalk()">🎙️ 누르고 말하세요</button>
                     <div class="call-action-row">
-                        <button class="call-ctrl-btn btn-call-start" onclick="sendVoiceCallControl(true)">📞 통화 시작&nbsp;&nbsp;</button>
-                        <button class="call-ctrl-btn btn-call-end" onclick="sendVoiceCallControl(false)">❌ 통화 종료&nbsp;&nbsp;</button>
+                        <button id="btnCallStart" class="call-ctrl-btn btn-call-start" onclick="sendVoiceCallControl(true)">📞 통화 시작&nbsp;&nbsp;</button>
+                        <button id="btnCallEnd" class="call-ctrl-btn btn-call-end" onclick="sendVoiceCallControl(false)">❌ 통화 종료&nbsp;&nbsp;</button>
                     </div>
                 </div>
             </div>
@@ -804,5 +804,6 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 
 <div id="portalToast" class="portal-toast" hidden role="status"></div>
 <dialog id="portalDialog" class="portal-dialog"><button class="close" onclick="document.getElementById('portalDialog').close()">닫기</button><h2 id="dialogTitle"></h2><div id="dialogBody"></div></dialog>
+<script src="/call-view.js"></script>
 <script src="/portal.js"></script>
 </body></html>

@@ -92,7 +92,11 @@ def parse_args() -> argparse.Namespace:
         help='Durable unresolved-call journal; keep the same path across restarts')
     parser.add_argument('--event-railings', default='1,2,3,4',
                         help='Comma-separated installed railing IDs to poll (default: 1,2,3,4)')
+    parser.add_argument('--monitor-url', default=os.environ.get('ECL_MONITOR_URL'))
+    parser.add_argument('--monitor-state-file', default='~/.local/state/ecl-railing/monitor.json')
     args = parser.parse_args()
+    if args.monitor_url and not args.no_console:
+        parser.error('Use --no-console with monitoring to keep one command owner')
     try:
         args.event_railings = tuple(dict.fromkeys(int(x.strip(), 0) for x in args.event_railings.split(',')))
         if not args.event_railings or any(not 1 <= x <= 255 for x in args.event_railings):
@@ -250,6 +254,19 @@ def main() -> int:
             voice.close()
             bus.close()
             LOG.exception('Failed to start local audio; check devices and requirements-playback.txt')
+            return 1
+
+    monitor = None
+    if args.monitor_url:
+        try:
+            from monitoring import CallGateway
+            monitor = CallGateway(audio, railings, voice, args.monitor_url,
+                os.environ.get('ECL_MONITOR_TOKEN', ''), args.monitor_state_file, args.event_railings)
+            monitor.start()
+        except Exception:
+            if local_audio: local_audio.close()
+            voice.close(); bus.close()
+            LOG.exception('Failed to start monitoring adapter')
             return 1
 
     audio.start_keepalive()
@@ -450,6 +467,7 @@ def main() -> int:
         print()
 
     finally:
+        if monitor: monitor.close()
         event_poller.close()
         audio.close()
         if local_audio:

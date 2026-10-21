@@ -19,7 +19,7 @@ public class PortalApi {
             var out=new LinkedHashMap<String,Object>();for(String k:List.of("ID","GATEWAY_ID","NUMBER","NAME","LATITUDE","LONGITUDE","ADDRESS","SEEN_AT","CAMERA_ID","STREAM_PATH"))out.put(k.toLowerCase(),row.get(k));
             out.put("online",gateways.online((String)row.get("GATEWAY_ID")));out.put("reported",row.get("SNAPSHOT")==null?Map.of():json.readTree((String)row.get("SNAPSHOT")));rails.add(out);
         }
-        var calls=db.queryForList("SELECT c.id,c.rail_id,c.status,c.direction,u.name AS owner_name,c.user_id FROM calls c JOIN portal_gateways g ON g.id=c.gateway_id JOIN portal_users u ON u.id=c.user_id WHERE g.site_id=?",site);
+        var calls=db.queryForList("SELECT c.id,c.gateway_id,c.rail_id,c.status,c.direction,c.detail,c.device_seen_at,u.name AS owner_name,c.user_id FROM calls c JOIN portal_gateways g ON g.id=c.gateway_id JOIN portal_users u ON u.id=c.user_id WHERE g.site_id=?",site);
         String user=(String)accounts.user(p.getName()).get("ID");
         for(var call:calls){call.put("OWNED",call.remove("USER_ID").equals(user));}
         return Map.of("role",role,"rails",rails,"calls",calls,"commands",commands.list(p.getName(),site),"voice_available",voice.available(),"contacts",db.queryForList("SELECT label,phone FROM contacts WHERE site_id=?",site),"schedules",db.queryForList("SELECT s.rail_id,s.start_time,s.end_time,s.enabled FROM schedules s JOIN rails r ON r.id=s.rail_id JOIN portal_gateways g ON g.id=r.gateway_id WHERE g.site_id=?",site));

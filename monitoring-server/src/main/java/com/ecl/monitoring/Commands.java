@@ -78,7 +78,10 @@ public class Commands {
         dispatch(); return result;
     }
     private void reserve(String username,String user,Map<String,Object> rail,String operation) {
-        String gateway=(String)rail.get("GATEWAY_ID"); List<Map<String,Object>> calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=?",gateway);
+        String gateway=(String)rail.get("GATEWAY_ID");
+        if(db.queryForObject("SELECT COUNT(*) FROM commands WHERE gateway_id=? AND status IN ('QUEUED','SENT','RECEIVED') AND (operation LIKE 'call.%' OR operation LIKE 'ptt.%')",Integer.class,gateway)>0)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Call transition already pending");
+        List<Map<String,Object>> calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=?",gateway);
         if(operation.equals("call.start")) {
             if(!calls.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Gateway call already reserved");
             db.update("INSERT INTO calls(gateway_id,id,rail_id,user_id,status,touched_at) VALUES(?,?,?,?,?,?)",gateway,UUID.randomUUID().toString(),rail.get("ID"),user,"PENDING",System.currentTimeMillis());
@@ -87,11 +90,19 @@ public class Commands {
             var c=calls.get(0);
             if(!c.get("USER_ID").equals(user) && !Boolean.TRUE.equals(accounts.user(username).get("ADMIN"))) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Call belongs to another operator");
             if(operation.startsWith("ptt.") && !c.get("STATUS").equals("ACTIVE")) throw new ResponseStatusException(HttpStatus.CONFLICT,"Call is not confirmed; retry hangup");
+            if(operation.startsWith("ptt.")) db.update("UPDATE calls SET status='SWITCHING',touched_at=? WHERE gateway_id=?",System.currentTimeMillis(),gateway);
             if(operation.equals("call.end")) db.update("UPDATE calls SET status='ENDING',touched_at=? WHERE gateway_id=?",System.currentTimeMillis(),gateway);
         }
     }
     @Scheduled(fixedDelay=200) public synchronized void dispatch() {
         long now=System.currentTimeMillis();
+        for(var call:db.queryForList("SELECT gateway_id,device_seen_at,status FROM calls")) {
+            String gateway=(String)call.get("GATEWAY_ID");
+            if(!gateways.online(gateway))connectionLost(gateway);
+            else if(call.get("DEVICE_SEEN_AT")!=null && now-((Number)call.get("DEVICE_SEEN_AT")).longValue()>5000
+                    && call.get("STATUS").equals("ACTIVE"))
+                db.update("UPDATE calls SET status='UNKNOWN',direction='',detail='GATEWAY_OFFLINE' WHERE gateway_id=?",gateway);
+        }
         for(var row:db.queryForList("SELECT * FROM commands WHERE status IN ('QUEUED','SENT','RECEIVED') AND expires_at<=?",now)) {
             String status=row.get("STATUS").equals("QUEUED")?"EXPIRED":"UNKNOWN";
             db.update("UPDATE commands SET status=?,detail='No device confirmation within deadline' WHERE id=?",status,row.get("ID"));
@@ -119,7 +130,7 @@ public class Commands {
         if(rows.isEmpty()) return false;
         if(!Set.of("RECEIVED","PLC_SENT","APPLIED","BUSY","FAILED","EXPIRED").contains(status))throw Accounts.bad("Invalid command acknowledgment");
         var row=rows.get(0);String current=(String)row.get("STATUS");if(current.equals(status))return true;
-        if(!Set.of("SENT","RECEIVED").contains(current))throw Accounts.bad("Invalid command transition");
+        if(!Set.of("SENT","RECEIVED").contains(current))return true; // late outcomes cannot rewrite a terminal/unknown request
         if(status.equals("APPLIED") && !CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Firmware has no application confirmation for this operation");
         if(status.equals("PLC_SENT") && CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Await actual application confirmation for this operation");
         if(((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis())status="UNKNOWN";
@@ -128,13 +139,42 @@ public class Commands {
             String operation=(String)row.get("OPERATION");
             if(operation.equals("call.end"))db.update("DELETE FROM calls WHERE gateway_id=? AND rail_id=?",gateway,row.get("RAIL_ID"));
             else if(operation.equals("call.start"))db.update("UPDATE calls SET status='ACTIVE',touched_at=? WHERE gateway_id=? AND status='PENDING'",System.currentTimeMillis(),gateway);
-            else if(operation.startsWith("ptt."))db.update("UPDATE calls SET direction=?,touched_at=? WHERE gateway_id=?",operation.equals("ptt.on")?"CONTROL_TX":"FIELD_TX",System.currentTimeMillis(),gateway);
+            else if(operation.startsWith("ptt."))db.update("UPDATE calls SET status='ACTIVE',direction=?,touched_at=? WHERE gateway_id=? AND status='SWITCHING'",operation.equals("ptt.on")?"CONTROL_TX":"FIELD_TX",System.currentTimeMillis(),gateway);
         } else if(!status.equals("RECEIVED")) uncertain(row);
         return true;
     }
     private void uncertain(Map<String,Object> row) {
         if(((String)row.get("OPERATION")).startsWith("call.") || ((String)row.get("OPERATION")).startsWith("ptt."))
             db.update("UPDATE calls SET status='UNKNOWN' WHERE gateway_id=?",row.get("GATEWAY_ID"));
+    }
+    public synchronized void connectionLost(String gateway) {
+        db.update("UPDATE calls SET status='UNKNOWN',direction='',detail='GATEWAY_OFFLINE' WHERE gateway_id=?",gateway);
+    }
+    public synchronized void callState(String gateway,tools.jackson.databind.JsonNode n) {
+        if(n.size()!=9 || !n.path("call_id").isString() || !n.path("railing_id").isInt()
+            || !n.path("session_id").isIntegralNumber() || !n.path("session_id").canConvertToLong()
+            || n.path("session_id").asLong()<1 || n.path("session_id").asLong()>0xffffffffL
+            || !n.path("phase").isString() || !Set.of("starting","active","switching","ending","unknown","ended").contains(n.path("phase").asText())
+            || !n.path("direction").isString() || !Set.of("","FIELD_TX","CONTROL_TX").contains(n.path("direction").asText())
+            || !n.path("error").isString() || !Set.of("","GATEWAY_OFFLINE","WROOM_TIMEOUT","S3_TIMEOUT","WROOM_FAILED","S3_FAILED").contains(n.path("error").asText()))throw Accounts.bad("Invalid call state");
+        var rail=registry.deviceRail(gateway,n.path("railing_id").intValue());
+        var rows=db.queryForList("SELECT * FROM calls WHERE gateway_id=? AND id=? AND rail_id=?",gateway,n.path("call_id").asText(),rail.get("ID"));
+        if(rows.isEmpty())return;
+        var call=rows.get(0);long session=n.path("session_id").asLong();
+        if(call.get("DEVICE_SESSION")!=null && ((Number)call.get("DEVICE_SESSION")).longValue()!=session)return;
+        String phase=n.path("phase").asText();
+        if(phase.equals("ended")) {
+            // A first observed END is allowed only for an explicit hangup recovery.
+            if(call.get("DEVICE_SESSION")==null && !call.get("STATUS").equals("ENDING"))return;
+            db.update("DELETE FROM calls WHERE gateway_id=? AND id=?",gateway,call.get("ID"));return;
+        }
+        db.update("UPDATE calls SET device_session=?,device_seen_at=? WHERE gateway_id=?",session,System.currentTimeMillis(),gateway);
+        if(phase.equals("unknown") || !n.path("error").asText().isEmpty()) {
+            db.update("UPDATE calls SET status='UNKNOWN',direction='',detail=? WHERE gateway_id=?",n.path("error").asText(),gateway);
+        } else if(phase.equals("ending")) {
+            db.update("UPDATE calls SET status='ENDING',direction='' WHERE gateway_id=?",gateway);
+        }
+        // Read-only snapshots never turn UNKNOWN into ACTIVE. A confirmed command is required.
     }
     public List<Map<String,Object>> list(String username,String site) {
         accounts.permit(username,site,false);

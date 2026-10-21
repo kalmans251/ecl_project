@@ -2,8 +2,9 @@
 
 Pi는 `/ws/gateways/{gateway_id}`에 자신의 Bearer 토큰으로 접속합니다.
 WSS 운영, loopback 개발만 WS. 기존 CCTV 이벤트 규격은 README를 참고하세요.
-새 서버에는 Pi 프로세스에 결합할 어댑터가 아직 포함되지 않습니다.
-아래는 해당 어댑터가 구현해야 하는 규격입니다. `tools/mock_gateway.py`는 시뮬레이터입니다.
+Pi에는 통화 제어 전용 optional 어댑터가 포함되어 있습니다. 실행·call_state 규격·미지원 기능은
+[CALL_INTEGRATION.md](CALL_INTEGRATION.md)를 참고하세요. 아래 일반 제어/음성 규격은
+해당 기능별 어댑터가 구현해야 하는 규격입니다. `tools/mock_gateway.py`는 시뮬레이터입니다.
 
 ## 일반 명령
 
@@ -73,7 +74,7 @@ CCTV와 음성은 별도 메시지이므로 Pi의 기존 통화 우선순위·�
 
 난간→서버는 FIELD_TX, 서버→Pi는 CONTROL_TX입니다.
 Codec2 2400: 20ms/160 samples/6 bytes × 8 frames = 160ms/48 bytes.
-이 JSON에는 PLC 7바이트 메타데이터가 포함되지 않습니다. Pi에서 기존
+이 JSON에는 PLC 11바이트 메타데이터(세션 ID 포함)가 포함되지 않습니다. Pi에서 기존
 `VoicePacket`으로 래핑/해제하여 wire mode/direction enum을 적용합니다.
 `sequence`는 0..65535입니다. 재연결/방향 변경 시 오래된 송수신 큐를 폐기하세요.
 브라우저 방향은 별도 `/ws/operator/voice/{call_id}`에서 binary PCM 2560바이트를 사용하며,

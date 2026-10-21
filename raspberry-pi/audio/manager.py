@@ -156,7 +156,9 @@ class AudioManager:
             if direction != 0 or frame.payload[8] not in (int(Node.WROOM), int(Node.S3)) or frame.payload[9] not in (2, 3):
                 return True
             with self._condition:
-                self._railings.call_direction_unknown(frame.railing_id, session_id)
+                self._railings.call_direction_unknown(frame.railing_id, session_id,
+                    error=("WROOM" if frame.payload[8] == int(Node.WROOM) else "S3") +
+                    ("_TIMEOUT" if frame.payload[9] == 3 else "_FAILED"))
                 self._pending_ptt.pop(frame.railing_id, None)
                 self._condition.notify_all()
             LOG.error("CALL endpoint failed rail=%d node=%d reason=%d; voice paused, waiting for confirmed END", frame.railing_id, frame.payload[8], frame.payload[9])

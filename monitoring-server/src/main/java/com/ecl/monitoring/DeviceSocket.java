@@ -16,10 +16,12 @@ public class DeviceSocket extends TextWebSocketHandler {
         session.setTextMessageSizeLimit(4096);
         session.setBinaryMessageSizeLimit(4096);
         gateways.connect(id(session),session);
+        commands.connectionLost(id(session));
         gateways.send(id(session),json.writeValueAsString(Map.of("version",1,"type","welcome","gateway_id",id(session))));
     }
     @Override protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         try {
+            if(!gateways.current(id(session),session.getId())){session.close(CloseStatus.POLICY_VIOLATION);return;}
             // Bound acknowledgments independently from REST rate limits.
             synchronized (session) {
                 long second=System.nanoTime()/1_000_000_000L;
@@ -30,6 +32,14 @@ public class DeviceSocket extends TextWebSocketHandler {
                 if (count>30) throw new IllegalArgumentException("Too many acknowledgments");
             }
             var node=json.readTree(message.getPayload());
+            if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("call_state")) {
+                if(!node.path("sequence").canConvertToLong() || !node.path("sequence").isIntegralNumber())throw Accounts.bad("Invalid sequence");
+                long sequence=node.path("sequence").longValue();
+                long previous=(Long)session.getAttributes().getOrDefault("call_sequence",0L);
+                if(sequence<=previous)return;
+                commands.callState(id(session),node);
+                session.getAttributes().put("call_sequence",sequence);return;
+            }
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("voice")){voice.receive(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("telemetry")){telemetry.accept(id(session),node);return;}
             if (!node.isObject() || node.size()!=4 || !node.path("version").isInt() || node.path("version").intValue()!=1
@@ -42,6 +52,7 @@ public class DeviceSocket extends TextWebSocketHandler {
         gateways.pong(id(session),session.getId());
     }
     @Override public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        if(gateways.current(id(session),session.getId()))commands.connectionLost(id(session));
         gateways.disconnect(id(session),session.getId());
     }
     @Override public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
