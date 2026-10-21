@@ -38,7 +38,8 @@ class PlcBus:
         self.tx_guard_seconds = tx_guard_seconds
 
         self._serial: serial.Serial | None = None
-        self._parser = FrameParser()
+        # Inter-chunk idle timeout, not the duration of a complete frame.
+        self._parser = FrameParser(idle_timeout=max(0.2, 4 * 10 / baudrate))
         self._tx_lock = threading.Lock()
         self._transaction_lock = threading.RLock()
         self._last_call_tx = {}
@@ -261,6 +262,7 @@ class PlcBus:
                 )
 
                 if not data:
+                    self._parser.expire()
                     continue
                 LOG.debug("PLC RX raw=%s", data.hex(" "))
                 frames = self._parser.feed(data)

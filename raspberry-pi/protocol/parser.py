@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from .constants import HEADER_SIZE, MAX_PAYLOAD, SOF1, SOF2
 from .frame import Frame, ProtocolError
@@ -10,19 +11,47 @@ LOG = logging.getLogger(__name__)
 
 
 class FrameParser:
-    def __init__(self) -> None:
+    def __init__(self, idle_timeout: float = 0.2) -> None:
+        if idle_timeout <= 0:
+            raise ValueError("idle_timeout must be positive")
         self._buffer = bytearray()
+        self._idle_timeout = idle_timeout
+        self._last_data_at: float | None = None
 
     def reset(self) -> None:
         self._buffer.clear()
+        self._last_data_at = None
+
+    def expire(self, now: float | None = None) -> bool:
+        """Discard an incomplete candidate after a host-observed RX idle gap.
+
+        This is not a total-frame deadline. Each received chunk restarts it.
+        Only the RX thread should call feed/expire/reset while the bus is open.
+        """
+        now = time.monotonic() if now is None else now
+        if (not self._buffer or self._last_data_at is None
+                or now - self._last_data_at < self._idle_timeout):
+            return False
+        expected = (HEADER_SIZE + self._buffer[2] + 2
+                    if len(self._buffer) >= 3 else None)
+        LOG.debug("PLC incomplete frame expired: received=%d expected=%s idle=%.3fs raw=%s",
+                  len(self._buffer), expected, now - self._last_data_at,
+                  self._buffer.hex(" "))
+        self.reset()
+        return True
 
     @property
     def pending_bytes(self) -> int:
         return len(self._buffer)
 
     def feed(self, data: bytes) -> list[Frame]:
+        now = time.monotonic()
+        # Check before appending so a new response cannot finish a stale one,
+        # even if the reader did not get an empty read during the gap.
+        self.expire(now)
         if data:
             self._buffer.extend(data)
+            self._last_data_at = now
 
         frames: list[Frame] = []
 
