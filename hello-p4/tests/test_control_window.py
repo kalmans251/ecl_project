@@ -50,10 +50,11 @@ static protocol_frame_t queue[16], sent[32];
 static unsigned count, index_, sent_count, drained;
 static int64_t now;
 static call_state_t mode;
-static bool drain_ok, recovery;
+static bool drain_ok, recovery, preparing;
 
 int64_t esp_timer_get_time(void) { return now; }
 call_state_t call_manager_get_state(void) { return mode; }
+bool call_manager_control_grants_enabled(void){return mode!=CALL_STATE_IDLE && (preparing || mode==CALL_STATE_FIELD_TX);}
 bool call_manager_voice_allowed(const protocol_frame_t *f){(void)f;return true;}
 bool call_manager_end_recovery_active(void) { return recovery; }
 int xQueueReceive(QueueHandle_t q, void *out, TickType_t timeout) {
@@ -80,7 +81,7 @@ int plc_uart_receive(uint8_t *buffer, size_t len) {
 }
 static void reset(void) {
     count = index_ = sent_count = drained = 0;
-    now = 0; mode = CALL_STATE_FIELD_TX; drain_ok = true; recovery=false;
+    now = 0; mode = CALL_STATE_FIELD_TX; drain_ok = true; recovery=false; preparing=false;
     s_receive_until_us = s_last_grant_us = s_last_voice_us = s_end_tx_quiet_until_us = 0;
     s_voice_packets_since_grant = 0;
     s_poll_pending=false;
@@ -127,6 +128,14 @@ int main(void) {
     process_plc_tx_queue();
     assert(sent_count == 1 && sent[0].payload[0] == AUDIO_DATA_CONTROL_WINDOW);
     process_plc_tx_queue(); assert(sent_count == 1);
+
+    reset();mode=CALL_STATE_CONTROL_TX;preparing=true;now=PLC_IDLE_GRANT_MS*1000;
+    process_plc_tx_queue();assert(sent_count==1 && sent[0].payload[0]==AUDIO_DATA_CONTROL_WINDOW);
+    now=s_receive_until_us-1;process_plc_tx_queue();assert(sent_count==1);
+    preparing=false;now=s_receive_until_us+PLC_IDLE_GRANT_MS*1000;
+    process_plc_tx_queue();assert(sent_count==1); // confirmed CONTROL_TX stops granting
+    reset();mode=CALL_STATE_IDLE;preparing=true;now=PLC_IDLE_GRANT_MS*1000;
+    process_plc_tx_queue();assert(sent_count==0); // never revive idle grants
 
     reset(); mode = CALL_STATE_IDLE; queue[count++] = voice();
     process_plc_tx_queue(); assert(sent_count == 0);

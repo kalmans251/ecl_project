@@ -166,13 +166,14 @@ static void process_plc_tx_queue(void)
             return;
         }
     }
-    // Only the active FIELD_TX owner may grant a receive window; idle is silent.
-    if ((call_manager_get_state() == CALL_STATE_FIELD_TX)
+    // The active owner grants while preparing as well, so a lost direction
+    // confirmation never forces Pi to retry directly into possible FIELD audio.
+    if (call_manager_control_grants_enabled()
         && esp_timer_get_time() - s_last_grant_us >= PLC_IDLE_GRANT_MS * 1000
         && esp_timer_get_time() - s_last_voice_us >= PLC_IDLE_GRANT_MS * 1000) {
         grant_control_window();
     }
-    if (call_manager_get_state() != CALL_STATE_FIELD_TX) {
+    if (!call_manager_control_grants_enabled()) {
         s_voice_packets_since_grant = 0;
     }
 }

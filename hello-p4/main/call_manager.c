@@ -995,3 +995,11 @@ bool call_manager_set_direction_ordered(uint32_t session, uint32_t request, audi
     s_ptt_request=request;
     return call_manager_set_direction(direction);
 }
+
+bool call_manager_control_grants_enabled(void) {
+    lock_manager();
+    bool enabled=s_call_state!=CALL_STATE_IDLE &&
+        (s_preparing || s_call_state==CALL_STATE_FIELD_TX);
+    unlock_manager();
+    return enabled;
+}
