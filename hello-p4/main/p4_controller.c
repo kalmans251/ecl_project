@@ -1944,6 +1944,7 @@ static void handle_audio(
 
         case CMD_DATA:
         {
+            call_manager_handle_readiness(frame);
             break;
         }
 

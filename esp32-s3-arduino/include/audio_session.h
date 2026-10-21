@@ -37,3 +37,5 @@ bool audio_session_send_codec2(
 
 uint32_t audio_session_id(void);
 bool audio_session_control(const protocol_frame_t *frame);
+
+void audio_session_report_readiness(const protocol_frame_t *request);

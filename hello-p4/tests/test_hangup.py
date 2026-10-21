@@ -26,78 +26,70 @@ int xQueueSend(QueueHandle_t q,const void *f,TickType_t t) {
 void projector_control_set(bool enabled) { (void)enabled;++restores; }
 void music_policy_add_pause_reason(music_pause_reason_t reason) { (void)reason; }
 void music_policy_remove_pause_reason(music_pause_reason_t reason) { (void)reason;++removes; }
+static void report(uint8_t node, uint8_t status) {
+    protocol_frame_t f={.railing_id=RAILING_ID,.src=node,.dst=NODE_P4,
+        .service=SERVICE_AUDIO,.command=CMD_DATA,.length=12,
+        .payload={AUDIO_DATA_READY}};
+    f.payload[1]=s_operation;f.payload[2]=s_target;f.payload[3]=status;
+    put_session(f.payload+4,s_session);put_session(f.payload+8,s_operation==CMD_SET?s_ptt_request:0);
+    call_manager_handle_readiness(&f);
+}
+static void both(void){report(NODE_WROOM,1);report(NODE_S3,1);}
 int main(void) {
     now=100;system_state_init();call_manager_init();
-    assert(!call_manager_end_recovery_active());
-    assert(call_manager_start(CALL_ORIGIN_EMERGENCY));
-    assert(call_manager_end());
-    assert(last.dst==NODE_PI && last.payload[1]==AUDIO_EVENT_CALL_ENDED);
-    assert(last.payload[2]==CALL_ORIGIN_EMERGENCY);
-    assert(!call_manager_end_recovery_active());
-    unsigned before=sent, r=restores, m=removes;
-    assert(call_manager_end());
-    assert(sent==before+1 && restores==r && removes==m);
-    assert(last.payload[2]==CALL_ORIGIN_EMERGENCY);
-    now+=8000000;
-    assert(!call_manager_end_recovery_active());
-    assert(call_manager_end());assert(!call_manager_end_recovery_active());
-    assert(call_manager_start(CALL_ORIGIN_NORMAL));
-    assert(!call_manager_end_recovery_active());
-    assert(call_manager_end());assert(last.payload[2]==CALL_ORIGIN_NORMAL);
-    assert(call_manager_start(CALL_ORIGIN_NORMAL));
-    now+=CALL_LEASE_US-1;call_manager_tick();assert(call_manager_is_active());
-    call_manager_keepalive();
-    now+=CALL_LEASE_US-1;call_manager_tick();assert(call_manager_is_active());
-    unsigned before_expiry=sent;
-    now+=1;call_manager_keepalive(); // cannot revive an expired lease
-    call_manager_tick();assert(!call_manager_is_active());
-    assert(terminal.payload[1]==AUDIO_EVENT_CALL_ENDED && terminal_count==1);
-    assert(sent==before_expiry+2); // S3/WROOM stop, no unsolicited Pi END
-    before=sent;call_manager_tick();call_manager_keepalive();assert(sent==before);
-    assert(call_manager_start(CALL_ORIGIN_EMERGENCY));
-    now+=CALL_LEASE_US;call_manager_tick();assert(!call_manager_is_active());
     assert(call_manager_bind_session(101));
-    assert(call_manager_start(CALL_ORIGIN_NORMAL));
-    assert(last.length==8 && last.payload[7]==101);
-    before=sent;
-    assert(!call_manager_bind_session(101)); // retry START only confirms
-    assert(sent==before+1 && last.payload[1]==AUDIO_EVENT_CALL_STARTED);
-    assert(!call_manager_bind_session(202));
-    assert(!call_manager_session_matches(202));
-    assert(!call_manager_stop_session(202));
-    assert(call_manager_is_active());
-    assert(call_manager_stop_session(101));
-    assert(terminal.length==8 && terminal.payload[7]==101);
-    assert(!call_manager_bind_session(101)); // delayed START cannot reopen
-    assert(call_manager_bind_session(202));
-    assert(call_manager_start(CALL_ORIGIN_NORMAL));
-    assert(!call_manager_stop_session(101));
-    assert(call_manager_session_matches(202));
+    assert(call_manager_start(CALL_ORIGIN_EMERGENCY));
+    assert(s_preparing && sent==2 && last.dst!=NODE_PI);
     protocol_frame_t voice={.railing_id=RAILING_ID,.src=NODE_S3,.dst=NODE_PI,
       .service=SERVICE_AUDIO,.command=CMD_DATA,.length=59,
-      .payload={AUDIO_DATA_CODEC2,1,AUDIO_DIRECTION_FIELD_TX,0,0,8,6,0,0,0,202}};
-    assert(call_manager_voice_allowed(&voice));
-    voice.payload[10]=101;assert(!call_manager_voice_allowed(&voice));
-    voice.payload[10]=202;voice.railing_id=2;assert(!call_manager_voice_allowed(&voice));
-    voice.railing_id=RAILING_ID;voice.length=55;assert(!call_manager_voice_allowed(&voice));
-    voice.length=59;
-    assert(call_manager_set_direction_ordered(202,2,AUDIO_DIRECTION_CONTROL_TX));
-    assert(last.length==12 && last.payload[11]==2);
-    assert(!call_manager_set_direction_ordered(202,1,AUDIO_DIRECTION_FIELD_TX));
-    assert(!call_manager_set_direction_ordered(202,2,AUDIO_DIRECTION_FIELD_TX));
-    assert(!call_manager_set_direction_ordered(101,3,AUDIO_DIRECTION_FIELD_TX));
-    before=sent;
-    assert(call_manager_set_direction_ordered(202,2,AUDIO_DIRECTION_CONTROL_TX));
-    assert(sent==before+3); // downstream SETs and same request confirmation
-    assert(!call_manager_set_direction_ordered(202,0,AUDIO_DIRECTION_FIELD_TX));
-    assert(call_manager_get_state()==CALL_STATE_CONTROL_TX);
+      .payload={AUDIO_DATA_CODEC2,1,AUDIO_DIRECTION_FIELD_TX,0,0,8,6,0,0,0,101}};
     assert(!call_manager_voice_allowed(&voice));
+    report(NODE_WROOM,1);unsigned before=sent;
+    assert(!call_manager_bind_session(101));assert(sent==before);
+    report(NODE_S3,1);assert(sent==before); // never unsolicited PLC confirmation
+    assert(!call_manager_bind_session(101));
+    assert(last.dst==NODE_PI && last.payload[1]==AUDIO_EVENT_CALL_STARTED);
+    assert(call_manager_voice_allowed(&voice));
+    assert(!call_manager_bind_session(202));assert(!call_manager_stop_session(202));
+    assert(call_manager_set_direction_ordered(101,1,AUDIO_DIRECTION_CONTROL_TX));
+    assert(call_manager_get_state()==CALL_STATE_FIELD_TX); // grants remain available to the retry
+    assert(!call_manager_voice_allowed(&voice));
+    assert(!call_manager_set_direction_ordered(101,1,AUDIO_DIRECTION_FIELD_TX));
+    both();assert(call_manager_set_direction_ordered(101,1,AUDIO_DIRECTION_CONTROL_TX));
+    assert(last.payload[1]==AUDIO_EVENT_DIRECTION_CHANGED && last.payload[11]==1);
+    assert(call_manager_get_state()==CALL_STATE_CONTROL_TX);
     voice.src=NODE_PI;voice.dst=NODE_WROOM;voice.payload[2]=AUDIO_DIRECTION_CONTROL_TX;
     assert(call_manager_voice_allowed(&voice));
-    assert(call_manager_stop_session(202));
-    assert(call_manager_stop_session(303)); // START lost: confirm idle with requested ID
-    assert(last.payload[6]==1 && last.payload[7]==47);
-    assert(!call_manager_is_active());
+    assert(call_manager_set_direction_ordered(101,2,AUDIO_DIRECTION_FIELD_TX));
+    // Delayed report from the prior PTT cannot complete this operation.
+    protocol_frame_t old={.railing_id=RAILING_ID,.src=NODE_S3,.dst=NODE_P4,
+        .service=SERVICE_AUDIO,.command=CMD_DATA,.length=12,
+        .payload={AUDIO_DATA_READY,CMD_SET,AUDIO_DIRECTION_CONTROL_TX,1}};
+    put_session(old.payload+4,101);put_session(old.payload+8,1);
+    call_manager_handle_readiness(&old);assert(s_ready_mask==0);
+    both();assert(call_manager_set_direction_ordered(101,2,AUDIO_DIRECTION_FIELD_TX));
+    assert(!call_manager_set_direction_ordered(101,1,AUDIO_DIRECTION_CONTROL_TX));
+    assert(call_manager_stop_session(101));assert(call_manager_is_active());
+    unsigned m=removes;report(NODE_WROOM,1);
+    assert(!call_manager_stop_session(101));assert(removes==m && terminal_count==0);
+    report(NODE_S3,1);assert(call_manager_stop_session(101));
+    assert(!call_manager_is_active() && removes==m+1 && terminal_count==1);
+    assert(last.payload[1]==AUDIO_EVENT_CALL_ENDED && last.payload[2]==CALL_ORIGIN_EMERGENCY);
+    before=sent;m=removes;assert(call_manager_stop_session(101));assert(sent==before+1 && removes==m);
+    assert(!call_manager_bind_session(101));
+    assert(call_manager_bind_session(202));assert(call_manager_start(CALL_ORIGIN_NORMAL));
+    report(NODE_S3,2);assert(!call_manager_bind_session(202));
+    assert(last.length==14 && last.payload[1]==4 && last.payload[12]==NODE_S3);
+    assert(s_preparing && !call_manager_voice_allowed(&voice));
+    assert(call_manager_stop_session(202));both();assert(call_manager_stop_session(202));
+    assert(call_manager_bind_session(203));assert(call_manager_start(CALL_ORIGIN_NORMAL));
+    now+=4000000;call_manager_tick();assert(s_failed_reason==3);
+    assert(!call_manager_bind_session(203));assert(last.payload[13]==3);
+    now+=CALL_LEASE_US;call_manager_tick();assert(s_operation==CMD_STOP && call_manager_is_active());
+    both();before=sent;call_manager_tick();assert(!call_manager_is_active());
+    assert(sent==before && terminal.payload[1]==AUDIO_EVENT_CALL_ENDED); // retained END, no unsolicited send
+    assert(call_manager_stop_session(303));assert(call_manager_is_active());
+    both();assert(call_manager_stop_session(303));assert(last.payload[6]==1 && last.payload[7]==47);
     return 0;
 }
 '''

@@ -312,6 +312,7 @@ static void handle_audio(const protocol_frame_t *frame)
         case CMD_STOP:
         case CMD_SET:
             if(!audio_session_control(frame)) Serial.println("[AUDIO] Rejected call session");
+            audio_session_report_readiness(frame);
             break;
 
         case CMD_STATUS_REQUEST:

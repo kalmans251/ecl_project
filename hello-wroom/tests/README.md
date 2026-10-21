@@ -70,9 +70,10 @@ underflow. Initialization/ownership failures are latched for that generation;
 a fresh PTT direction transition is required to retry.
 
 `voice_session_output_state()` exposes IDLE/PREPARING/READY/STOPPING/FAILED
-locally. This is output state only, not a complete call acknowledgement. No
-wire format or P4/Pi success criterion changes in this prerequisite patch.
-Endpoint acknowledgements and aggregation by P4 remain follow-up work.
+locally. This remains a local output state accessor. The endpoint report combines it
+with the current session/request, and P4 waits for both endpoint reports.
+Endpoint acknowledgements and P4 aggregation are now connected; see
+[`CALL_READINESS.md`](../../CALL_READINESS.md).
 
 Host tests cover preparation without packets, release before any playback,
 failed DMA/decoder initialization, first-packet playback with deterministic

@@ -182,3 +182,6 @@ int protocol_encode(
 #define EMERGENCY_SOURCE_BUTTON        0x01
 
 #define EMERGENCY_ACTION_ACK           0x01
+
+/* Endpoint preparation report, 12 bytes; internal P4/WROOM/S3 only. */
+#define AUDIO_DATA_READY 0x04

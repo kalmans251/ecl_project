@@ -42,3 +42,5 @@ typedef enum {
     VOICE_OUTPUT_FAILED,
 } voice_output_state_t;
 voice_output_state_t voice_session_output_state(void);
+
+bool voice_session_readiness(const protocol_frame_t *request, protocol_frame_t *reply);

@@ -29,6 +29,8 @@ struct Packet {
 QueueHandle_t s_packets = nullptr;
 portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 bool s_enabled = false;
+unsigned s_readiness = 1; // no capture has started at boot
+bool s_initialized = false;
 uint32_t s_generation = 0;
 uint32_t s_queue_drops = 0;
 uint32_t s_peak = 0;
@@ -41,6 +43,17 @@ void state(bool &enabled, uint32_t &generation) {
     portENTER_CRITICAL(&s_lock);
     enabled = s_enabled;
     generation = s_generation;
+    portEXIT_CRITICAL(&s_lock);
+}
+
+void publish(uint32_t generation, unsigned status) {
+    portENTER_CRITICAL(&s_lock);
+    if(generation==s_generation)s_readiness=status;
+    portEXIT_CRITICAL(&s_lock);
+}
+void fail(uint32_t generation) {
+    portENTER_CRITICAL(&s_lock);
+    if(generation==s_generation){s_enabled=false;s_readiness=2;}
     portEXIT_CRITICAL(&s_lock);
 }
 
@@ -94,14 +107,18 @@ void capture_task(void *) {
         uint32_t requested;
         state(enabled, requested);
         if (running && (!enabled || requested != generation)) {
-            i2s_stop(kPort);
+            esp_err_t stopped=i2s_stop(kPort);
             codec2_destroy(codec);
             codec = nullptr;
             running = false;
             sample_count = 0;
             frame_count = 0;
+            if(stopped!=ESP_OK){fail(requested);continue;}
         }
         if (!enabled) {
+            portENTER_CRITICAL(&s_lock);
+            if(requested==s_generation && s_readiness!=2)s_readiness=1;
+            portEXIT_CRITICAL(&s_lock);
             vTaskDelay(pdMS_TO_TICKS(5));
             continue;
         }
@@ -114,14 +131,14 @@ void capture_task(void *) {
                 if (codec != nullptr) codec2_destroy(codec);
                 codec = nullptr;
                 Serial.println("[MIC] Codec2 2400 init failed; capture disabled");
-                microphone_codec2_set_enabled(false);
+                fail(generation);
                 continue;
             }
             if (i2s_start(kPort) != ESP_OK) {
                 codec2_destroy(codec);
                 codec = nullptr;
                 Serial.println("[MIC] I2S start failed; capture disabled");
-                microphone_codec2_set_enabled(false);
+                fail(generation);
                 continue;
             }
             sequence = 0;
@@ -130,6 +147,7 @@ void capture_task(void *) {
             size_t discarded;
             while (i2s_read(kPort, raw, sizeof(raw), &discarded, 0) == ESP_OK
                    && discarded != 0) {}
+            publish(generation,1);
             Serial.println("[MIC] FIELD_TX capture started: 8000 Hz / 160 samples / 6 bytes");
         }
 
@@ -143,7 +161,7 @@ void capture_task(void *) {
         if (!still_enabled || current != generation) continue;
         if (err != ESP_OK && err != ESP_ERR_TIMEOUT) {
             Serial.printf("[MIC] I2S read failed: %s\n", esp_err_to_name(err));
-            microphone_codec2_set_enabled(false);
+            fail(generation);
             continue;
         }
 
@@ -200,6 +218,9 @@ bool microphone_codec2_init() {
         s_packets = nullptr;
         return false;
     }
+    portENTER_CRITICAL(&s_lock);
+    s_initialized=true;s_readiness=1;
+    portEXIT_CRITICAL(&s_lock);
     Serial.printf("[MIC] Ready WS=%d SCK=%d SD=%d channel=%s gain=%d\n",
         PIN_I2S_WS, PIN_I2S_SCK, PIN_I2S_SD,
         MIC_USE_RIGHT_CHANNEL ? "RIGHT" : "LEFT", MIC_GAIN);
@@ -209,6 +230,7 @@ bool microphone_codec2_init() {
 void microphone_codec2_set_enabled(bool enabled) {
     portENTER_CRITICAL(&s_lock);
     s_enabled = enabled;
+    s_readiness = s_initialized ? 0 : (enabled ? 2 : 1);
     ++s_generation; // invalidate partial and queued audio, even across rapid PTT
     portEXIT_CRITICAL(&s_lock);
 }
@@ -241,4 +263,11 @@ void microphone_codec2_process() {
             (unsigned long)s_sent, (unsigned long)s_send_drops, (unsigned long)drops,
             (unsigned long)peak, (unsigned long)clipped, (unsigned long)encode_us);
     }
+}
+
+unsigned microphone_codec2_readiness() {
+    portENTER_CRITICAL(&s_lock);
+    unsigned status=s_readiness;
+    portEXIT_CRITICAL(&s_lock);
+    return status;
 }

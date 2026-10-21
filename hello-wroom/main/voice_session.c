@@ -356,7 +356,7 @@ bool voice_session_control(const protocol_frame_t *f) {
     unsigned offset=f->cmd==CMD_SET?1:0;
     if (f->payload_len != (f->cmd==CMD_SET?9:4)) return false;
     uint32_t id=session_id(f->payload+offset);
-    if (!id) return false;
+    if (!id && f->cmd!=CMD_STOP) return false;
     portENTER_CRITICAL(&s_lock);
     bool same=id==s_session, active=s_active;
     if(f->cmd==CMD_START && !same) {s_session=id; s_ptt_request=0; ++s_generation;}
@@ -365,7 +365,9 @@ bool voice_session_control(const protocol_frame_t *f) {
         if(same)return active; /* reject an ended session's duplicate START */
         voice_session_start();return true;
     }
-    if(!same || !active)return false;
+    if(f->cmd==CMD_STOP && !active)return true;
+    if(!same)return false;
+    if(!active)return false;
     if(f->cmd==CMD_STOP){voice_session_stop();return true;}
     if(f->cmd==CMD_SET) {
         uint32_t request=session_id(f->payload+5);
@@ -388,4 +390,32 @@ bool voice_session_forward_allowed(const protocol_frame_t *f) {
         session_id(f->payload+7)==s_session;
     portEXIT_CRITICAL(&s_lock);
     return allowed;
+}
+
+bool voice_session_readiness(const protocol_frame_t *f, protocol_frame_t *reply) {
+    if(f->src!=NODE_P4 || f->railing_id!=RAILING_ID ||
+       (f->cmd!=CMD_START && f->cmd!=CMD_STOP && f->cmd!=CMD_SET) ||
+       f->payload_len!=(f->cmd==CMD_SET?9:4)) return false;
+    uint32_t id=session_id(f->payload+(f->cmd==CMD_SET?1:0));
+    uint32_t request=f->cmd==CMD_SET?session_id(f->payload+5):0;
+    uint8_t direction=f->cmd==CMD_SET?f->payload[0]:(f->cmd==CMD_START?AUDIO_DIR_FIELD_TX:0);
+    bool quiet=!emergency_alert_is_active() && (!music_player_is_playing() || music_player_is_paused());
+    portENTER_CRITICAL(&s_lock);
+    bool match=id && id==s_session && (f->cmd!=CMD_SET || request==s_ptt_request);
+    bool target=f->cmd==CMD_STOP ? !s_active : s_active && s_direction==direction;
+    if(f->cmd==CMD_STOP && !s_active)match=true;
+    uint8_t status=0;
+    if(!match || !target || s_output_state==VOICE_OUTPUT_FAILED)status=2;
+    else if(direction==AUDIO_DIR_CONTROL_TX)status=s_output_state==VOICE_OUTPUT_READY?1:0;
+    else status=!s_output_busy && s_output_state==VOICE_OUTPUT_IDLE &&
+        (f->cmd==CMD_STOP || quiet)?1:0;
+    portEXIT_CRITICAL(&s_lock);
+    memset(reply,0,sizeof(*reply));
+    reply->railing_id=RAILING_ID;reply->src=NODE_WROOM;reply->dst=NODE_P4;
+    reply->service=SERVICE_AUDIO;reply->cmd=CMD_DATA;reply->payload_len=12;
+    reply->payload[0]=AUDIO_DATA_READY;reply->payload[1]=f->cmd;
+    reply->payload[2]=direction;reply->payload[3]=status;
+    memcpy(reply->payload+4,f->payload+(f->cmd==CMD_SET?1:0),4);
+    if(f->cmd==CMD_SET)memcpy(reply->payload+8,f->payload+5,4);
+    return true;
 }

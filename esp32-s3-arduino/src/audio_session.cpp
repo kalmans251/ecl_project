@@ -234,17 +234,19 @@ bool audio_session_send_codec2(
 
 uint32_t audio_session_id(void) { return s_session; }
 bool audio_session_control(const protocol_frame_t *f) {
-    if(f->src!=NODE_P4)return false;
+    if(f->src!=NODE_P4 || f->railing_id!=RAILING_ID)return false;
     unsigned offset=f->command==CMD_SET?1:0;
     if(f->length!=(f->command==CMD_SET?9:4))return false;
     const uint8_t *p=f->payload+offset;
     uint32_t id=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
-    if(!id)return false;
+    if(!id && f->command!=CMD_STOP)return false;
     if(f->command==CMD_START){
         if(id==s_session)return s_active;
         audio_session_stop();s_session=id;s_ptt_request=0;audio_session_start();return true;
     }
-    if(id!=s_session || !s_active)return false;
+    if(f->command==CMD_STOP && !s_active)return true;
+    if(id!=s_session)return false;
+    if(!s_active)return false;
     if(f->command==CMD_STOP){audio_session_stop();return true;}
     if(f->command==CMD_SET) {
         p=f->payload+5;
@@ -255,4 +257,26 @@ bool audio_session_control(const protocol_frame_t *f) {
         s_ptt_request=request;return true;
     }
     return false;
+}
+
+void audio_session_report_readiness(const protocol_frame_t *f) {
+    if(f->src!=NODE_P4 || f->railing_id!=RAILING_ID ||
+       (f->command!=CMD_START && f->command!=CMD_SET && f->command!=CMD_STOP) ||
+       f->length!=(f->command==CMD_SET?9:4))return;
+    const uint8_t *p=f->payload+(f->command==CMD_SET?1:0);
+    uint32_t id=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+    p=f->payload+5;
+    uint32_t request=f->command==CMD_SET?((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3]:0;
+    uint8_t direction=f->command==CMD_SET?f->payload[0]:(f->command==CMD_START?AUDIO_DIRECTION_FIELD_TX:0);
+    bool match=id && id==s_session && (f->command!=CMD_SET || request==s_ptt_request);
+    if(f->command==CMD_STOP && !s_active)match=true;
+    bool target=f->command==CMD_STOP?!s_active:(s_active && s_direction==direction);
+    protocol_frame_t reply={};
+    reply.railing_id=RAILING_ID;reply.src=NODE_S3;reply.dst=NODE_P4;
+    reply.service=SERVICE_AUDIO;reply.command=CMD_DATA;reply.length=12;
+    reply.payload[0]=AUDIO_DATA_READY;reply.payload[1]=f->command;
+    reply.payload[2]=direction;reply.payload[3]=match && target?microphone_codec2_readiness():2;
+    memcpy(reply.payload+4,f->payload+(f->command==CMD_SET?1:0),4);
+    if(f->command==CMD_SET)memcpy(reply.payload+8,f->payload+5,4);
+    ble_send_frame(&reply);
 }

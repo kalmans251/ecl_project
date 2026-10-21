@@ -24,7 +24,10 @@ class EmergencyManager:
         self,
         bus: PlcBus,
         railings: RailingManager,
+        *,
+        audio=None,
     ) -> None:
+        self.audio = audio
         self._bus = bus
         self._railings = railings
 
@@ -188,7 +191,10 @@ class EmergencyManager:
         )
 
         try:
-            self._bus.send_frame(frame)
+            if self.audio is not None:
+                self.audio._start_call(railing_id, request_frame=frame, emergency=True)
+            else:
+                self._bus.send_frame(frame)
         finally:
             # CALL_STARTED may have arrived synchronously. Otherwise retain
             # ownership until a late START or an explicitly confirmed hangup.

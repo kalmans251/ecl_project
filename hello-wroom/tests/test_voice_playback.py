@@ -313,6 +313,12 @@ int xQueueReceive(QueueHandle_t q, void *p, unsigned ticks) {
     }
     assert(initialized==1);
     assert(voice_session_output_state()==VOICE_OUTPUT_READY);
+    protocol_frame_t request={.railing_id=RAILING_ID,.src=NODE_P4,.cmd=CMD_SET,.payload_len=9,
+        .payload={AUDIO_DIR_CONTROL_TX,0,0,0,1,0,0,0,0}}, reply;
+    assert(voice_session_readiness(&request,&reply));
+    assert(reply.dst==NODE_P4 && reply.payload[3]==1 && reply.payload[7]==1);
+    request.payload[8]=9;assert(voice_session_readiness(&request,&reply));
+    assert(reply.payload[3]==2); // wrong PTT request cannot report ready
     if (++polls==3) voice_session_stop();
     return 0;
 }
