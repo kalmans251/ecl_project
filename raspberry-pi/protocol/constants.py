@@ -79,6 +79,7 @@ class AudioEvent(IntEnum):
     CALL_STARTED = 0x01
     CALL_ENDED = 0x02
     DIRECTION_CHANGED = 0x03
+    PREPARATION_FAILED = 0x04
 
 
 class CallOrigin(IntEnum):

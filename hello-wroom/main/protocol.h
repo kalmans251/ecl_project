@@ -387,3 +387,6 @@ typedef enum
         0x01
 
 } emergency_action_t;
+
+/* Endpoint preparation report, 12 bytes; internal P4/WROOM/S3 only. */
+#define AUDIO_DATA_READY 0x04

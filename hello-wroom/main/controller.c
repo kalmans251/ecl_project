@@ -538,9 +538,14 @@ static void handle_audio(const protocol_frame_t *frame)
         case CMD_START:
         case CMD_STOP:
         case CMD_SET:
+        {
             if (!voice_session_control(frame))
                 ESP_LOGW(TAG, "Rejected call control session");
+            protocol_frame_t report;
+            if (voice_session_readiness(frame, &report))
+                send_reply(frame, CMD_DATA, report.payload, report.payload_len);
             break;
+        }
 
         case CMD_DATA:
         {

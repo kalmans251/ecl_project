@@ -101,6 +101,21 @@ static void put_session(uint8_t *p, uint32_t id) {
 }
 static call_origin_t s_last_end_origin = CALL_ORIGIN_NORMAL;
 
+/* Controller-owned preparation transaction. Voice readers use s_mutex. */
+static uint8_t s_operation, s_target, s_ready_mask, s_failed_node, s_failed_reason;
+static bool s_preparing;
+static int64_t s_prepare_deadline, s_next_probe;
+static bool end_call(bool polled_only);
+static void lock_manager(void);
+static void unlock_manager(void);
+static void begin_prepare(uint8_t operation, uint8_t direction) {
+    lock_manager();
+    s_operation=operation;s_target=direction;s_ready_mask=0;
+    s_failed_node=s_failed_reason=0;s_preparing=true;
+    s_prepare_deadline=esp_timer_get_time()+4000000;
+    s_next_probe=esp_timer_get_time()+200000;
+    unlock_manager();
+}
 /* ============================================================
  * LOCK
  * ============================================================ */
@@ -453,6 +468,7 @@ void call_manager_init(void)
 
     s_call_state =
         CALL_STATE_IDLE;
+    s_preparing = false;
 
 
     s_call_origin =
@@ -462,6 +478,7 @@ void call_manager_init(void)
     s_session = 0;
     s_ptt_request = 0;
     s_session_ended = false;
+    s_operation=0;s_preparing=false;s_ready_mask=0;s_failed_node=0;
 
 
     ESP_LOGI(
@@ -597,23 +614,8 @@ bool call_manager_start(
      * WROOM / S3 통화모드 시작
      * ======================================================== */
 
+    begin_prepare(CMD_START,AUDIO_DIRECTION_FIELD_TX);
     request_audio_start();
-
-
-    /*
-     * 기본 FIELD_TX
-     */
-    request_audio_direction(
-        AUDIO_DIRECTION_FIELD_TX
-    );
-
-
-    notify_pi_call_event(
-        AUDIO_EVENT_CALL_STARTED,
-        origin,
-        AUDIO_DIRECTION_FIELD_TX
-    );
-
 
     ESP_LOGI(
         TAG,
@@ -630,99 +632,30 @@ bool call_manager_start(
  * SET DIRECTION
  * ============================================================ */
 
-bool call_manager_set_direction(
-    audio_direction_t direction
-)
-{
-    if (
-        direction !=
-        AUDIO_DIRECTION_FIELD_TX
-        &&
-        direction !=
-        AUDIO_DIRECTION_CONTROL_TX
-    )
-    {
-        return false;
-    }
-
-
+static void notify_prepare_failure(void) {
+    uint8_t payload[14]={AUDIO_DATA_EVENT,AUDIO_EVENT_PREPARATION_FAILED,(uint8_t)s_call_origin,s_target};
+    put_session(payload+4,s_session);put_session(payload+8,s_operation==CMD_SET?s_ptt_request:0);
+    payload[12]=s_failed_node;payload[13]=s_failed_reason;
+    send_frame_to_node(NODE_PI,SERVICE_AUDIO,CMD_DATA,payload,sizeof(payload));
+}
+static bool finish_prepare(void) {
+    if(s_failed_node){notify_prepare_failure();return false;}
+    if(s_ready_mask!=3)return false;
     lock_manager();
-
-
-    if (
-        s_call_state ==
-        CALL_STATE_IDLE
-    )
-    {
-        unlock_manager();
-
-
-        ESP_LOGW(
-            TAG,
-            "Direction ignored: no active call"
-        );
-
-
-        return false;
+    if(s_operation!=CMD_STOP){
+        s_preparing=false;
+        s_call_state=(call_state_t)s_target;
     }
-
-
-    if (
-        direction ==
-        AUDIO_DIRECTION_FIELD_TX
-    )
-    {
-        s_call_state =
-            CALL_STATE_FIELD_TX;
-    }
-    else
-    {
-        s_call_state =
-            CALL_STATE_CONTROL_TX;
-    }
-
-
     unlock_manager();
-
-
-    request_audio_direction(
-        direction
-    );
-
-
-    call_origin_t origin =
-        call_manager_get_origin();
-
-
-    notify_pi_call_event(
-        AUDIO_EVENT_DIRECTION_CHANGED,
-        origin,
-        (uint8_t)direction
-    );
-
-
-    if (
-        direction ==
-        AUDIO_DIRECTION_FIELD_TX
-    )
-    {
-        ESP_LOGI(
-            TAG,
-            "CALL -> FIELD_TX"
-        );
-    }
-    else
-    {
-        ESP_LOGI(
-            TAG,
-            "CALL -> CONTROL_TX"
-        );
-    }
-
-
     return true;
 }
-
+bool call_manager_set_direction(audio_direction_t direction) {
+    if(!call_manager_is_active() || (direction!=AUDIO_DIRECTION_FIELD_TX &&
+        direction!=AUDIO_DIRECTION_CONTROL_TX))return false;
+    begin_prepare(CMD_SET,direction);
+    request_audio_direction(direction);
+    return true;
+}
 
 /* ============================================================
  * END CALL
@@ -738,7 +671,7 @@ static void notify_call_end(call_origin_t origin, bool polled_only) {
     if(!polled_only)notify_pi_call_event(AUDIO_EVENT_CALL_ENDED,origin,0);
 }
 
-static bool end_call(bool polled_only)
+static bool finalize_end(bool polled_only)
 {
     lock_manager();
 
@@ -781,8 +714,7 @@ static bool end_call(bool polled_only)
      * 음성 경로 먼저 종료.
      * ======================================================== */
 
-    request_audio_stop();
-
+    /* Endpoints have acknowledged stop before restoring music. */
 
     /* ========================================================
      * Sleep 상태 복원
@@ -847,6 +779,7 @@ static bool end_call(bool polled_only)
 
     s_call_state =
         CALL_STATE_IDLE;
+    s_preparing = false;
 
 
     s_call_origin =
@@ -876,6 +809,34 @@ static bool end_call(bool polled_only)
     return true;
 }
 
+
+static bool end_call(bool polled_only) {
+    if(!call_manager_is_active())return finalize_end(polled_only);
+    if(s_operation!=CMD_STOP) {
+        begin_prepare(CMD_STOP,0);
+        request_audio_stop();
+        return true;
+    }
+    if(polled_only && s_failed_node)return false;
+    if(!finish_prepare())return false;
+    return finalize_end(polled_only);
+}
+
+void call_manager_handle_readiness(const protocol_frame_t *f) {
+    if(f->railing_id!=RAILING_ID || f->dst!=NODE_P4 || f->service!=SERVICE_AUDIO ||
+       f->command!=CMD_DATA || f->length!=12 || f->payload[0]!=AUDIO_DATA_READY ||
+       (f->src!=NODE_WROOM && f->src!=NODE_S3) || !s_preparing)return;
+    uint8_t session[4],request[4];put_session(session,s_session);
+    put_session(request,s_operation==CMD_SET?s_ptt_request:0);
+    if(f->payload[1]!=s_operation || f->payload[2]!=s_target ||
+       memcmp(f->payload+4,session,4) || memcmp(f->payload+8,request,4) || f->payload[3]>2)return;
+    uint8_t bit=f->src==NODE_WROOM?1:2;
+    if(f->payload[3]==1){
+        s_ready_mask|=bit;
+        if(s_operation==CMD_STOP && s_ready_mask==3)s_failed_node=s_failed_reason=0;
+    }
+    if(f->payload[3]==2){s_failed_node=f->src;s_failed_reason=2;}
+}
 
 /* ============================================================
  * GET
@@ -949,12 +910,22 @@ void call_manager_keepalive(void)
 
 void call_manager_tick(void)
 {
+    int64_t now=esp_timer_get_time();
+    if(s_preparing && s_ready_mask!=3 && !s_failed_node && now>=s_prepare_deadline) {
+        s_failed_node=(s_ready_mask&1)?NODE_S3:NODE_WROOM;s_failed_reason=3;
+    }
+    if(s_preparing && now>=s_next_probe) {
+        s_next_probe=now+(s_failed_node?1000000:200000);
+        if(s_operation==CMD_START)request_audio_start();
+        else if(s_operation==CMD_SET)request_audio_direction((audio_direction_t)s_target);
+        else if(s_operation==CMD_STOP)request_audio_stop();
+    }
     lock_manager();
     bool expired = s_call_state != CALL_STATE_IDLE &&
                    esp_timer_get_time() >= s_call_lease_until_us;
     unlock_manager();
     if (expired) {
-        ESP_LOGW(TAG, "Pi keepalive expired; ending call");
+        if(s_operation!=CMD_STOP)ESP_LOGW(TAG, "Pi keepalive expired; ending call");
         end_call(true);
     }
 }
@@ -966,7 +937,7 @@ bool call_manager_session_matches(uint32_t session) {
 bool call_manager_bind_session(uint32_t session) {
     if (!session) return false;
     if (call_manager_is_active()) {
-        if (session == s_session) {
+        if (session == s_session && s_operation==CMD_START && finish_prepare()) {
             notify_pi_call_event(AUDIO_EVENT_CALL_STARTED, call_manager_get_origin(),
                                 (uint8_t)call_manager_get_state());
         }
@@ -979,12 +950,15 @@ bool call_manager_bind_session(uint32_t session) {
     return true;
 }
 bool call_manager_stop_session(uint32_t session) {
-    if (call_manager_is_active() && !call_manager_session_matches(session)) return false;
-    if (!call_manager_is_active() && session != s_session) {
-        /* STOP for a lost START (or a pre-session journal) confirms idle only. */
-        uint8_t payload[8] = {AUDIO_DATA_EVENT, AUDIO_EVENT_CALL_ENDED, 0, 0};
-        put_session(payload+4, session);
-        return send_frame_to_node(NODE_PI,SERVICE_AUDIO,CMD_DATA,payload,sizeof(payload));
+    if (call_manager_is_active() && session != s_session) return false;
+    if (!call_manager_is_active() && (!s_session_ended || session != s_session)) {
+        /* After a P4 reboot, endpoints may still hold the recovered session.
+         * Confirm their physical stop before declaring the bus free. */
+        lock_manager();
+        s_session=session;s_ptt_request=0;s_operation=0;
+        s_call_state=CALL_STATE_FIELD_TX;s_preparing=true;
+        s_call_lease_until_us=esp_timer_get_time()+CALL_LEASE_US;
+        unlock_manager();
     }
     return call_manager_end();
 }
@@ -999,7 +973,7 @@ bool call_manager_voice_allowed(const protocol_frame_t *f) {
     uint32_t id=((uint32_t)f->payload[7]<<24)|((uint32_t)f->payload[8]<<16)|
                 ((uint32_t)f->payload[9]<<8)|f->payload[10];
     lock_manager();
-    bool valid=id && id==s_session &&
+    bool valid=!s_preparing && id && id==s_session &&
         ((s_call_state==CALL_STATE_FIELD_TX && f->payload[2]==AUDIO_DIRECTION_FIELD_TX &&
           f->src==NODE_S3 && f->dst==NODE_PI) ||
          (s_call_state==CALL_STATE_CONTROL_TX && f->payload[2]==AUDIO_DIRECTION_CONTROL_TX &&
@@ -1009,10 +983,15 @@ bool call_manager_voice_allowed(const protocol_frame_t *f) {
 }
 
 bool call_manager_set_direction_ordered(uint32_t session, uint32_t request, audio_direction_t direction) {
-    if (!call_manager_session_matches(session) || !request || request < s_ptt_request ||
-        (direction != AUDIO_DIRECTION_FIELD_TX && direction != AUDIO_DIRECTION_CONTROL_TX)) return false;
-    if (request == s_ptt_request && (uint8_t)call_manager_get_state() != (uint8_t)direction) return false;
-    s_ptt_request = request;
-    /* Same-ID retries replay downstream SET and Pi confirmation without changing generation. */
+    if(!call_manager_session_matches(session) || !request || request<s_ptt_request ||
+       (direction!=AUDIO_DIRECTION_FIELD_TX && direction!=AUDIO_DIRECTION_CONTROL_TX) ||
+       s_operation==CMD_STOP)return false;
+    if(request==s_ptt_request) {
+        if(s_operation!=CMD_SET || direction!=s_target)return false;
+        if(finish_prepare())notify_pi_call_event(AUDIO_EVENT_DIRECTION_CHANGED,s_call_origin,direction);
+        return true;
+    }
+    if(s_preparing)return false;
+    s_ptt_request=request;
     return call_manager_set_direction(direction);
 }

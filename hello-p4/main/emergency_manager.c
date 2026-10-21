@@ -607,6 +607,11 @@ uint8_t emergency_manager_get_source(void)
         s_source;
 }
 bool emergency_manager_ack_session(uint32_t seq, uint32_t session) {
+    /* Retry the existing emergency call even after ACK cleared the alarm. */
+    if (call_manager_session_matches(session) && call_manager_get_origin()==CALL_ORIGIN_EMERGENCY) {
+        call_manager_bind_session(session);
+        return true;
+    }
     if (!s_active || seq != s_active_seq) return false;
     if (!call_manager_bind_session(session)) return false;
     return emergency_manager_ack(seq);

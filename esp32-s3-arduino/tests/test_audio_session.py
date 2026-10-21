@@ -16,18 +16,25 @@ extern Console Serial;
 #include "audio_session.cpp"
 Console Serial;
 static bool mic;
+static unsigned ready=0;
+unsigned microphone_codec2_readiness(){return ready;}
 static protocol_frame_t sent;
 void microphone_codec2_set_enabled(bool enabled){mic=enabled;}
 bool ble_send_frame(const protocol_frame_t *f){sent=*f;return true;}
 int main(){
  audio_session_init();
- protocol_frame_t c={};c.src=NODE_P4;c.command=CMD_START;c.length=4;c.payload[3]=7;
+ protocol_frame_t c={};c.railing_id=RAILING_ID;c.src=NODE_P4;c.command=CMD_START;c.length=4;c.payload[3]=7;
  assert(audio_session_control(&c));assert(mic && audio_session_id()==7);
+ audio_session_report_readiness(&c);assert(sent.payload[0]==AUDIO_DATA_READY && sent.payload[3]==0);
+ ready=1;audio_session_report_readiness(&c);assert(sent.dst==NODE_P4 && sent.payload[3]==1 && sent.payload[7]==7);
+ ready=2;audio_session_report_readiness(&c);assert(sent.payload[3]==2);ready=1;
  uint8_t bits[48]={};
  assert(audio_session_send_codec2(bits,8,1,7));
  assert(sent.length==59 && sent.payload[10]==7 && sent.payload[5]==8);
  c.command=CMD_STOP;c.payload[3]=6;assert(!audio_session_control(&c));assert(mic);
  c.payload[3]=7;assert(audio_session_control(&c));assert(!mic);
+ assert(audio_session_control(&c));audio_session_report_readiness(&c);
+ assert(sent.payload[1]==CMD_STOP && sent.payload[2]==0 && sent.payload[3]==1);
  c.command=CMD_START;assert(!audio_session_control(&c));
  c.payload[3]=8;assert(audio_session_control(&c));assert(mic);
  assert(!audio_session_send_codec2(bits,8,2,7)); // captured under old session

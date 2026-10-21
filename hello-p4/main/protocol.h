@@ -210,7 +210,8 @@ typedef enum
 
     AUDIO_EVENT_CALL_ENDED        = 0x02,
 
-    AUDIO_EVENT_DIRECTION_CHANGED = 0x03
+    AUDIO_EVENT_DIRECTION_CHANGED = 0x03,
+    AUDIO_EVENT_PREPARATION_FAILED = 0x04
 
 } audio_event_t;
 
@@ -406,3 +407,6 @@ typedef enum
         0x01
 
 } emergency_event_t;
+
+/* Endpoint preparation report, 12 bytes; internal P4/WROOM/S3 only. */
+#define AUDIO_DATA_READY 0x04

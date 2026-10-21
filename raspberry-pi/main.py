@@ -150,15 +150,8 @@ def main() -> int:
         baudrate=args.baud,
     )
 
-    emergency = EmergencyManager(
-        bus,
-        railings,
-    )
-
-    audio = AudioManager(
-        bus,
-        railings,
-    )
+    audio = AudioManager(bus, railings)
+    emergency = EmergencyManager(bus, railings, audio=audio)
 
     voice = VoiceRelay(
         bus,
