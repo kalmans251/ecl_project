@@ -75,7 +75,7 @@ class PollTests(unittest.TestCase):
         frame,opts=self.bus.sent[-1]
         self.assertEqual(frame.railing_id,2)
         self.assertEqual(opts['grant_railing'],1)
-        self.assertEqual(opts['reply_budget_ms'],120)
+        self.assertEqual(opts['reply_budget_ms'],140)
         self.assertTrue(opts['wait_for_window'])
 
     def test_pending_call_and_keepalive_take_priority(self):
@@ -115,3 +115,48 @@ class PollTests(unittest.TestCase):
             self.poller.poll_once(1)
         self.assertFalse(self.states.call_pending(1))
         self.assertEqual(self.poller.ack[1],99)
+
+    def test_fragmented_reply_finishing_after_old_deadline_is_accepted(self):
+        import time
+        from protocol import FrameParser
+        parser = FrameParser()
+        workers = []
+        def send(request):
+            raw = response(request).encode()
+            def receive():
+                time.sleep(0.102)
+                # Each chunk goes through the real CRC/length parser.
+                for chunk in (raw[:12], raw[12:]):
+                    for frame in parser.feed(chunk):
+                        self.poller.handle_frame(frame)
+                    time.sleep(0.060)
+            worker = threading.Thread(target=receive)
+            workers.append(worker)
+            worker.start()
+        self.bus.callback = send
+        try:
+            self.poller.poll_once(1)
+            self.assertEqual(len(self.events), 1)
+            self.assertEqual(self.poller.ack[1], 9)
+        finally:
+            for worker in workers:
+                worker.join()
+
+    def test_corrupt_reply_still_not_acknowledged(self):
+        from protocol import FrameParser
+        def send(request):
+            raw = bytearray(response(request).encode())
+            raw[-1] ^= 1
+            for frame in FrameParser().feed(bytes(raw)):
+                self.poller.handle_frame(frame)
+        self.bus.callback = send
+        self.poller.poll_once(1)
+        self.assertEqual(self.events, [])
+        self.assertNotIn(1, self.poller.ack)
+
+    def test_grant_budget_still_fits_9600_and_timeout_scales_with_baud(self):
+        from plc.events import POLL_REPLY_BUDGET_MS
+        self.assertLessEqual(18 * 10 * 1000 / 9600 + 40 + POLL_REPLY_BUDGET_MS, 200)
+        self.bus.baudrate = 4800
+        slow = EventPoller(self.bus, self.states, self.audio, [1], self.events.append)
+        self.assertGreater(slow.reply_timeout, self.poller.reply_timeout)

@@ -8,6 +8,16 @@ from protocol import Frame, Node, Service, Command, AudioDirection, AudioDataTyp
 
 LOG = logging.getLogger(__name__)
 
+# Largest EVENT_REPLY: 24 payload + 10 framing bytes, 8N1.
+# Observed modem response startup is ~102 ms. Allow 200 ms startup plus
+# the entire reply on the UART and 100 ms host scheduling margin.
+MAX_EVENT_REPLY_BYTES = 34
+POLL_STARTUP_SECONDS = 0.200
+POLL_HOST_MARGIN_SECONDS = 0.100
+# Separate from host wait: request + 40 ms bus margin + reply budget
+# must still fit the P4 grant (18 bytes at 9600 + 40 + 140 < 200 ms).
+POLL_REPLY_BUDGET_MS = 140
+
 
 class EventPoller:
     def __init__(self, bus, railings, audio, ids, dispatch):
@@ -15,6 +25,8 @@ class EventPoller:
         self.ids, self.dispatch = tuple(ids), dispatch
         self.stop_event = threading.Event()
         self.condition = threading.Condition()
+        self.reply_timeout = (POLL_STARTUP_SECONDS + POLL_HOST_MARGIN_SECONDS
+                              + MAX_EVENT_REPLY_BYTES * 10 / getattr(bus, 'baudrate', 9600))
         self.pending = None
         self.received = False
         self.ack = {}
@@ -67,7 +79,7 @@ class EventPoller:
                     if field:
                         try:
                             self.bus.send_control_frame(request, wait_for_window=True, timeout=0.8,
-                                grant_railing=owner, reply_budget_ms=120)
+                                grant_railing=owner, reply_budget_ms=POLL_REPLY_BUDGET_MS)
                         except TimeoutError:
                             if self.audio.recovery_delay(owner)>0:
                                 return True
@@ -76,12 +88,13 @@ class EventPoller:
                         # Finish preceding Pi audio and leave modem turnaround.
                         time.sleep(0.025)
                         self.bus.send_frame(request)
-                    deadline = time.monotonic() + 0.12
+                    deadline = time.monotonic() + self.reply_timeout
                     with self.condition:
                         while not self.received:
                             remaining = deadline - time.monotonic()
                             if remaining <= 0:
-                                LOG.debug('No emergency poll reply rail=%d', rail)
+                                LOG.debug('No valid event poll reply before deadline rail=%d token=%s timeout=%.3fs',
+                                          rail, token.hex(), self.reply_timeout)
                                 break
                             self.condition.wait(remaining)
                 finally:
