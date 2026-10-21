@@ -945,3 +945,15 @@ separate feature. Voice packets are session-tagged but not PTT-epoch-tagged, so 
 change does not claim to reject every delayed audio packet across on/off/on within
 one call. Firmware replay protection across reboot and physical bus verification
 remain outstanding.
+
+## 서버 없이 장치 통합 검증
+
+[HARDWARE_TEST.md](HARDWARE_TEST.md)의 Pi 전용 시험 도구로 P4/WROOM/S3 응답과
+통화 상태를 검사하고, USB 마이크/AUX를 통한 실제 음성을 수동 확인할 수 있습니다.
+기존 main.py 및 UART 사용 서비스를 종료한 뒤 실행하세요.
+
+```bash
+python tools/hardware_test.py --suite communication --rails 1 --cycles 10
+```
+
+결과는 `test-results/`의 JSONL/CSV/요약 JSON/로그로 저장됩니다.
