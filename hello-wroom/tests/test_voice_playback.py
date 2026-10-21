@@ -3,11 +3,10 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-import ctypes.util
 import os
 
 CODEC2_SRC = os.environ.get('ECL_TEST_CODEC2_SRC')
-CODEC2_LIB = os.environ.get('ECL_TEST_CODEC2_LIB') or ctypes.util.find_library('codec2')
+CODEC2_LIB = os.environ.get('ECL_TEST_CODEC2_LIB')
 MAIN = Path(__file__).resolve().parents[1] / 'main'
 HEADERS = {
 'driver/uart.h': '#pragma once\n',
@@ -151,9 +150,58 @@ int main(void) {
 }
 '''
 
+
+# Instrument calls to the real library only in the successful playback harness.
+# The failure harness below deliberately retains its injected decoder substitutes.
+REAL_HARNESS = HARNESS.replace('#include "voice_session.c"', r'''
+#include <math.h>
+#include "voice_session.h"
+#include "codec2.h"
+static short decoded_pcm[160];
+static unsigned decoded_frames, nonzero_samples;
+static void checked_decode(struct CODEC2 *decoder, short *pcm, const unsigned char *bits);
+#define codec2_decode checked_decode
+#include "voice_session.c"
+#undef codec2_decode
+static void checked_decode(struct CODEC2 *decoder, short *pcm, const unsigned char *bits) {
+    codec2_decode(decoder, pcm, bits);
+    memcpy(decoded_pcm, pcm, sizeof(decoded_pcm));
+    ++decoded_frames;
+    for (unsigned i=0; i<160; ++i) if (pcm[i]) ++nonzero_samples;
+}
+''')
+REAL_HARNESS = REAL_HARNESS.replace('    ++writes;', r'''
+    if (worker_started) {
+        assert(decoded_frames==writes+1);
+        for (unsigned i=0; i<160; ++i) assert(pcm[4*i]==decoded_pcm[i]);
+    }
+    ++writes;
+''')
+REAL_HARNESS = REAL_HARNESS.replace('    voice_session_init();', r'''
+    struct CODEC2 *encoder=codec2_create(CODEC2_MODE_2400);
+    assert(encoder);
+    short tone[160];
+    for (unsigned frame=0; frame<8; ++frame) {
+        for (unsigned i=0; i<160; ++i)
+            tone[i]=(short)(5000*sin((frame*160+i)*0.11));
+        codec2_encode(encoder, payload+11+frame*6, tone);
+    }
+    codec2_destroy(encoder);
+    voice_session_init();
+''')
+REAL_HARNESS = REAL_HARNESS.replace('    writes=released=0;', r'''
+    assert(decoded_frames==8 && nonzero_samples>0);
+    decoded_frames=nonzero_samples=0;
+    writes=released=0;
+''')
+REAL_HARNESS = REAL_HARNESS.replace('    puts("WROOM', '    assert(decoded_frames==8 && nonzero_samples>0);\n    puts("WROOM')
+
 class VoicePlaybackTests(unittest.TestCase):
-    @unittest.skipUnless(CODEC2_LIB and CODEC2_SRC, 'requires libcodec2')
     def test_worker(self):
+        if not (CODEC2_LIB and CODEC2_SRC):
+            if os.environ.get('CI') or os.environ.get('ECL_REQUIRE_CODEC2'):
+                self.fail('Pinned Codec2 source/library required; run tests/run_host_tests.py')
+            self.skipTest('requires pinned Codec2 source and library')
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             for name, text in HEADERS.items():
@@ -162,9 +210,9 @@ class VoicePlaybackTests(unittest.TestCase):
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(text)
             source=root/'harness.c'
-            source.write_text(HARNESS)
+            source.write_text(REAL_HARNESS)
             binary=root/'test'
-            subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-I',str(root),'-I',str(MAIN),'-I',CODEC2_SRC,str(source),str(MAIN/'voice_decoder.c'),CODEC2_LIB if '/' in CODEC2_LIB else '-l:'+CODEC2_LIB,'-o',str(binary)],check=True)
+            subprocess.run(['cc','-std=c11','-fsingle-precision-constant','-Wall','-Wextra','-Werror','-I',str(root),'-I',str(MAIN),'-I',CODEC2_SRC,str(source),str(MAIN/'voice_decoder.c'),CODEC2_LIB,'-lm','-o',str(binary)],check=True)
             subprocess.run([str(binary)],check=True,timeout=5)
 
 FAILURE_MAIN = r'''
@@ -243,7 +291,7 @@ void codec2_decode(struct CODEC2 *decoder,short *pcm,const unsigned char *bits) 
             source=root/'failure.c';source.write_text(harness)
             for dma_ok in (0,1):
                 binary=root/('failure'+str(dma_ok))
-                subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror',
+                subprocess.run(['cc','-std=c11','-fsingle-precision-constant','-Wall','-Wextra','-Werror',
                     '-DDMA_OK='+str(dma_ok),'-I',str(root),'-I',str(MAIN),
                     str(source),'-o',str(binary)],check=True)
                 subprocess.run([str(binary)],check=True,timeout=5)
