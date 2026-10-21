@@ -70,8 +70,11 @@ int main(int argc, char **argv) {
 }
 """
 class DecoderTests(unittest.TestCase):
-    @unittest.skipUnless(SRC and LIB, 'requires pinned Codec2 source and library')
     def test_decoder(self):
+        if not (SRC and LIB):
+            if os.environ.get('CI') or os.environ.get('ECL_REQUIRE_CODEC2'):
+                self.fail('Pinned Codec2 source/library required; run tests/run_host_tests.py')
+            self.skipTest('requires pinned Codec2 source and library')
         with tempfile.TemporaryDirectory() as folder:
             source = Path(folder) / 'test.c'
             source.write_text(HARNESS)
@@ -81,4 +84,6 @@ class DecoderTests(unittest.TestCase):
                 '-o', str(binary)], check=True)
             full = subprocess.run([str(binary), 'full'], check=True, timeout=10, capture_output=True)
             small = subprocess.run([str(binary), 'small'], check=True, timeout=10, capture_output=True)
+            self.assertEqual(len(full.stdout), 200 * 160 * 2)
+            self.assertNotEqual(full.stdout, bytes(len(full.stdout)))
             self.assertEqual(full.stdout, small.stdout)

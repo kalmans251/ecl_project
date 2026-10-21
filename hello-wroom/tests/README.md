@@ -1,3 +1,39 @@
+## Required CI suite
+
+Run the same entry point as the `wroom-host-tests` GitHub Actions job (Linux, Python 3, Git and GCC required):
+
+```sh
+python hello-wroom/tests/run_host_tests.py --build-dir "$(mktemp -d)"
+```
+
+The runner reads `GIT_REPOSITORY` and the full `GIT_TAG` from the firmware's
+`components/codec2/CMakeLists.txt`, fetches and verifies that exact commit, and
+builds a fresh shared library from the same `src/*.c` files. It uses the firmware's
+2400-only mode definitions and single-precision constants. No distribution
+Codec2 package or system-library fallback is used. The build directory must not
+already contain a `source` checkout; dependencies are intentionally not cached.
+
+The runner sets `ECL_TEST_CODEC2_SRC` and `ECL_TEST_CODEC2_LIB` before discovering
+all WROOM tests. Missing required worker/decoder/failure tests, any skip, dependency
+fetch/build failures, C compilation failures and failed assertions fail the job.
+Direct unittest invocation in CI (or with `ECL_REQUIRE_CODEC2=1`) also fails when
+the Codec2 paths are absent. Local direct invocation without those variables may
+skip the two dependency-requiring tests; use the runner for complete verification.
+
+Real playback encodes a tone, decodes it through `voice_decoder.c` and the actual
+worker, checks that nonzero decoded PCM reaches `audio_output_write` unchanged
+apart from the expected sample repetition/stereo conversion, and checks eight
+20 ms output blocks per session. Decoder equivalence checks exactly 200 frames
+(64,000 bytes) of nonzero PCM against the full constructor. Existing DMA/decoder
+failure, retry, queue, audio-output and music tests remain part of the suite.
+
+These are host software checks. RTOS queues, I2S and DMA drivers are substitutes;
+passing does not establish ESP32 heap/stack margin, real scheduling, DAC/amp
+operation, speaker loudness, noise, or uninterrupted physical playback. Those
+require the board procedures below.
+
+## Individual tests and hardware procedure
+
 Run host tests against the exact Codec2 revision pinned in components/codec2/CMakeLists.txt:
 
 ```sh

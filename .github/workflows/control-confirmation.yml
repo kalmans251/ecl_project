@@ -18,9 +18,18 @@ jobs:
       - run: PYTHONPATH=raspberry-pi python -m unittest discover -s raspberry-pi/tests -v
       - run: python -m unittest discover -s hello-p4/tests -v
       - run: python -m unittest discover -s esp32-s3-arduino/tests -v
-      - run: python -m unittest discover -s hello-wroom/tests -p test_voice_playback.py -v
-      - run: python -m unittest discover -s hello-wroom/tests -p test_music_apply.py -v
-      - run: python -m unittest discover -s hello-wroom/tests -p test_player_confirmation.py -v
+  wroom-host-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install host build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential git
+      - name: Build firmware-pinned Codec2 and require all WROOM host tests
+        run: python hello-wroom/tests/run_host_tests.py --build-dir "$RUNNER_TEMP/wroom-codec2"
   wroom-build:
     runs-on: ubuntu-latest
     steps:
