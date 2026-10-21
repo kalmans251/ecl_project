@@ -134,6 +134,7 @@ class CallGateway:
                 self.accepted_connections.pop(mid, None)
                 self.data['receipts'][mid]['status'] = status
                 self._save()
+                self.busy = False
             try: self._ack(mid, status)
             except Exception: pass  # saved outcome is available to a duplicate, never replayed
             self.voice.state_changed()

@@ -91,7 +91,7 @@ public class Commands {
             if(!c.get("USER_ID").equals(user) && !Boolean.TRUE.equals(accounts.user(username).get("ADMIN"))) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Call belongs to another operator");
             if(operation.startsWith("ptt.") && !c.get("STATUS").equals("ACTIVE")) throw new ResponseStatusException(HttpStatus.CONFLICT,"Call is not confirmed; retry hangup");
             if(operation.startsWith("ptt.")) db.update("UPDATE calls SET status='SWITCHING',touched_at=? WHERE gateway_id=?",System.currentTimeMillis(),gateway);
-            if(operation.equals("call.end")) db.update("UPDATE calls SET status='ENDING',touched_at=? WHERE gateway_id=?",System.currentTimeMillis(),gateway);
+            if(operation.equals("call.end")) db.update("UPDATE calls SET status='ENDING',end_requested=TRUE,touched_at=? WHERE gateway_id=?",System.currentTimeMillis(),gateway);
         }
     }
     @Scheduled(fixedDelay=200) public synchronized void dispatch() {
@@ -165,7 +165,7 @@ public class Commands {
         String phase=n.path("phase").asText();
         if(phase.equals("ended")) {
             // A first observed END is allowed only for an explicit hangup recovery.
-            if(call.get("DEVICE_SESSION")==null && !call.get("STATUS").equals("ENDING"))return;
+            if(call.get("DEVICE_SESSION")==null && !Boolean.TRUE.equals(call.get("END_REQUESTED")))return;
             db.update("DELETE FROM calls WHERE gateway_id=? AND id=?",gateway,call.get("ID"));return;
         }
         db.update("UPDATE calls SET device_session=?,device_seen_at=? WHERE gateway_id=?",session,System.currentTimeMillis(),gateway);

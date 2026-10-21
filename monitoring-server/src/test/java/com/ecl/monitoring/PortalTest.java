@@ -106,6 +106,9 @@ class PortalTest {
    var end=json.readTree(device.next());
    state.put("phase","ended");state.put("error","");state.put("session_id",124L);
    commands.callState("gateway-01",json.valueToTree(state));assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls WHERE id=?",Integer.class,cid));
+   // A lost connection must not erase the explicit hangup recovery intent.
+   db.update("UPDATE calls SET device_session=NULL WHERE id=?",cid);
+   commands.connectionLost("gateway-01");
    state.put("session_id",123L);commands.callState("gateway-01",json.valueToTree(state));
    assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls WHERE id=?",Integer.class,cid));
    device.ack(end.path("message_id").asText(),"APPLIED");
