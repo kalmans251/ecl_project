@@ -22,6 +22,7 @@ jobs:
           cache-dependency-path: monitoring-server/pom.xml
       - run: mvn -B -ntp verify
       - run: |
+          node --test src/test/js/*.test.js
           node --check src/main/resources/static/portal.js
           node --check src/main/resources/static/mic-worklet.js
           node --check src/main/resources/static/login.js

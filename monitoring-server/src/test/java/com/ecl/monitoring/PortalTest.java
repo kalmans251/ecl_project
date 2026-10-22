@@ -79,4 +79,23 @@ class PortalTest {
   assertEquals(200,b.request("/api/portal/sites/site-01/contacts/"+URLEncoder.encode("경찰서",java.nio.charset.StandardCharsets.UTF_8),"PUT",Map.of("phone","01000000000"),true).statusCode());
   assertEquals(503,b.request("/api/portal/sites/site-01/sms","POST",Map.of("request_id",UUID.randomUUID(),"label","경찰서","rail_id",rail),true).statusCode());assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM sms_requests",Integer.class));
  }
+ @Test void musicSocketUpdatesAuthorizedPortalWithoutReplacingOtherState()throws Exception{
+  String rail=rail();telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.now().toString(),"state",Map.of("volume",20))));
+  var browser=new Browser(newUser("music-viewer","VIEWER"));
+  try(var device=new Device()){
+   device.ws.sendText(json.writeValueAsString(Map.of("version",1,"type","music_state","railing_id",1,"observed_at",Instant.now().toString(),"fresh_ms",10000,"state",Map.of("available",true,"state","playing","filename","actual.mp3","position_ms",12345))),true).join();
+   long until=System.nanoTime()+3_000_000_000L;
+   while(System.nanoTime()<until){
+    var response=browser.request("/api/portal/sites/site-01/state","GET",null,false);
+    assertEquals(200,response.statusCode());
+    for(var r:json.readTree(response.body()).path("rails"))if(r.path("id").asText().equals(rail) && r.path("music_status").path("available").asBoolean()){
+     assertEquals("actual.mp3",r.path("music_status").path("filename").asText());
+     assertEquals(12345,r.path("music_status").path("position_ms").asLong());
+     assertEquals(20,r.path("reported").path("volume").asInt());return;
+    }
+    Thread.sleep(20);
+   }
+   fail("Music state did not reach portal");
+  }
+ }
 }

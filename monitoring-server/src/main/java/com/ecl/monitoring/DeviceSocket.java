@@ -9,8 +9,9 @@ public class DeviceSocket extends TextWebSocketHandler {
     private final Gateways gateways;
     private final Events events;
     private final Commands commands; private final Telemetry telemetry;private final Voice voice;
+    private final MusicTelemetry music;
     private final JsonMapper json=JsonMapper.builder().build();
-    public DeviceSocket(Gateways gateways, Events events, Commands commands, Telemetry telemetry,Voice voice) { this.gateways=gateways; this.events=events; this.commands=commands;this.telemetry=telemetry;this.voice=voice; }
+    public DeviceSocket(Gateways gateways, Events events, Commands commands, Telemetry telemetry,Voice voice,MusicTelemetry music) { this.gateways=gateways; this.events=events; this.commands=commands;this.telemetry=telemetry;this.voice=voice;this.music=music; }
     private String id(WebSocketSession session) { return session.getUri().getPath().substring("/ws/gateways/".length()); }
     @Override public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         session.setTextMessageSizeLimit(4096);
@@ -20,6 +21,7 @@ public class DeviceSocket extends TextWebSocketHandler {
     }
     @Override protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         try {
+            if(!gateways.isCurrent(id(session),session.getId())) { session.close(CloseStatus.POLICY_VIOLATION);return; }
             // Bound acknowledgments independently from REST rate limits.
             synchronized (session) {
                 long second=System.nanoTime()/1_000_000_000L;
@@ -30,6 +32,7 @@ public class DeviceSocket extends TextWebSocketHandler {
                 if (count>30) throw new IllegalArgumentException("Too many acknowledgments");
             }
             var node=json.readTree(message.getPayload());
+            if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("music_state")){music.accept(id(session),session.getId(),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("voice")){voice.receive(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("telemetry")){telemetry.accept(id(session),node);return;}
             if (!node.isObject() || node.size()!=4 || !node.path("version").isInt() || node.path("version").intValue()!=1

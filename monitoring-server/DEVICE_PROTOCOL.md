@@ -90,3 +90,20 @@ Pi는 PCM을 디코딩할 필요 없이 Codec2만 전달하면 됩니다.
 6. 시뮬레이터 종료 → OFFLINE, 상태 미수신 확인.
 
 시뮬레이터는 실제 음성이나 물리 장치 성공을 증명하지 않습니다.
+
+## 음악 현재 상태 (version 1, music_state)
+
+인증된 게이트웨이 WebSocket에서 별도로 보내는 부분 상태다. 일반 `telemetry`와
+병합해 전원/센서 값을 덮어쓰지 않는다. `railing_id`는 인증된 게이트웨이에 등록되어야 한다.
+
+```json
+{"version":1,"type":"music_state","railing_id":1,"observed_at":"2026-10-22T10:00:00Z","fresh_ms":10000,"state":{"available":true,"state":"playing","filename":"song.mp3","position_ms":12345}}
+```
+
+조회 실패/통화 중 조회 보류는 `state: {"available":false}`만 전달한다.
+state는 `idle|playing|paused`, filename은 문자열 또는 null, position_ms는 uint32이다.
+fresh_ms는 1000~120000이며 Pi의 전체 난간 순회 주기에 맞춘 유효기간이다.
+관측 시각은 서버 기준 과거 60초~미래 2초 안이어야 한다. 구 연결과 역순 샘플은 적용하지 않는다.
+`GET /api/portal/sites/{site}/state`의 난간별 `music_status`에서 최신 값과
+`fresh`, `age_ms`, `fresh_ms`를 제공한다. 접속 사이트 권한을 그대로 적용한다.
+Pi 연결/실물 테스트 방법은 [MUSIC_SYNC.md](MUSIC_SYNC.md)를 참조한다.

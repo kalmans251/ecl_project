@@ -92,7 +92,20 @@ def parse_args() -> argparse.Namespace:
         help='Durable unresolved-call journal; keep the same path across restarts')
     parser.add_argument('--event-railings', default='1,2,3,4',
                         help='Comma-separated installed railing IDs to poll (default: 1,2,3,4)')
+    parser.add_argument('--music-sync', action='store_true', help='Poll actual music state round-robin')
+    parser.add_argument('--music-poll-interval', type=float, default=2.0, help='Seconds between rails (1..30)')
+    parser.add_argument('--monitor-url', help='Optional telemetry-only WSS gateway URL; enables music sync')
     args = parser.parse_args()
+    if not 1 <= args.music_poll_interval <= 30:
+        parser.error('--music-poll-interval must be 1..30')
+    if args.monitor_url:
+        from music_sync import validate_url
+        try:
+            validate_url(args.monitor_url)
+            if not os.environ.get('MONITOR_GATEWAY_TOKEN'):
+                raise ValueError('Set MONITOR_GATEWAY_TOKEN')
+        except ValueError as exc:
+            parser.error(str(exc))
     try:
         args.event_railings = tuple(dict.fromkeys(int(x.strip(), 0) for x in args.event_railings.split(',')))
         if not args.event_railings or any(not 1 <= x <= 255 for x in args.event_railings):
@@ -114,6 +127,7 @@ def print_help() -> None:
         "  call <id>           start a normal call (initial FIELD_TX)\n"
         "  ptt <id> on|off      switch CONTROL_TX / FIELD_TX\n"
         "  hangup <id>          end active call\n"
+        "  music-sync-status  show background music snapshots\n"
         "  voice-status         show Codec2 relay counters\n"
         "  help                 show this help\n"
         "  quit                 exit\n"
@@ -251,6 +265,23 @@ def main() -> int:
             bus.close()
             LOG.exception('Failed to start local audio; check devices and requirements-playback.txt')
             return 1
+
+    music_sync = publisher = None
+    try:
+        if args.music_sync or args.monitor_url:
+            from music_sync import MusicSync, MusicPublisher
+            if args.monitor_url:
+                publisher = MusicPublisher(args.monitor_url, os.environ['MONITOR_GATEWAY_TOKEN'])
+                publisher.start()
+            music_sync = MusicSync(controls, args.event_railings, args.music_poll_interval,
+                                   publisher.publish if publisher else None)
+            music_sync.start()
+    except Exception:
+        if publisher: publisher.close()
+        if local_audio: local_audio.close()
+        voice.close(); bus.close()
+        LOG.exception('Failed to start music sync')
+        return 1
 
     audio.start_keepalive()
     event_poller.start()
@@ -411,6 +442,10 @@ def main() -> int:
                 )
                 continue
 
+            if command == "music-sync-status":
+                print(json.dumps(music_sync.snapshot() if music_sync else {}, indent=2, ensure_ascii=False))
+                continue
+
             if command == "voice-status":
                 print(
                     json.dumps(
@@ -450,6 +485,8 @@ def main() -> int:
         print()
 
     finally:
+        if music_sync: music_sync.close()
+        if publisher: publisher.close()
         event_poller.close()
         audio.close()
         if local_audio:
