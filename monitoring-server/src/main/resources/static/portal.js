@@ -14,7 +14,34 @@ async function api(path,method='GET',data){
 }
 function rails(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
 function requireSelection(single=false){const items=rails();if(!items.length || (single&&items.length!==1))throw Error(single?'난간 하나를 선택하세요.':'난간을 선택하세요.');if(view.role==='VIEWER')throw Error('조회 계정은 제어할 수 없습니다.');return items;}
-async function send(operation,value,ids){const items=requireSelection(operation.startsWith('call.')||operation.startsWith('ptt.'));const result=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:ids||items.map(r=>r.id),operation,value:value??null});toast(`${operation}: 요청 접수 · 적용 확인은 처리 내역에서 확인하세요.`);await poll();return result;}
+let controlBusy=false;
+async function waitControlResults(rows){
+ const deadline=performance.now()+20000;
+ let latest=rows;
+ while(performance.now()<deadline){
+  latest=await Promise.all(latest.map(r=>['QUEUED','SENT','RECEIVED'].includes(r.status)?api(`/api/portal/commands/${r.id}`):r));
+  if(latest.every(r=>!['QUEUED','SENT','RECEIVED'].includes(r.status)))return latest;
+  await new Promise(resolve=>setTimeout(resolve,400));
+ }
+ throw Error('확인 대기 시간 초과 · 적용 여부 불명. 처리 내역을 확인하세요. 자동 재전송하지 않습니다.');
+}
+async function send(operation,value,ids){
+ const items=requireSelection(operation.startsWith('call.')||operation.startsWith('ptt.'));
+ const general=!operation.startsWith('call.')&&!operation.startsWith('ptt.')&&operation!=='emergency.ack';
+ if(general&&controlBusy)throw Error('이전 제어의 장치 응답을 기다리고 있습니다.');
+ if(general)controlBusy=true;
+ try{
+  const rows=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:ids||items.map(r=>r.id),operation,value:value??null});
+  toast(`${operation}: 요청 접수 · 장치 응답 대기`);
+  if(!general){await poll();return rows;}
+  const results=await waitControlResults(rows);await poll();
+  const label=r=>view.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id;
+  const failed=results.filter(r=>!['APPLIED','COMPLETED'].includes(r.status));
+  if(failed.length)throw Error(failed.map(r=>`${label(r)}: ${r.status}`).join(' / ')+' · 처리 내역 확인 필요, 자동 재전송 없음');
+  toast(results.map(r=>`${label(r)}: ${r.status==='APPLIED'?'장치 적용 확인':r.detail||'응답 확인'}`).join(' / '));
+  return results;
+ }finally{if(general)controlBusy=false;}
+}
 async function guarded(action){try{await action();}catch(error){toast(error.message);}}
 function choose(id){if(activeCall && !selected.has(id)){toast('통화 종료 후 난간을 변경하세요.');return;}selected=selected.has(id)?new Set():new Set([id]);dirty.clear();renderSelection();}
 function selectAllDevices(){if(activeCall)return toast('통화 종료 후 선택을 변경하세요.');selected=new Set(view.rails.map(r=>r.id));dirty.clear();renderSelection();}
@@ -77,7 +104,7 @@ async function playSelectedMusic(){
 }
 function toggleDeviceState(type,value){if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');mark('projector',value?'on':'off');document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(String(value))));}
 function switchDisplayView(mode,edit=true){$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);}
-async function applyAllUpdates(){await guarded(async()=>{requireSelection();if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){await send(op,value);if(dirty.get(op)===value)dirty.delete(op);}toast('변경 요청 접수 완료 · 장치 실제 적용 여부는 처리 내역을 확인하세요.');});}
+async function applyAllUpdates(){await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(dirty.get(op)===value)dirty.delete(op);}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
 function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
@@ -133,7 +160,7 @@ async function changeSite(){if(activeCall)return toast('통화 종료 후 현장
 async function logout(){await guarded(async()=>{if(view?.calls.some(c=>c.OWNED))throw Error('통화를 종료한 뒤 로그아웃하세요.');closeVoice();await api('/api/auth/logout','POST');location.href='/login.html';});}
 function dialog(title){text('dialogTitle',title);$('dialogBody').replaceChildren();$('portalDialog').showModal();return $('dialogBody');}
 function table(parent,headers,rows){const t=document.createElement('table');let tr=document.createElement('tr');for(const h of headers){const th=document.createElement('th');th.textContent=h;tr.append(th);}t.append(tr);for(const row of rows){tr=document.createElement('tr');for(const val of row){const td=document.createElement('td');td.textContent=val??'--';tr.append(td);}t.append(tr);}parent.append(t);}
-function showResults(){const body=dialog('요청 처리 내역');const p=document.createElement('p');p.textContent='APPLIED: 장치 적용 확인 · PLC_SENT: PLC로 송신 · UNKNOWN: 적용 여부 불명 (자동 재전송하지 않음)';body.append(p);table(body,['시간','난간','요청','상태'],(view?.commands||[]).map(c=>[new Date(c.created_at).toLocaleTimeString('ko-KR'),view.rails.find(r=>r.id===c.rail_id)?.name||c.rail_id,c.operation,c.status+(c.detail?' · '+c.detail:'')]));if(view?.schedules.length){const title=document.createElement('h3');title.textContent='저장된 예약 (Asia/Seoul)';body.append(title);for(const schedule of view.schedules){const line=document.createElement('p');line.textContent=`${view.rails.find(r=>r.id===schedule.RAIL_ID)?.name||schedule.RAIL_ID}: ${schedule.START_TIME} ~ ${schedule.END_TIME} · ${schedule.ENABLED?'활성':'비활성'} `;const b=document.createElement('button');b.textContent='예약 해제';b.onclick=()=>guarded(async()=>{requireSelection();await api(`/api/portal/rails/${schedule.RAIL_ID}/schedule`,'PUT',{start_time:schedule.START_TIME,end_time:schedule.END_TIME,enabled:false});await poll();$('portalDialog').close();showResults();});line.append(b);body.append(line);}}}
+function showResults(){const body=dialog('요청 처리 내역');for(const node of ['p4','wroom','s3']){const b=document.createElement('button');b.textContent=`${node.toUpperCase()} 응답 조회`;b.disabled=view?.role==='VIEWER';b.onclick=()=>guarded(async()=>{await send('query',node);$('portalDialog').close();showResults();});body.append(b);}const p=document.createElement('p');p.textContent='APPLIED: 장치 적용 확인 · COMPLETED: 조회 응답 또는 P4 정책 확인(재생 확인 아님) · PLC_SENT: PLC로 송신 · UNKNOWN: 적용 여부 불명 (자동 재전송하지 않음)';body.append(p);table(body,['시간','난간','요청','상태'],(view?.commands||[]).map(c=>[new Date(c.created_at).toLocaleTimeString('ko-KR'),view.rails.find(r=>r.id===c.rail_id)?.name||c.rail_id,c.operation,c.status+(c.detail?' · '+c.detail:'')+(c.operation==='query'&&c.result?.steps?' · '+c.result.steps.map(s=>`${({2:'P4',3:'WROOM',4:'S3'})[s.node]||s.node}: ${s.data}`).join(', '):'')]));if(view?.schedules.length){const title=document.createElement('h3');title.textContent='저장된 예약 (Asia/Seoul)';body.append(title);for(const schedule of view.schedules){const line=document.createElement('p');line.textContent=`${view.rails.find(r=>r.id===schedule.RAIL_ID)?.name||schedule.RAIL_ID}: ${schedule.START_TIME} ~ ${schedule.END_TIME} · ${schedule.ENABLED?'활성':'비활성'} `;const b=document.createElement('button');b.textContent='예약 해제';b.onclick=()=>guarded(async()=>{requireSelection();await api(`/api/portal/rails/${schedule.RAIL_ID}/schedule`,'PUT',{start_time:schedule.START_TIME,end_time:schedule.END_TIME,enabled:false});await poll();$('portalDialog').close();showResults();});line.append(b);body.append(line);}}}
 function toggleStatsMenu(event){event.stopPropagation();$('statsMenuDropdown').classList.toggle('show');$('statsMenuDropdown').style.display=$('statsMenuDropdown').classList.contains('show')?'block':'none';}
 function openStatsDetail(label){guarded(async()=>{$('statsMenuDropdown').style.display='none';const s=await api(`/api/portal/sites/${site}/statistics?period=${({일일:'daily',주간:'weekly',월간:'monthly',연간:'yearly'})[label]}`);const body=dialog(label+' 통계');const p=document.createElement('p');p.textContent=`충전량 ${s.watt_hours.toFixed(2)} Wh · 유효 난간 측정 시간 ${s.coverage_rail_seconds}초 · 비상 발생 ${s.emergency_starts}회 · 표본 ${s.samples}개. 실제 수신 데이터만 집계하며 보존 기간은 ${s.retained_days}일입니다.`;body.append(p);table(body,['측정 시간','난간','배터리 (%)'],s.points.map(p=>[new Date(p.time).toLocaleString('ko-KR'),view.rails.find(r=>r.id===p.rail)?.name||p.rail,p.battery]));});}
 async function sendEmergencySms(label,input){await guarded(async()=>{const r=requireSelection(true)[0];const phone=$(input).value;if(!confirm(`${label}의 저장된 연락처로 ${r.name} 비상 확인 문자를 발송할까요?`))return;await api(`/api/portal/sites/${site}/contacts/${encodeURIComponent(label)}`,'PUT',{phone});const result=await api(`/api/portal/sites/${site}/sms`,'POST',{request_id:newId(),label,rail_id:r.id});toast(`문자 요청 ${result.status} · 수신자 도착 여부는 별도 확인이 필요합니다.`);});}

@@ -40,7 +40,7 @@ class DeviceControls:
         self.pending = None
         self.result = None
 
-    def execute(self, parts):
+    def execute(self, parts, *, guard=None, structured=False):
         if not parts or parts[0].lower() not in (
                 'power', 'projector', 'led', 'music', 'volume', 'sleep', 'detection', 'query', 'ping', 'cctv'):
             return None
@@ -152,7 +152,9 @@ class DeviceControls:
             add(Service.SYSTEM, Command.PING)
         with self.lock, getattr(self.bus, "transaction", nullcontext)():
             results = []
+            steps = []
             for original in frames:
+                if guard: guard()
                 self._check_idle()
                 self.request_id = (self.request_id + 1) & 0xffffffff
                 token = self.request_id.to_bytes(4, 'big')
@@ -177,6 +179,8 @@ class DeviceControls:
                     if status not in (0, 3):
                         reason = 'rejected' if status == 1 else 'execution failed'
                         raise RuntimeError(f'Device application {reason} rail={rail}; completed steps={len(results)}')
+                    steps.append(dict(node=int(source), service=int(original.service),
+                                      command=int(original.command), status=status, data=response.hex()))
                     if status == 3:
                         results.append('P4 policy confirmed; WROOM playback not confirmed')
                     elif original.service == Service.SYSTEM:
@@ -187,6 +191,9 @@ class DeviceControls:
                     with self.condition:
                         self.pending = None
                         self.result = None
+        if structured:
+            return dict(railing_id=rail, steps=steps,
+                        device_application_confirmed=all(s['status']==0 and s['service']!=Service.SYSTEM for s in steps))
         return f'Confirmed rail={rail}: {" ".join(parts)}; ' + '; '.join(results)
 
     def handle_frame(self, frame):
