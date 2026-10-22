@@ -18,3 +18,13 @@ typedef ssize_t (*music_index_read_fn)(void *, uint8_t *, size_t);
 bool music_index_scan(music_index_t *, mp3dec_t *, uint8_t *, size_t,
                       uint32_t, music_index_read_fn, void *);
 bool music_index_locate(const music_index_t *, uint32_t, uint32_t *, uint64_t *);
+
+/* Probe only the first MPEG frame after ID3. No guessed CBR duration or TLEN. */
+typedef struct {
+    uint32_t duration_ms, hz, frame_samples;
+    const char *source;
+} music_header_info_t;
+bool music_header_probe(const uint8_t *, size_t, uint64_t, music_header_info_t *);
+/* Stop once the requested sample is indexed; UINT32_MAX requests the whole file. */
+bool music_index_scan_to(music_index_t *, mp3dec_t *, uint8_t *, size_t,
+                         uint32_t, music_index_read_fn, void *, uint32_t);

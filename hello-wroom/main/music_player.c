@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "audio_output.h"
 #include "board_config.h"
@@ -720,19 +721,35 @@ static void wait_while_paused(
  * ============================================================ */
 
 typedef struct {
-    int fd; TickType_t began; unsigned reads;
+    int fd; TickType_t deadline, last_yield;
+    uint64_t bytes; const char *failure;
     bool *paused,*stop,*restart;char *path;size_t path_size;
 } index_reader_t;
 static ssize_t index_read(void *opaque,uint8_t *dst,size_t capacity)
 {
     index_reader_t *r=opaque;
     process_control_commands(r->paused,r->stop,r->restart,r->path,r->path_size);
-    if(*r->paused || *r->stop || *r->restart || xTaskGetTickCount()-r->began>pdMS_TO_TICKS(5000))return -1;
+    if(*r->paused || *r->stop || *r->restart){r->failure="control interrupted";return -1;}
+    TickType_t now=xTaskGetTickCount();
+    if((int32_t)(r->deadline-now)<=0){r->failure="time budget exceeded";return -1;}
+    /* Yield by elapsed CPU time, not every 16 KB of file data. */
+    if(now-r->last_yield>=pdMS_TO_TICKS(100)){vTaskDelay(1);r->last_yield=xTaskGetTickCount();}
     size_t n=capacity<SD_READ_SIZE?capacity:SD_READ_SIZE;
     ssize_t got=read(r->fd,s_sd_read_buffer,n);
-    if(got>0)memcpy(dst,s_sd_read_buffer,(size_t)got);
-    if(++r->reads%32==0)vTaskDelay(1);
+    if(got>0){memcpy(dst,s_sd_read_buffer,(size_t)got);r->bytes+=(size_t)got;}
+    if(got<0)r->failure="SD read failed";
     return got;
+}
+/* Keep the playback decoder/input intact if an on-demand scan is cancelled. */
+static bool prepare_seek_index(index_reader_t *reader,uint32_t start,uint32_t target)
+{
+    mp3dec_t header_decoder;
+    off_t saved=lseek(reader->fd,0,SEEK_CUR);
+    if(saved<0 || lseek(reader->fd,start,SEEK_SET)<0){reader->failure="SD seek failed";return false;}
+    bool ok=music_index_scan_to(&s_index,&header_decoder,(uint8_t *)s_stereo_pcm,sizeof(s_stereo_pcm),
+                               start,index_read,reader,target);
+    if(lseek(reader->fd,saved,SEEK_SET)<0){reader->failure="SD restore failed";*reader->stop=true;return false;}
+    return ok;
 }
 
 static play_result_t play_mp3_file(
@@ -870,17 +887,39 @@ static play_result_t play_mp3_file(
     bool seeking=false;
     uint64_t seek_target=0;
     off_t audio_start=lseek(fd,0,SEEK_CUR);
-    index_reader_t reader={fd,xTaskGetTickCount(),0,&paused,&stop_requested,&restart_requested,restart_path,restart_path_size};
-    bool indexed=audio_start>=0 && music_index_scan(&s_index,&s_decoder,s_mp3_buffer,sizeof(s_mp3_buffer),
-        (uint32_t)audio_start,index_read,&reader);
-    if(!indexed)s_index.ready=false;
+    TickType_t scan_began=xTaskGetTickCount();
+    index_reader_t reader={.fd=fd,.deadline=scan_began+pdMS_TO_TICKS(5000),.last_yield=scan_began,
+        .paused=&paused,.stop=&stop_requested,.restart=&restart_requested,.path=restart_path,.path_size=restart_path_size};
+    struct stat file_stat;
+    music_header_info_t header={0};
+    size_t probe_size=0;
+    /* A standard first MPEG frame fits within 2 KB; ID3 was already skipped. */
+    while(audio_start>=0 && probe_size<2048) {
+        ssize_t got=index_read(&reader,s_mp3_buffer+probe_size,2048-probe_size);
+        if(got<=0)break;
+        probe_size+=(size_t)got;
+    }
+    bool metadata=!reader.failure && fstat(fd,&file_stat)==0 && file_stat.st_size>audio_start &&
+        music_header_probe(s_mp3_buffer,probe_size,(uint64_t)(file_stat.st_size-audio_start),&header);
+    memset(&s_index,0,sizeof(s_index));
+    bool indexed=false;
+    if(!metadata && !reader.failure && audio_start>=0 && lseek(fd,audio_start,SEEK_SET)>=0)
+        indexed=music_index_scan(&s_index,&s_decoder,s_mp3_buffer,sizeof(s_mp3_buffer),(uint32_t)audio_start,index_read,&reader);
     if(lseek(fd,audio_start,SEEK_SET)<0){close(fd);return PLAY_RESULT_ERROR;}
     mp3dec_init(&s_decoder);
+    uint32_t timeline_frame_samples=metadata?header.frame_samples:s_index.frame_samples;
+    uint32_t duration=metadata?header.duration_ms:indexed?(uint32_t)(s_index.total_samples*1000/s_index.hz):0;
     portENTER_CRITICAL(&s_info_mux);
-    s_info.seekable=indexed;
-    s_info.duration_ms=indexed?(uint32_t)(s_index.total_samples*1000/s_index.hz):0;
+    s_info.seekable=metadata || indexed;
+    s_info.duration_ms=duration;
     portEXIT_CRITICAL(&s_info_mux);
-    if(!indexed)ESP_LOGW(TAG,"Timeline unavailable (scan interrupted/unsupported); playback remains available");
+    if(duration)ESP_LOGI(TAG,"Timeline source=%s duration_ms=%lu index=%s bytes=%llu elapsed_ms=%lu",
+        metadata?header.source:"frame scan",(unsigned long)duration,indexed?"ready":"on demand",
+        (unsigned long long)reader.bytes,(unsigned long)((xTaskGetTickCount()-scan_began)*portTICK_PERIOD_MS));
+    else ESP_LOGW(TAG,"Timeline unavailable reason=%s bytes=%llu elapsed_ms=%lu; playback remains available",
+        reader.failure?reader.failure:"unsupported/invalid MP3",(unsigned long long)reader.bytes,
+        (unsigned long)((xTaskGetTickCount()-scan_began)*portTICK_PERIOD_MS));
+
 
 
 
@@ -916,12 +955,26 @@ static play_result_t play_mp3_file(
             music_player_info_t current;music_player_get_info(&current);
             uint32_t offset=0;uint64_t sample=0;
             bool valid=!paused && current.state==MUSIC_PLAYER_PLAYING && current.playback_id==s_seek_request.seek_id &&
-                (int32_t)(s_seek_request.seek_deadline-xTaskGetTickCount())>0 &&
-                music_index_locate(&s_index,s_seek_request.seek_ms,&offset,&sample);
+                s_seek_request.seek_ms<current.duration_ms && (int32_t)(s_seek_request.seek_deadline-xTaskGetTickCount())>0;
             if(!valid)confirm_operation(&s_seek_request,1,(uint8_t)current.state);
             else {
                 confirm_operation(&s_seek_confirmation,2,(uint8_t)current.state);
                 s_seek_confirmation=s_seek_request;s_seek_request.confirm_operation=false;
+                if(!music_index_locate(&s_index,s_seek_confirmation.seek_ms,&offset,&sample)) {
+                    audio_output_deinit();playback_started=false;
+                    reader.deadline=s_seek_confirmation.seek_deadline;
+                    reader.last_yield=xTaskGetTickCount();reader.bytes=0;reader.failure=NULL;
+                    valid=prepare_seek_index(&reader,(uint32_t)audio_start,s_seek_confirmation.seek_ms) &&
+                        music_index_locate(&s_index,s_seek_confirmation.seek_ms,&offset,&sample);
+                    if(!valid)ESP_LOGW(TAG,"Seek index incomplete reason=%s bytes=%llu; request may be retried",
+                        reader.failure?reader.failure:"unsupported/EOF",(unsigned long long)reader.bytes);
+                }
+                if(!valid || paused || stop_requested || restart_requested ||
+                   (int32_t)(s_seek_confirmation.seek_deadline-xTaskGetTickCount())<=0) {
+                    confirm_operation(&s_seek_confirmation,2,(uint8_t)s_state);
+                    seeking=false;
+                    continue;
+                }
                 if(lseek(fd,offset,SEEK_SET)<0){confirm_operation(&s_seek_confirmation,2,(uint8_t)current.state);break;}
                 audio_output_deinit();music_eq_reset();mp3dec_init(&s_decoder);
                 buffer_len=0;eof=false;playback_started=false;decoded_sample_frames=sample;
@@ -1223,7 +1276,7 @@ static play_result_t play_mp3_file(
 
 
         uint64_t frame_begin=decoded_sample_frames;
-        if(s_index.ready && info.hz>0 && info.frame_bytes>0)decoded_sample_frames+=s_index.frame_samples;
+        if(timeline_frame_samples && info.hz>0 && info.frame_bytes>0)decoded_sample_frames+=timeline_frame_samples;
         else if(samples>0)decoded_sample_frames+=(uint64_t)samples;
         if(seeking && frame_begin<seek_target){if((frame_begin/s_index.frame_samples)%32==0)vTaskDelay(1);continue;} /* reservoir/filter warmup: no PCM or EQ output */
 
