@@ -24,6 +24,7 @@ idf_component_register(
         "music_manager.c"
 
     PRIV_REQUIRES
+        esp_hw_support
         spi_flash
         esp_driver_uart
         esp_timer

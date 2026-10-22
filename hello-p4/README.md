@@ -72,3 +72,19 @@ GPIO 번호는 커넥터의 물리 핀 순번이 아닙니다. GPIO46/47은 저�
 외부 회로 연결 후 전압이 떨어지면 연결을 중단하고 해당 회로를 점검하세요.
 P4 GPIO에 5V를 직접 인가하지 마세요. GPIO48 손상 여부와 CRC 오류 해결 여부는
 아직 확정되지 않았으며, 핀 변경은 비교 진단을 위한 것입니다.
+
+
+## Olimex ESP32-P4-DevKit GPIO 전원
+
+제조사 Rev.D1 회로도에서 GPIO39~48의 VDD_IO_5는 ESP_LDO_VO4에 연결됩니다.
+`app_main()`은 UART 및 작업 시작 전에 LDO 채널 4를 3300 mV로 설정합니다.
+핸들을 정적으로 보관하고 해제하지 않아 실행 중 해당 전원을 유지합니다.
+실패하면 오류를 출력하고 시스템 초기화를 중단합니다.
+다른 보드에서는 회로도 확인 없이 이 전원 설정을 적용하지 마세요.
+
+- 회로도: https://github.com/OLIMEX/ESP32-P4-DevKit/blob/main/HARDWARE/ESP32-P4-DevKit-Rev.D1/ESP32-P4-DevKit_Rev_D1.pdf
+- 배선 유지: PLC TX GPIO46, RX GPIO47. P4만 다시 빌드하고 플래시합니다.
+- 부팅 시 `LDO4 configured to 3300 mV` 로그를 확인합니다. 이 로그는 설정 성공이며 실측 전압을 뜻하지 않습니다.
+- 외부 부하를 분리한 TX의 HIGH가 약 3.3 V인지 먼저 측정합니다.
+- 전원을 끄고 레벨시프터/모뎀을 다시 연결한 뒤 communication 및 calls 테스트와 CRC/부분 프레임 로그를 확인합니다.
+- 전압 회복 및 CRC 개선은 실제 보드에서 검증해야 합니다.
