@@ -122,7 +122,7 @@ public class Commands {
         if(!Set.of("RECEIVED","PLC_SENT","APPLIED","BUSY","FAILED","EXPIRED").contains(status))throw Accounts.bad("Invalid command acknowledgment");
         var row=rows.get(0);String current=(String)row.get("STATUS");if(current.equals(status))return true;
         if(!Set.of("SENT","RECEIVED").contains(current))throw Accounts.bad("Invalid command transition");
-        if(MusicCommands.supports((String)row.get("OPERATION")) && status.equals("APPLIED")) throw Accounts.bad("Music result identity required");
+        if((MusicCommands.supports((String)row.get("OPERATION")) || ControlCommands.supports((String)row.get("OPERATION"))) && Set.of("APPLIED","PLC_SENT").contains(status)) throw Accounts.bad("Music result identity required");
         if(status.equals("APPLIED") && !CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Firmware has no application confirmation for this operation");
         if(status.equals("PLC_SENT") && CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Await actual application confirmation for this operation");
         if(((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis())status="UNKNOWN";
@@ -151,6 +151,23 @@ public class Commands {
         boolean expired=((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis();
         db.update("UPDATE commands SET status=?,result_data=?,detail=? WHERE id=?",expired?"UNKNOWN":status,
             expired?null:json.writeValueAsString(node.get("data")),expired?"Late music result; application unknown":"",row.get("ID"));
+    }
+    public synchronized void controlResult(String gateway,tools.jackson.databind.JsonNode node) {
+        if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1
+            || !node.path("type").asText().equals("control_result") || !node.path("message_id").isString()
+            || !node.path("status").isString() || !node.has("data"))throw Accounts.bad("Invalid control result");
+        var rows=db.queryForList("SELECT * FROM commands WHERE id=? AND gateway_id=?",node.path("message_id").asText(),gateway);
+        if(rows.isEmpty())throw Accounts.bad("Unknown control request");
+        var row=rows.get(0);String op=(String)row.get("OPERATION"),status=node.path("status").asText();
+        if(!ControlCommands.supports(op))throw Accounts.bad("Not a general control");
+        var rail=registry.rail((String)row.get("RAIL_ID"));
+        ControlCommands.validate(op,(String)row.get("ARGS"),((Number)rail.get("NUMBER")).intValue(),status,node.get("data"));
+        if(!Set.of("SENT","RECEIVED").contains(row.get("STATUS")))return;
+        boolean expired=((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis();
+        String detail=expired?"Late result; application unknown":status.equals("COMPLETED")?
+            (op.equals("query")?"Device response confirmed":"P4 policy confirmed; WROOM playback not confirmed"):"";
+        db.update("UPDATE commands SET status=?,result_data=?,detail=? WHERE id=?",expired?"UNKNOWN":status,
+            expired?null:json.writeValueAsString(node.get("data")),detail,row.get("ID"));
     }
     private void uncertain(Map<String,Object> row) {
         if(((String)row.get("OPERATION")).startsWith("call.") || ((String)row.get("OPERATION")).startsWith("ptt."))

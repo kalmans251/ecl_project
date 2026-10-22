@@ -1,4 +1,5 @@
 """Round-robin music snapshots; one PLC reader, no unsolicited catalog traffic."""
+from control_remote import OPERATIONS
 import asyncio
 from datetime import datetime, timezone
 import json
@@ -74,7 +75,7 @@ class MusicSync:
 
 
 class MusicPublisher:
-    """Authenticated music state and bounded list/play commands."""
+    """Authenticated music state and bounded device controls."""
     def __init__(self, url, token, remote=None):
         validate_url(url)
         if not token:
@@ -134,7 +135,7 @@ class MusicPublisher:
                     await ws.send(json.dumps(result, ensure_ascii=False))
             except Exception as exc:
                 # Journal remains uncertain; never retry automatically.
-                LOG.warning('Music command result unavailable (%s)', type(exc).__name__)
+                LOG.warning('Gateway command result unavailable (%s)', type(exc).__name__)
         while not self.stop.is_set():
             for message in self.drain():
                 await ws.send(json.dumps(message, ensure_ascii=False))
@@ -143,7 +144,7 @@ class MusicPublisher:
             except asyncio.TimeoutError:
                 continue
             message = json.loads(raw)
-            if message.get('type') == 'command' and message.get('operation') in ('music.list','music.play','music.seek') and self.remote:
+            if message.get('type') == 'command' and message.get('operation') in ({'music.list','music.play','music.seek'} | OPERATIONS) and self.remote:
                 if self.command_task and not self.command_task.done():
                     await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='BUSY')))
                 else:

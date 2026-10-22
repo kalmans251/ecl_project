@@ -1,4 +1,4 @@
-"""Bounded remote music commands, with a durable no-replay journal."""
+"""Bounded remote music/general commands with one durable no-replay journal."""
 from datetime import datetime
 import hashlib
 import json
@@ -8,6 +8,7 @@ import threading
 import time
 import uuid
 from music_info import GROUPS, page, play, seek
+from control_remote import OPERATIONS, parts as control_parts
 
 
 class MusicRemote:
@@ -22,7 +23,8 @@ class MusicRemote:
 
     def handle(self, message, connected=lambda: True):
         ident = message.get('message_id')
-        answer = dict(version=1, type='music_result', message_id=ident, status='FAILED', data=None)
+        general = message.get('operation') in OPERATIONS
+        answer = dict(version=1, type='control_result' if general else 'music_result', message_id=ident, status='FAILED', data=None)
         if not self.lock.acquire(blocking=False):
             return dict(version=1, type='ack', message_id=ident, status='BUSY')
         try:
@@ -33,10 +35,13 @@ class MusicRemote:
                 if type(rail) is not int or rail not in self.rails:
                     raise ValueError('Unconfigured railing')
                 op = message['operation']
-                value = message['value']
-                if not isinstance(value, str): raise ValueError('Invalid value')
-                parts = value.split(':')
-                if op == 'music.list':
+                value = message.get('value')
+                if general:
+                    command_parts = control_parts(op, value, rail)
+                elif not isinstance(value, str): raise ValueError('Invalid value')
+                parts = value.split(':') if isinstance(value,str) else []
+                if general: pass
+                elif op == 'music.list':
                     if len(parts)!=2 or parts[0] not in GROUPS or parts[1] not in ('0','8','16','24'):
                         raise ValueError('Invalid page')
                 elif op == 'music.play':
@@ -63,14 +68,18 @@ class MusicRemote:
                 db.execute('DELETE FROM requests WHERE expires<?', (time.time()-86400,))
                 if db.execute('SELECT COUNT(*) FROM requests').fetchone()[0] >= 10000:
                     return answer
-                # Commit before ANY PLC mutation: restart cannot replay an uncertain play.
+                # Commit before ANY PLC mutation: restart cannot replay an uncertain device action.
                 db.execute('INSERT INTO requests VALUES(?,?,?,NULL)', (ident,fingerprint,expiry))
             def guard():
                 if not connected() or time.monotonic() >= deadline:
                     raise TimeoutError('Connection/deadline ended; no further PLC sends')
             try:
                 guard()
-                if op == 'music.list':
+                if general:
+                    result = self.controls.execute(command_parts, guard=guard, structured=True)
+                    result.update(operation=op,value=value)
+                    answer.update(status='APPLIED' if result['device_application_confirmed'] else 'COMPLETED',data=result)
+                elif op == 'music.list':
                     result = page(self.controls,rail,parts[0],int(parts[1]),guard=guard)
                     answer.update(status='COMPLETED',data=result)
                 elif op == 'music.seek':
