@@ -1,5 +1,8 @@
 #include <stdio.h>
 
+#include "esp_ldo_regulator.h"
+#include "esp_log.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -31,6 +34,10 @@
 #include "music_manager.h"
 #include "emergency_manager.h"
 
+/* Olimex ESP32-P4-DevKit: VDD_IO_5 (GPIO39..48) is supplied by
+ * ESP_LDO_VO4. Keep this non-adjustable channel acquired for firmware lifetime. */
+static esp_ldo_channel_handle_t s_gpio_ldo4;
+
 void app_main(void)
 {
     printf("\n");
@@ -40,6 +47,19 @@ void app_main(void)
     printf(" PROTOCOL   : SERVICE + CRC16\n");
     printf("========================================\n");
 
+
+    const esp_ldo_channel_config_t gpio_supply = {
+        .chan_id = 4,
+        .voltage_mv = 3300,
+    };
+    esp_err_t err = esp_ldo_acquire_channel(&gpio_supply, &s_gpio_ldo4);
+    if (err != ESP_OK) {
+        ESP_LOGE("BOARD", "LDO4 initialization failed: %s; system startup stopped",
+                 esp_err_to_name(err));
+        return;
+    }
+    ESP_LOGI("BOARD", "LDO4 configured to 3300 mV for GPIO39..48 (PLC TX=%d RX=%d)",
+             PLC_TX_PIN, PLC_RX_PIN);
 
     /* Queue / Router */
 
