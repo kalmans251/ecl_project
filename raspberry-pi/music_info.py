@@ -1,14 +1,22 @@
 """On-demand, correlated WROOM music reads. Never stream a catalog unsolicited."""
 import time
-from contextlib import nullcontext
+from contextlib import ExitStack, nullcontext
 from protocol import Command, Frame, Node, Service
 
 GROUPS = {'default': 0, '10': 1, '20': 2, '30': 3, '40': 4}
 
 
-def request(controls, rail, operation, payload=b''):
+def request(controls, rail, operation, payload=b'', *, background=False, timeout=None):
     # Release bus ownership between tracks so event polling can run.
-    with controls.lock, getattr(controls.bus, 'transaction', nullcontext)():
+    with ExitStack() as stack:
+        if background:
+            for lock in (controls.lock, controls.bus.transaction()):
+                if not lock.acquire(blocking=False):
+                    raise RuntimeError('PLC busy; background music query skipped')
+                stack.callback(lock.release)
+        else:
+            stack.enter_context(controls.lock)
+            stack.enter_context(getattr(controls.bus, 'transaction', nullcontext)())
         controls._check_idle()
         controls.request_id = (controls.request_id + 1) & 0xffffffff
         token = controls.request_id.to_bytes(4, 'big')
@@ -18,7 +26,7 @@ def request(controls, rail, operation, payload=b''):
         try:
             controls.bus.send_frame(Frame(rail, Node.PI, Node.P4, Service.MUSIC,
                 Command.APPLY, token + bytes([operation]) + payload))
-            deadline = time.monotonic() + controls.ack_timeout
+            deadline = time.monotonic() + (controls.ack_timeout if timeout is None else timeout)
             with controls.condition:
                 while controls.result is None:
                     remaining = deadline - time.monotonic()
@@ -34,8 +42,9 @@ def request(controls, rail, operation, payload=b''):
                 controls.pending = controls.result = None
 
 
-def status(controls, rail):
-    data = request(controls, rail, Command.MUSIC_INFO)
+def status(controls, rail, *, background=False):
+    data = request(controls, rail, Command.MUSIC_INFO, background=background,
+                   timeout=0.6 if background else None)
     if len(data) < 6 or data[0] > 2 or data[5] > 95 or len(data) != 6 + data[5]:
         raise ValueError('Malformed music status')
     return {'railing_id': rail, 'state': ('idle', 'playing', 'paused')[data[0]],

@@ -9,15 +9,16 @@ import tools.jackson.databind.json.JsonMapper;
 @RestController
 public class PortalApi {
     private final Accounts accounts;private final Registry registry;private final JdbcTemplate db;private final Gateways gateways;private final Commands commands;private final Voice voice;
+    private final MusicTelemetry music;
     private final JsonMapper json=JsonMapper.builder().build();
-    public PortalApi(Accounts accounts,Registry registry,JdbcTemplate db,Gateways gateways,Commands commands,Voice voice){this.accounts=accounts;this.registry=registry;this.db=db;this.gateways=gateways;this.commands=commands;this.voice=voice;}
+    public PortalApi(Accounts accounts,Registry registry,JdbcTemplate db,Gateways gateways,Commands commands,Voice voice,MusicTelemetry music){this.accounts=accounts;this.registry=registry;this.db=db;this.gateways=gateways;this.commands=commands;this.voice=voice;this.music=music;}
     @GetMapping("/api/auth/csrf") public Map<String,String> csrf(CsrfToken token){return Map.of("token",token.getToken(),"header",token.getHeaderName());}
     @GetMapping("/api/portal/me") public Map<String,Object> me(Principal p){return Map.of("user",accounts.user(p.getName()),"sites",registry.sites(p.getName()));}
     @GetMapping("/api/portal/sites/{site}/state") public Map<String,Object> state(Principal p,@PathVariable String site){
         String role=accounts.permit(p.getName(),site,false);List<Map<String,Object>> rails=new ArrayList<>();
         for(var row:db.queryForList("SELECT r.*,g.site_id,c.id AS camera_id,c.stream_path FROM rails r JOIN portal_gateways g ON g.id=r.gateway_id LEFT JOIN cameras c ON c.rail_id=r.id WHERE g.site_id=? ORDER BY g.id,r.number",site)){
             var out=new LinkedHashMap<String,Object>();for(String k:List.of("ID","GATEWAY_ID","NUMBER","NAME","LATITUDE","LONGITUDE","ADDRESS","SEEN_AT","CAMERA_ID","STREAM_PATH"))out.put(k.toLowerCase(),row.get(k));
-            out.put("online",gateways.online((String)row.get("GATEWAY_ID")));out.put("reported",row.get("SNAPSHOT")==null?Map.of():json.readTree((String)row.get("SNAPSHOT")));rails.add(out);
+            out.put("online",gateways.online((String)row.get("GATEWAY_ID")));out.put("reported",row.get("SNAPSHOT")==null?Map.of():json.readTree((String)row.get("SNAPSHOT")));out.put("music_status",music.view((String)row.get("ID"),(String)row.get("GATEWAY_ID")));rails.add(out);
         }
         var calls=db.queryForList("SELECT c.id,c.rail_id,c.status,c.direction,u.name AS owner_name,c.user_id FROM calls c JOIN portal_gateways g ON g.id=c.gateway_id JOIN portal_users u ON u.id=c.user_id WHERE g.site_id=?",site);
         String user=(String)accounts.user(p.getName()).get("ID");

@@ -1,5 +1,6 @@
 'use strict';
 let csrf, me, site, view, selected=new Set(), dirty=new Map(), isSleepMode=false, currentCategory=0, map, markers=new Map(), activeCall, voiceSocket, audioContext, micStream, micNode, pcmQueue=[], playbackSources=new Set(), playAt=0, toastTimer, polling=false, lastEmergency=new Set(), modalRail, pttPressed=false;
+let musicReceivedAt=0;
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
 const newId=()=>crypto.randomUUID();
@@ -29,7 +30,7 @@ function switchCategoryTabUI(name,code,edit=true){currentCategory=code;document.
 function setSubModeUI(value){if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);else mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
 function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit)dirty.set('volume',String(value));}
 function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','age'][Number(value)]);}
-function updateAudioTrack(){toast('현재 펌웨어에서 트랙 선택 명령을 지원하지 않습니다.');}
+function updateAudioTrack(){toast('모니터링 화면의 트랙 선택 연동은 준비 중입니다.');}
 function toggleDeviceState(type,value){if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');mark('projector',value?'on':'off');document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(String(value))));}
 function switchDisplayView(mode,edit=true){$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);}
 async function applyAllUpdates(){await guarded(async()=>{requireSelection();if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){await send(op,value);if(dirty.get(op)===value)dirty.delete(op);}toast('변경 요청 접수 완료 · 장치 실제 적용 여부는 처리 내역을 확인하세요.');});}
@@ -44,7 +45,17 @@ function renderMap(){
  for(const r of view.rails){if(r.latitude==null||r.longitude==null)continue;const pos=[r.latitude,r.longitude],m=L.marker(pos,{draggable:view.role!=='VIEWER'}).addTo(map);const label=document.createElement('span');label.textContent=r.name;m.bindTooltip(label);m.on('click',()=>choose(r.id));m.on('dragend',()=>{choose(r.id);const p=m.getLatLng();$('inputLat').value=p.lat.toFixed(6);$('inputLng').value=p.lng.toFixed(6);toast('좌표 이동됨 · 좌표 변경 및 지도 저장을 누르세요.');});markers.set(r.id,m);coords.push(pos);}
  if(coords.length && !map._portalFitted){map.fitBounds(coords,{padding:[30,30],maxZoom:16});map._portalFitted=true;}map.invalidateSize();
 }
+function renderMusicStatus(){
+ const items=rails();
+ if(items.length!==1){text('musicNowTitle','난간 하나를 선택하세요');text('musicNowState','--');text('musicNowTime','--:-- / --:--');return;}
+ const r=items[0], d=musicDisplay(r.music_status,r.online,performance.now()-musicReceivedAt);
+ text('musicNowTitle',d.filename);
+ text('musicNowState',d.fresh?({playing:'재생 중 · 추정 경과 시간',paused:'일시정지',idle:'정지 · 마지막 곡'})[d.state]:'상태 확인 대기 · 마지막 수신값');
+ const seconds=d.positionMs===null?null:Math.floor(d.positionMs/1000);
+ text('musicNowTime',seconds===null?'--:-- / --:--':`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} / --:--`);
+}
 function renderLive(){
+ renderMusicStatus();
  const r=rails()[0],fresh=r?.seen_at && Date.now()-r.seen_at<15000,s=fresh?r.reported:{};
  text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':s.battery_percent.toFixed(1)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
  text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?(fresh?'ONLINE · 상태 수신':'ONLINE · 상태 미수신'):'OFFLINE'):'난간 선택');text('radarDetectedCount',s.detection_count??'--');
@@ -55,7 +66,7 @@ function renderLive(){
  for(const item of view.rails){if(item.reported.emergency && item.seen_at && Date.now()-item.seen_at<15000 && !lastEmergency.has(item.id)){lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
  drawRadar(s.radar||[]);
 }
-async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;view=next;selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length)selected.add(view.rails[0].id);renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();}catch(e){toast(e.message);text('systemCommState','서버 연결 실패');closeVoice();}finally{polling=false;}}
+async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length)selected.add(view.rails[0].id);renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();}catch(e){toast(e.message);text('systemCommState','서버 연결 실패');musicReceivedAt=-Infinity;renderMusicStatus();closeVoice();}finally{polling=false;}}
 async function changeSite(){if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');site=$('siteSelect').value;selected.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
 async function logout(){await guarded(async()=>{if(view?.calls.some(c=>c.OWNED))throw Error('통화를 종료한 뒤 로그아웃하세요.');closeVoice();await api('/api/auth/logout','POST');location.href='/login.html';});}
 function dialog(title){text('dialogTitle',title);$('dialogBody').replaceChildren();$('portalDialog').showModal();return $('dialogBody');}
@@ -92,5 +103,5 @@ function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Err
  const infoLoad=async()=>{info.replaceChildren();const users=await api('/api/portal/admin/users'),gateways=await api('/api/portal/admin/gateways');const heading=document.createElement('h3');heading.textContent='등록 정보';info.append(heading);table(info,['사용자','ID'],users.map(u=>[u.NAME+' ('+u.USERNAME+')',u.ID]));table(info,['현장','ID'],me.sites.map(s=>[s.NAME,s.ID]));table(info,['Pi','현장 ID'],gateways.map(g=>[g.ID,g.SITE_ID]));table(info,['현재 현장 난간','ID'],(view?.rails||[]).map(r=>[r.name,r.id]));};await infoLoad();});}
 function loadContacts(){for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}
 function fillSites(){$('siteSelect').replaceChildren();for(const s of me.sites){const o=document.createElement('option');o.value=s.ID;o.textContent=s.NAME+' · '+s.ROLE;$('siteSelect').append(o);}if(me.sites.some(s=>s.ID===site))$('siteSelect').value=site;else site=$('siteSelect').value;}
-async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));$('piTrackSelect').append(new Option('장치 명령 미지원',''));const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!voiceSocket)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
+async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));$('piTrackSelect').append(new Option('서버 트랙 선택 연동 준비 중',''));const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!voiceSocket)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
 init();

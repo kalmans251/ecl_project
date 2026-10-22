@@ -633,6 +633,11 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             </div>
             <div class="audio-ctrl-box">
                 <div class="audio-ctrl-title">🎧 오디오 원격 제어</div>
+                <div aria-live="polite" style="overflow-wrap:anywhere; margin-bottom:10px;">
+                    <div id="musicNowTitle">곡 정보 없음</div>
+                    <small id="musicNowState">상태 확인 대기</small>
+                    <div id="musicNowTime">--:-- / --:--</div>
+                </div>
                 <div class="audio-row">
                     <span class="audio-label">볼륨</span>
                     <input type="range" class="neon-slider" id="piVolume" min="0" max="100" step="1" value="20" oninput="updateVolUI(this.value)">
@@ -646,7 +651,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                 </div>
                 <div class="audio-row">
                     <span class="audio-label">트랙 선택</span>
-                    <select class="neon-select" id="piTrackSelect" disabled title="현재 장치 트랙 목록/선택 명령 미지원" onchange="updateAudioTrack(this.value)"></select>
+                    <select class="neon-select" id="piTrackSelect" disabled title="서버 트랙 목록/선택 연동 준비 중" onchange="updateAudioTrack(this.value)"></select>
                 </div>
                 <div class="audio-row" style="justify-content: center; gap: 15px; margin-top:10px;">
                     <button class="play-btn-circle" disabled title="현재 장치 이전 곡 명령 미지원" onclick="sendAudioAction(3)">⏮</button>
@@ -804,5 +809,6 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 
 <div id="portalToast" class="portal-toast" hidden role="status"></div>
 <dialog id="portalDialog" class="portal-dialog"><button class="close" onclick="document.getElementById('portalDialog').close()">닫기</button><h2 id="dialogTitle"></h2><div id="dialogBody"></div></dialog>
+<script src="/music-status.js"></script>
 <script src="/portal.js"></script>
 </body></html>
