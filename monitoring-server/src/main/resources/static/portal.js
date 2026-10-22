@@ -1,6 +1,6 @@
 'use strict';
 let csrf, me, site, view, selected=new Set(), dirty=new Map(), isSleepMode=false, currentCategory=0, map, markers=new Map(), activeCall, voiceSocket, audioContext, micStream, micNode, pcmQueue=[], playbackSources=new Set(), playAt=0, toastTimer, polling=false, lastEmergency=new Set(), modalRail, pttPressed=false;
-let musicReceivedAt=0, musicPage=null, musicBusy=false, musicSelectionKey=null;
+let musicReceivedAt=0, musicPage=null, musicBusy=false, musicSelectionKey=null, musicSeekEditing=false, musicSeekKey=null;
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
 const newId=()=>crypto.randomUUID();
@@ -89,15 +89,32 @@ function renderMap(){
  for(const r of view.rails){if(r.latitude==null||r.longitude==null)continue;const pos=[r.latitude,r.longitude],m=L.marker(pos,{draggable:view.role!=='VIEWER'}).addTo(map);const label=document.createElement('span');label.textContent=r.name;m.bindTooltip(label);m.on('click',()=>choose(r.id));m.on('dragend',()=>{choose(r.id);const p=m.getLatLng();$('inputLat').value=p.lat.toFixed(6);$('inputLng').value=p.lng.toFixed(6);toast('좌표 이동됨 · 좌표 변경 및 지도 저장을 누르세요.');});markers.set(r.id,m);coords.push(pos);}
  if(coords.length && !map._portalFitted){map.fitBounds(coords,{padding:[30,30],maxZoom:16});map._portalFitted=true;}map.invalidateSize();
 }
+function musicTime(ms){if(ms===null||ms===undefined)return '--:--';const sec=Math.floor(ms/1000);return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
+function showSeekTarget(){text('musicSeekTarget',musicTime(Number($('musicSeek').value)*1000));}
+async function seekMusic(){
+ const r=requireSelection(true)[0],d=musicDisplay(r.music_status,r.online,performance.now()-musicReceivedAt);
+ if(musicBusy||!d.fresh||!d.seekable||d.state!=='playing'||!d.durationMs)throw Error('재생 중인 곡의 최신 시간 정보가 필요합니다.');
+ const target=Number($('musicSeek').value)*1000;
+ if(!Number.isInteger(target)||target<0||target>=d.durationMs)throw Error('곡 길이 안의 위치를 선택하세요.');
+ musicBusy=true;renderMusicStatus();
+ try{const result=await musicRequest(r,'music.seek',`${d.playbackId}:${target}`);toast(`${r.name}: ${musicTime(result.position_ms)} 이동 확인`);await poll();}
+ finally{musicBusy=false;musicSeekEditing=false;renderMusicStatus();}
+}
 function renderMusicStatus(){
  renderMusicCatalog();
  const items=rails();
- if(items.length!==1){text('musicNowTitle','난간 하나를 선택하세요');text('musicNowState','--');text('musicNowTime','--:-- / --:--');return;}
+ if(items.length!==1){$('musicSeek').disabled=true;$('musicSeekApply').disabled=true;text('musicNowTitle','난간 하나를 선택하세요');text('musicNowState','--');text('musicNowTime','--:-- / --:--');return;}
  const r=items[0], d=musicDisplay(r.music_status,r.online,performance.now()-musicReceivedAt);
  text('musicNowTitle',d.filename);
  text('musicNowState',d.fresh?({playing:'재생 중 · 추정 경과 시간',paused:'일시정지',idle:'정지 · 마지막 곡'})[d.state]:'상태 확인 대기 · 마지막 수신값');
- const seconds=d.positionMs===null?null:Math.floor(d.positionMs/1000);
- text('musicNowTime',seconds===null?'--:-- / --:--':`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} / --:--`);
+ text('musicNowTime',`${musicTime(d.positionMs)} / ${musicTime(d.durationMs)}`);
+ const key=`${r.id}:${d.playbackId}`;
+ if(key!==musicSeekKey){musicSeekKey=key;musicSeekEditing=false;}
+ const enabled=d.fresh && d.seekable && d.state==='playing' && !!d.durationMs && view.role!=='VIEWER' && !musicBusy;
+ $('musicSeek').disabled=!enabled;$('musicSeekApply').disabled=!enabled;
+ $('musicSeek').max=Math.max(0,Math.floor(((d.durationMs||1)-1)/1000));
+ if(!musicSeekEditing)$('musicSeek').value=Math.min(Number($('musicSeek').max),Math.floor((d.positionMs||0)/1000));
+ if(d.durationMs)showSeekTarget();else text('musicSeekTarget','--:--');
 }
 function renderLive(){
  renderMusicStatus();

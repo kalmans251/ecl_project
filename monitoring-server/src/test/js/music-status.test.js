@@ -14,3 +14,9 @@ test('track change uses device position and unavailable does not invent progress
  assert.equal(musicDisplay({available:false},true,0).positionMs,null);
  assert.equal(musicDisplay(null,false,0).fresh,false);
 });
+
+test('duration bounds interpolation and carries device playback identity',()=>{
+ const result=musicDisplay({...snapshot,duration_ms:11000,playback_id:9,seekable:true},true,1000);
+ assert.equal(result.positionMs,11000);assert.equal(result.playbackId,9);assert.equal(result.seekable,true);
+ assert.equal(musicDisplay({...snapshot,duration_ms:null},true,0).durationMs,null);
+});

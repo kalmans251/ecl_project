@@ -58,6 +58,8 @@ class Command(IntEnum):
     MUSIC_CATALOG = 0x31
     MUSIC_TRACK = 0x32
     MUSIC_PLAY = 0x33
+    MUSIC_TIMELINE = 0x34
+    MUSIC_SEEK = 0x35
 
 
 class EmergencySource(IntEnum):

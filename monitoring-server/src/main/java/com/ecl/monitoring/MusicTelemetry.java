@@ -34,11 +34,18 @@ public class MusicTelemetry {
         var state=new LinkedHashMap<String,Object>();
         boolean available=s.path("available").booleanValue();state.put("available",available);
         if(available) {
-            if(s.size()!=4 || !Set.of("idle","playing","paused").contains(s.path("state").asText())
+            if((s.size()!=4 && s.size()!=7) || !Set.of("idle","playing","paused").contains(s.path("state").asText())
                     || !s.path("position_ms").isIntegralNumber() || s.path("position_ms").asLong()<0
                     || s.path("position_ms").asLong()>0xffffffffL || !s.has("filename")
                     || !(s.get("filename").isNull() || s.get("filename").isString())
                     || s.path("filename").asText("").length()>128) throw Accounts.bad("Invalid music fields");
+            if(s.size()==7) {
+                if(!s.has("duration_ms") || !(s.path("duration_ms").isNull() || MusicCommands.uint(s.path("duration_ms"),0xffffffffL))
+                    || !MusicCommands.uint(s.path("playback_id"),0xffffffffL) || !s.path("seekable").isBoolean())throw Accounts.bad("Invalid timeline");
+                if(s.path("seekable").booleanValue() && (s.path("duration_ms").asLong()<=0 || s.path("playback_id").asLong()==0 || !s.path("state").asText().equals("playing")))throw Accounts.bad("Invalid seek capability");
+                state.put("duration_ms",s.path("duration_ms").isNull()?null:s.path("duration_ms").asLong());
+                state.put("playback_id",s.path("playback_id").asLong());state.put("seekable",s.path("seekable").booleanValue());
+            }
             state.put("state",s.path("state").asText());
             state.put("filename",s.get("filename").isNull()?null:s.get("filename").asText());
             state.put("position_ms",s.path("position_ms").asLong());

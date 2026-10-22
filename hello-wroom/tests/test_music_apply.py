@@ -22,6 +22,7 @@ static bool voice, emergency, queue_ok=true;
 static unsigned replies, stops, selections;
 static size_t reply_len;
 static uint8_t volume, response[128], saved_id[4], saved_rail;
+bool music_player_seek_confirmed(uint8_t rail,const uint8_t id[4],uint32_t playback,uint32_t pos){(void)rail;(void)id;return playback==9 && pos<30000;}
 static bool voice_session_is_active(void) { return voice; }
 static bool emergency_alert_is_active(void) { return emergency; }
 static void audio_output_set_volume(uint8_t v) { volume=v; }
@@ -92,6 +93,11 @@ int main(void) {
  f.payload[8]=4;handle_music_apply(&f);assert(selections==1 && response[5]==1);
  f.payload[8]=5;f.payload[11]=1;handle_music_apply(&f);assert(selections==1 && response[5]==1);
  f.payload[11]=0;queue_ok=false;handle_music_apply(&f);assert(response[5]==2);
+ f.payload_len=5;f.payload[4]=CMD_MUSIC_TIMELINE;handle_music_apply(&f);
+ assert(reply_len==26 && response[5]==0 && response[6]==MUSIC_PLAYER_PAUSED && response[19]==0 && response[20]==5);
+ f.payload_len=13;f.payload[4]=CMD_MUSIC_SEEK;memset(f.payload+5,0,8);f.payload[8]=9;before=replies;
+ handle_music_apply(&f);assert(replies==before);
+ f.payload[8]=10;handle_music_apply(&f);assert(response[5]!=0);
  f.src=NODE_PI;before=replies;handle_music_apply(&f);assert(replies==before);
  return 0;
 }

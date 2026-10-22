@@ -7,7 +7,14 @@ import tools.jackson.databind.JsonNode;
 final class MusicCommands {
     static final Set<String> GROUPS=Set.of("default","10","20","30","40");
     record Selection(long version,String group,int index) {}
-    static boolean supports(String operation) { return "music.list".equals(operation)||"music.play".equals(operation); }
+    static boolean supports(String operation) { return "music.list".equals(operation)||"music.play".equals(operation)||"music.seek".equals(operation); }
+    static long[] seekValue(String value) {
+        if(value==null || !value.matches("[0-9]{1,10}:[0-9]{1,10}"))throw Accounts.bad("Invalid seek");
+        String[] p=value.split(":");long id=Long.parseLong(p[0]),ms=Long.parseLong(p[1]);
+        if(id<1 || id>0xffffffffL || ms>0xffffffffL)throw Accounts.bad("Invalid seek range");
+        return new long[]{id,ms};
+    }
+    static void validate(String op,String value) { if(op.equals("music.seek"))seekValue(value);else parse(op,value); }
     static Selection parse(String operation,String value) {
         if(value==null) throw Accounts.bad("Music selection required");
         String[] p=value.split(":",-1);
@@ -26,6 +33,14 @@ final class MusicCommands {
     static void validateResult(String operation,String value,int rail,String status,JsonNode data) {
         if(Set.of("FAILED","UNKNOWN","EXPIRED").contains(status)) {
             if(!data.isNull()) throw Accounts.bad("Failure cannot claim music result");return;
+        }
+        if(operation.equals("music.seek")) {
+            long[] choice=seekValue(value);
+            if(!status.equals("APPLIED") || !data.isObject() || data.size()!=5 || !data.path("railing_id").isInt() || data.path("railing_id").intValue()!=rail
+                || !uint(data.path("playback_id"),0xffffffffL) || data.path("playback_id").asLong()!=choice[0]
+                || !uint(data.path("position_ms"),0xffffffffL) || !data.path("state").asText().equals("playing")
+                || !data.path("device_application_confirmed").isBoolean() || !data.path("device_application_confirmed").booleanValue())throw Accounts.bad("Seek result mismatch");
+            return;
         }
         Selection choice=parse(operation,value);
         if(!data.isObject() || !data.path("railing_id").isInt() || data.path("railing_id").intValue()!=rail

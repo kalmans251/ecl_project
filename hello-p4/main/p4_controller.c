@@ -664,7 +664,7 @@ void p4_controller_task(
 
         if(frame.src==NODE_PI && frame.command==CMD_APPLY) {
             bool wroom_apply=frame.service==SERVICE_MUSIC && frame.length>=5 &&
-                (frame.payload[4]==CMD_MUSIC_INFO || frame.payload[4]==CMD_MUSIC_CATALOG ||
+                (frame.payload[4]==CMD_MUSIC_INFO || frame.payload[4]==CMD_MUSIC_TIMELINE || frame.payload[4]==CMD_MUSIC_SEEK || frame.payload[4]==CMD_MUSIC_CATALOG ||
                  frame.payload[4]==CMD_MUSIC_TRACK || frame.payload[4]==CMD_MUSIC_PLAY || frame.payload[4]==CMD_STOP || (frame.payload[4]==CMD_SET &&
                  frame.length>=6 && frame.payload[5]==MUSIC_SET_VOLUME));
             if(wroom_apply)handle_music(&frame);
@@ -1498,7 +1498,7 @@ static void handle_music(
     // APPLY: request_id[4], original command, original payload.
     // RESULT: request_id[4], original command, status, applied detail.
     if (frame->src == NODE_WROOM && frame->command == CMD_APPLY_RESULT) {
-        bool info = frame->length >= 7 && (frame->payload[4] == CMD_MUSIC_INFO ||
+        bool info = frame->length >= 7 && (frame->payload[4] == CMD_MUSIC_INFO || frame->payload[4] == CMD_MUSIC_TIMELINE || frame->payload[4] == CMD_MUSIC_SEEK ||
             frame->payload[4] == CMD_MUSIC_CATALOG || frame->payload[4] == CMD_MUSIC_TRACK ||
             frame->payload[4] == CMD_MUSIC_PLAY);
         if (frame->length != 7 && !info) return;
@@ -1518,12 +1518,13 @@ static void handle_music(
     if (frame->src == NODE_PI && frame->command == CMD_APPLY) {
         if (frame->length < 5) return;
         uint8_t op = frame->payload[4];
-        bool valid = ((op == CMD_MUSIC_INFO || op == CMD_MUSIC_CATALOG) && frame->length == 5) ||
+        bool valid = ((op == CMD_MUSIC_INFO || op == CMD_MUSIC_TIMELINE || op == CMD_MUSIC_CATALOG) && frame->length == 5) ||
             ((op == CMD_MUSIC_TRACK || op == CMD_MUSIC_PLAY) && frame->length == 12 && frame->payload[9] <= 4) ||
+            (op == CMD_MUSIC_SEEK && frame->length == 13) ||
             (op == CMD_STOP && frame->length == 5) ||
             (op == CMD_SET && frame->length == 7 &&
              frame->payload[5] == MUSIC_SET_VOLUME && frame->payload[6] <= 100);
-        if (op == CMD_MUSIC_PLAY) {
+        if (op == CMD_MUSIC_PLAY || op == CMD_MUSIC_SEEK) {
             p4_system_state_t state;
             system_state_get(&state);
             valid = valid && music_manager_is_session_enabled() &&

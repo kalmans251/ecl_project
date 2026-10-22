@@ -642,6 +642,11 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                     <div id="musicNowTime">--:-- / --:--</div>
                 </div>
                 <div class="audio-row">
+                    <input type="range" class="neon-slider" id="musicSeek" aria-label="재생 이동 위치" min="0" max="0" value="0" step="1" disabled oninput="musicSeekEditing=true;showSeekTarget()">
+                    <span id="musicSeekTarget">--:--</span>
+                    <button id="musicSeekApply" disabled onclick="guarded(seekMusic)">이동</button>
+                </div>
+                <div class="audio-row">
                     <span class="audio-label">볼륨</span>
                     <input type="range" class="neon-slider" id="piVolume" min="0" max="100" step="1" value="20" oninput="updateVolUI(this.value)">
                     <span class="vol-value-text" id="volDisplay">20%</span>
