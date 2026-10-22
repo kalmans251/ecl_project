@@ -81,3 +81,6 @@ CREATE INDEX IF NOT EXISTS telemetry_period ON telemetry_samples(rail_id,observe
 CREATE INDEX IF NOT EXISTS audit_site ON audit_log(site_id,created_at);
 
 CREATE TABLE IF NOT EXISTS sms_requests(id VARCHAR(36) PRIMARY KEY, user_id VARCHAR(36), site_id VARCHAR(80), label VARCHAR(30), rail_id VARCHAR(36), status VARCHAR(20), created_at BIGINT);
+
+-- Music results remain bound to the durable command and its site permissions.
+ALTER TABLE commands ADD COLUMN IF NOT EXISTS result_data VARCHAR(8192);

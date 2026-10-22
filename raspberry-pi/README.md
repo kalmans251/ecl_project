@@ -964,4 +964,4 @@ python tools/hardware_test.py --suite communication --rails 1 --cycles 10
 PLC process. `music-sync-status` shows the latest per-railing observations.
 Optional authenticated server publishing uses `--monitor-url` and
 `requirements-monitoring.txt`. See [music synchronization setup](../monitoring-server/MUSIC_SYNC.md)
-for timing, TLS/token setup, current telemetry-only limits and hardware checks.
+for timing, TLS/token setup, current supported music operations and limits and hardware checks.

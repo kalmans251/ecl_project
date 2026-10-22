@@ -32,6 +32,7 @@ public class DeviceSocket extends TextWebSocketHandler {
                 if (count>30) throw new IllegalArgumentException("Too many acknowledgments");
             }
             var node=json.readTree(message.getPayload());
+            if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("music_result")){commands.musicResult(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("music_state")){music.accept(id(session),session.getId(),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("voice")){voice.receive(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("telemetry")){telemetry.accept(id(session),node);return;}

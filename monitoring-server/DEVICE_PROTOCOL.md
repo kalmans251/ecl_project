@@ -2,8 +2,8 @@
 
 Pi는 `/ws/gateways/{gateway_id}`에 자신의 Bearer 토큰으로 접속합니다.
 WSS 운영, loopback 개발만 WS. 기존 CCTV 이벤트 규격은 README를 참고하세요.
-새 서버에는 Pi 프로세스에 결합할 어댑터가 아직 포함되지 않습니다.
-아래는 해당 어댑터가 구현해야 하는 규격입니다. `tools/mock_gateway.py`는 시뮬레이터입니다.
+Pi main.py에는 음악 상태/목록/선택 재생 어댑터가 포함되어 있습니다.
+나머지 명령은 향후 통합 어댑터가 구현해야 하는 규격입니다. `tools/mock_gateway.py`는 시뮬레이터입니다.
 
 ## 일반 명령
 
@@ -107,3 +107,31 @@ fresh_ms는 1000~120000이며 Pi의 전체 난간 순회 주기에 맞춘 유효
 `GET /api/portal/sites/{site}/state`의 난간별 `music_status`에서 최신 값과
 `fresh`, `age_ms`, `fresh_ms`를 제공한다. 접속 사이트 권한을 그대로 적용한다.
 Pi 연결/실물 테스트 방법은 [MUSIC_SYNC.md](MUSIC_SYNC.md)를 참조한다.
+
+
+## 음악 목록/선택 재생 명령
+
+기존 POST `/api/portal/commands`를 사용한다. 운영 권한과 단일 난간 선택이 필요하다.
+`GET /api/portal/commands/{id}`는 해당 현장 조회 권한을 확인한 뒤 지속 저장된 결과를 반환한다.
+
+| operation | value | 제한 |
+|---|---|---|
+| music.list | `default:0` 등 `group:offset` | group=default/10/20/30/40, offset=0/8/16/24, 최대 8곡, 45초 |
+| music.play | `5:default:0` 등 `catalog_version:group:index` | version=uint32, index=0..31, 15초 |
+
+`music.play`는 Pi가 조회한 목록의 버전과 항목을 확인하고 WROOM의 첫 PCM 출력을 확인한다.
+단순 `ack APPLIED`로 완료할 수 없으며 아래 상관관계가 있는 `music_result`를 사용한다.
+목록 완료는 COMPLETED로서 재생 성공(APPLIED)을 뜻하지 않는다.
+
+```json
+{"version":1,"type":"music_result","message_id":"요청 UUID","status":"COMPLETED","data":{"railing_id":1,"catalog_version":5,"group":"default","offset":0,"total":1,"tracks":[{"group":"default","index":0,"filename":"a.mp3"}]}}
+```
+
+```json
+{"version":1,"type":"music_result","message_id":"요청 UUID","status":"APPLIED","data":{"railing_id":1,"catalog_version":5,"group":"default","index":0,"filename":"a.mp3","state":"playing","device_application_confirmed":true}}
+```
+
+실패 결과는 status=FAILED/UNKNOWN/EXPIRED, data=null이다. 서버는 인증된 gateway와 요청 ID,
+난간, operation, group/offset 또는 catalog version/index 및 필드 범위를 검증한다.
+만료/종결된 요청을 늦게 온 응답으로 성공 처리하지 않는다. 중복 요청은 Pi의 영속 기록으로
+재실행을 막으며, 연결 끊김/실패 시 자동 재전송하지 않는다. 메시지 4096바이트 제한을 유지한다.

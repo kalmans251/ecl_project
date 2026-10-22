@@ -98,4 +98,32 @@ class PortalTest {
    fail("Music state did not reach portal");
   }
  }
+ @Test void catalogAndSelectedPlaybackUseDurableCorrelatedResults()throws Exception{
+  String rail=rail(),owner=newUser("music-owner","OPERATOR");var browser=new Browser(owner);
+  try(var device=new Device()){
+   var request=command(rail,"music.list","default:0");
+   var posted=browser.request("/api/portal/commands","POST",request,true);assertEquals(200,posted.statusCode(),posted.body());
+   var outgoing=json.readTree(device.next());String id=outgoing.path("message_id").asText();
+   var data=Map.of("railing_id",1,"catalog_version",5,"group","default","offset",0,"total",1,"tracks",List.of(Map.of("group","default","index",0,"filename","a.mp3")));
+   assertThrows(RuntimeException.class,()->commands.musicResult("foreign",json.valueToTree(Map.of("version",1,"type","music_result","message_id",id,"status","COMPLETED","data",data))));
+   device.ws.sendText(json.writeValueAsString(Map.of("version",1,"type","music_result","message_id",id,"status","COMPLETED","data",data)),true).join();
+   waitMusic(browser,id,"COMPLETED");
+   assertEquals("a.mp3",json.readTree(browser.request("/api/portal/commands/"+id,"GET",null,false).body()).path("result").path("tracks").get(0).path("filename").asText());
+   assertEquals(200,browser.request("/api/portal/commands","POST",request,true).statusCode());assertNull(device.messages.poll(100,TimeUnit.MILLISECONDS));
+   posted=browser.request("/api/portal/commands","POST",command(rail,"music.play","5:default:0"),true);assertEquals(200,posted.statusCode());
+   outgoing=json.readTree(device.next());String playId=outgoing.path("message_id").asText();
+   assertThrows(RuntimeException.class,()->commands.ack("gateway-01",playId,"APPLIED"));
+   var played=Map.of("railing_id",1,"catalog_version",5,"group","default","index",0,"filename","a.mp3","state","playing","device_application_confirmed",true);
+   device.ws.sendText(json.writeValueAsString(Map.of("version",1,"type","music_result","message_id",playId,"status","APPLIED","data",played)),true).join();
+   waitMusic(browser,playId,"APPLIED");
+   assertTrue(commands.find(owner,playId).get("device_application_confirmed").equals(true));
+   accounts.membership("admin",(String)accounts.user(owner).get("ID"),"site-01","NONE");
+   assertEquals(403,browser.request("/api/portal/commands/"+id,"GET",null,false).statusCode());
+  }
+ }
+ void waitMusic(Browser browser,String id,String expected)throws Exception{
+  long until=System.nanoTime()+3_000_000_000L;
+  while(System.nanoTime()<until){var response=browser.request("/api/portal/commands/"+id,"GET",null,false);if(json.readTree(response.body()).path("status").asText().equals(expected))return;Thread.sleep(20);}
+  fail("Music result not confirmed");
+ }
 }
