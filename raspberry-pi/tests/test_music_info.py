@@ -23,6 +23,10 @@ class Bus:
             if self.bad_identity: identity = bytes(7)
             data = identity + b'\x05a.mp3'
             if self.change: self.version = b'\x00\x00\x00\x06'
+        elif op == Command.MUSIC_TIMELINE:
+            data = b'\x02' + (12345).to_bytes(4,'big') + (123000).to_bytes(4,'big') + (9).to_bytes(4,'big') + b'\x00\x05a.mp3'
+        elif op == Command.MUSIC_SEEK:
+            data = b'\x01' + f.payload[5:13]
         else:
             data = b'\x02' + (12345).to_bytes(4, 'big') + b'\x05a.mp3'
         # Wrong source / token / rail must not complete the pending request.
@@ -47,7 +51,7 @@ class MusicInfoTests(unittest.TestCase):
         result = json.loads(self.controls.execute('music 1 status'.split()))
         self.assertEqual(result['state'], 'paused')
         self.assertEqual(result['position_ms'], 12345)
-        self.assertIsNone(result['duration_ms'])
+        self.assertEqual(result['duration_ms'],123000)
     def test_reject_wrong_identity(self):
         self.bus.bad_identity = True
         with self.assertRaises(ValueError): self.controls.execute('music 1 list'.split())
@@ -74,3 +78,15 @@ class MusicInfoTests(unittest.TestCase):
         self.bus.bad_identity = True
         with self.assertRaises(ValueError): self.controls.execute('music 1 list'.split())
         with self.assertRaises(ValueError): self.controls.execute('music 1 play default 0'.split())
+
+    def test_seek_identity_and_paused_cli_guard(self):
+        from music_info import seek
+        result = seek(self.controls, 1, 9, 20000)
+        self.assertEqual(result['playback_id'], 9)
+        self.assertEqual(result['position_ms'], 20000)
+        before = len(self.bus.sent)
+        with self.assertRaises((ValueError, RuntimeError)):
+            self.controls.execute('music 1 seek 20'.split())
+        self.assertEqual(len(self.bus.sent), before + 1) # status only, paused rejects seek
+        for identity, position in [(0, 0), (9, -1), (2**32, 0)]:
+            with self.assertRaises(ValueError): seek(self.controls, 1, identity, position)

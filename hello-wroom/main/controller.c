@@ -266,6 +266,22 @@ static void handle_music_apply(const protocol_frame_t *frame)
         send_reply(frame, CMD_APPLY_RESULT, response, sizeof(response));
         return;
     }
+    if(op==CMD_MUSIC_SEEK && frame->payload_len==13) {
+        uint32_t playback=0,position=0;
+        for(int i=0;i<4;i++){playback=(playback<<8)|frame->payload[5+i];position=(position<<8)|frame->payload[9+i];}
+        if(music_player_seek_confirmed(frame->railing_id,frame->payload,playback,position))return;
+        send_reply(frame,CMD_APPLY_RESULT,response,sizeof(response));return;
+    }
+    if(op==CMD_MUSIC_TIMELINE && frame->payload_len==5) {
+        music_player_info_t info;music_player_get_info(&info);
+        uint8_t data[116]={0};memcpy(data,response,5);data[5]=0;data[6]=(uint8_t)info.state;
+        for(int i=0;i<4;i++){
+            data[7+i]=info.position_ms>>(24-i*8);data[11+i]=info.duration_ms>>(24-i*8);data[15+i]=info.playback_id>>(24-i*8);
+        }
+        data[19]=info.seekable && info.state==MUSIC_PLAYER_PLAYING;
+        size_t n=strlen(info.filename);data[20]=n;memcpy(data+21,info.filename,n);
+        send_reply(frame,CMD_APPLY_RESULT,data,21+n);return;
+    }
     if (op == CMD_MUSIC_INFO && frame->payload_len == 5) {
         music_player_info_t info;
         music_player_get_info(&info);

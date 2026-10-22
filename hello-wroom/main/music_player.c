@@ -1,5 +1,7 @@
 #include "music_player.h"
 #include "music_eq.h"
+#include "music_index.h"
+#include "esp_random.h"
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -78,6 +80,7 @@ typedef enum
     PLAYER_CMD_PAUSE,
 
     PLAYER_CMD_RESUME,
+    PLAYER_CMD_SEEK,
 
 } player_command_type_t;
 
@@ -91,6 +94,8 @@ typedef struct
     uint8_t confirm_rail;
     uint8_t request_id[4];
     uint8_t selection[7];
+    uint32_t seek_id, seek_ms;
+    TickType_t seek_deadline;
 
     char path[
         MUSIC_PATH_MAX
@@ -104,6 +109,8 @@ static TaskHandle_t s_confirm_owner;
 static player_command_t s_confirm_context;
 static bool s_confirm_enqueued;
 static player_command_t s_start_confirmation, s_restart_confirmation;
+static player_command_t s_seek_request, s_seek_confirmation;
+static music_index_t s_index;
 void music_player_confirm_begin(uint8_t rail,const uint8_t id[4],uint8_t op) {
     portENTER_CRITICAL(&s_confirm_mux);
     memset(&s_confirm_context,0,sizeof(s_confirm_context));
@@ -131,6 +138,10 @@ static void confirm_operation(player_command_t *cmd,uint8_t status,uint8_t detai
     if (cmd->confirm_op == CMD_MUSIC_PLAY) {
         memcpy(result.payload + 7, cmd->selection, 7);
         result.payload_len = 14;
+    }
+    if (cmd->confirm_op == CMD_MUSIC_SEEK) {
+        result.payload_len=15;
+        for(int i=0;i<4;i++){result.payload[7+i]=cmd->seek_id>>(24-i*8);result.payload[11+i]=cmd->seek_ms>>(24-i*8);}
     }
     router_enqueue(&result);cmd->confirm_operation=false;
 }
@@ -492,9 +503,7 @@ static void process_control_commands(
             case PLAYER_CMD_PAUSE:
             {
                 if (
-                    !*paused &&
-                    s_state ==
-                    MUSIC_PLAYER_PLAYING
+                    !*paused
                 )
                 {
                     *paused =
@@ -582,6 +591,10 @@ static void process_control_commands(
             }
 
 
+            case PLAYER_CMD_SEEK:
+                confirm_operation(&s_seek_request,2,(uint8_t)s_state);
+                s_seek_request=command;
+                break;
             default:
             {
                 break;
@@ -690,6 +703,9 @@ static void wait_while_paused(
             case PLAYER_CMD_PAUSE:
                 confirm_operation(&command,0,MUSIC_PLAYER_PAUSED);
                 break;
+            case PLAYER_CMD_SEEK:
+                confirm_operation(&command,1,MUSIC_PLAYER_PAUSED);
+                break;
             default:
             {
                 break;
@@ -702,6 +718,22 @@ static void wait_while_paused(
 /* ============================================================
  * PLAY ONE MP3
  * ============================================================ */
+
+typedef struct {
+    int fd; TickType_t began; unsigned reads;
+    bool *paused,*stop,*restart;char *path;size_t path_size;
+} index_reader_t;
+static ssize_t index_read(void *opaque,uint8_t *dst,size_t capacity)
+{
+    index_reader_t *r=opaque;
+    process_control_commands(r->paused,r->stop,r->restart,r->path,r->path_size);
+    if(*r->paused || *r->stop || *r->restart || xTaskGetTickCount()-r->began>pdMS_TO_TICKS(5000))return -1;
+    size_t n=capacity<SD_READ_SIZE?capacity:SD_READ_SIZE;
+    ssize_t got=read(r->fd,s_sd_read_buffer,n);
+    if(got>0)memcpy(dst,s_sd_read_buffer,(size_t)got);
+    if(++r->reads%32==0)vTaskDelay(1);
+    return got;
+}
 
 static play_result_t play_mp3_file(
     const char *path,
@@ -788,6 +820,9 @@ static play_result_t play_mp3_file(
     portENTER_CRITICAL(&s_info_mux);
     memcpy(s_info.filename, display_name, sizeof(display_name));
     s_info.position_ms = 0;
+    s_info.duration_ms=0;s_info.seekable=false;
+    s_info.playback_id=esp_random();
+    if(!s_info.playback_id)s_info.playback_id=1;
     s_info.state = MUSIC_PLAYER_IDLE;
     portEXIT_CRITICAL(&s_info_mux);
 
@@ -832,6 +867,21 @@ static play_result_t play_mp3_file(
 
     restart_path[0] =
         '\0';
+    bool seeking=false;
+    uint64_t seek_target=0;
+    off_t audio_start=lseek(fd,0,SEEK_CUR);
+    index_reader_t reader={fd,xTaskGetTickCount(),0,&paused,&stop_requested,&restart_requested,restart_path,restart_path_size};
+    bool indexed=audio_start>=0 && music_index_scan(&s_index,&s_decoder,s_mp3_buffer,sizeof(s_mp3_buffer),
+        (uint32_t)audio_start,index_read,&reader);
+    if(!indexed)s_index.ready=false;
+    if(lseek(fd,audio_start,SEEK_SET)<0){close(fd);return PLAY_RESULT_ERROR;}
+    mp3dec_init(&s_decoder);
+    portENTER_CRITICAL(&s_info_mux);
+    s_info.seekable=indexed;
+    s_info.duration_ms=indexed?(uint32_t)(s_index.total_samples*1000/s_index.hz):0;
+    portEXIT_CRITICAL(&s_info_mux);
+    if(!indexed)ESP_LOGW(TAG,"Timeline unavailable (scan interrupted/unsupported); playback remains available");
+
 
 
     while (1)
@@ -861,6 +911,27 @@ static play_result_t play_mp3_file(
             break;
         }
 
+
+        if(s_seek_request.confirm_operation) {
+            music_player_info_t current;music_player_get_info(&current);
+            uint32_t offset=0;uint64_t sample=0;
+            bool valid=!paused && current.state==MUSIC_PLAYER_PLAYING && current.playback_id==s_seek_request.seek_id &&
+                (int32_t)(s_seek_request.seek_deadline-xTaskGetTickCount())>0 &&
+                music_index_locate(&s_index,s_seek_request.seek_ms,&offset,&sample);
+            if(!valid)confirm_operation(&s_seek_request,1,(uint8_t)current.state);
+            else {
+                confirm_operation(&s_seek_confirmation,2,(uint8_t)current.state);
+                s_seek_confirmation=s_seek_request;s_seek_request.confirm_operation=false;
+                if(lseek(fd,offset,SEEK_SET)<0){confirm_operation(&s_seek_confirmation,2,(uint8_t)current.state);break;}
+                audio_output_deinit();music_eq_reset();mp3dec_init(&s_decoder);
+                buffer_len=0;eof=false;playback_started=false;decoded_sample_frames=sample;
+                seek_target=((uint64_t)s_seek_confirmation.seek_ms*s_index.hz/1000/s_index.frame_samples)*s_index.frame_samples;
+                seeking=true;last_second=UINT32_MAX;
+            }
+        }
+        if(seeking && (paused || (int32_t)(s_seek_confirmation.seek_deadline-xTaskGetTickCount())<=0)) {
+            confirm_operation(&s_seek_confirmation,2,(uint8_t)s_state);seeking=false;
+        }
 
         /* ====================================================
          * PAUSE
@@ -1151,6 +1222,11 @@ static play_result_t play_mp3_file(
         }
 
 
+        uint64_t frame_begin=decoded_sample_frames;
+        if(s_index.ready && info.hz>0 && info.frame_bytes>0)decoded_sample_frames+=s_index.frame_samples;
+        else if(samples>0)decoded_sample_frames+=(uint64_t)samples;
+        if(seeking && frame_begin<seek_target){if((frame_begin/s_index.frame_samples)%32==0)vTaskDelay(1);continue;} /* reservoir/filter warmup: no PCM or EQ output */
+
         /* ====================================================
          * PCM
          * ==================================================== */
@@ -1370,14 +1446,14 @@ static play_result_t play_mp3_file(
              * POSITION
              * ================================================ */
 
-            decoded_sample_frames +=
-                (uint64_t)samples;
-
-
             uint32_t position_ms = (uint32_t)(decoded_sample_frames * 1000 / (uint64_t)info.hz);
             portENTER_CRITICAL(&s_info_mux);
             s_info.position_ms = position_ms;
             portEXIT_CRITICAL(&s_info_mux);
+            if(seeking){
+                s_seek_confirmation.seek_ms=position_ms;
+                confirm_operation(&s_seek_confirmation,0,MUSIC_PLAYER_PLAYING);seeking=false;
+            }
 
             uint32_t second =
                 (uint32_t)(
@@ -1663,6 +1739,8 @@ static void music_task(
                 );
 
 
+            confirm_operation(&s_seek_confirmation,2,(uint8_t)s_state);
+            confirm_operation(&s_seek_request,2,(uint8_t)s_state);
             /* Failure/stop/restart before first PCM must resolve the old request. */
             confirm_operation(&s_start_confirmation,2,(uint8_t)s_state);
             if(result==PLAY_RESULT_RESTART) {
@@ -1965,4 +2043,13 @@ bool music_player_is_paused(void)
     return
         s_state ==
         MUSIC_PLAYER_PAUSED;
+}
+bool music_player_seek_confirmed(uint8_t rail,const uint8_t request_id[4],uint32_t playback_id,uint32_t position_ms)
+{
+    music_player_info_t info;music_player_get_info(&info);
+    if(!s_command_queue || !info.seekable || info.state!=MUSIC_PLAYER_PLAYING || info.playback_id!=playback_id || position_ms>=info.duration_ms)return false;
+    player_command_t command={0};command.type=PLAYER_CMD_SEEK;command.confirm_operation=true;
+    command.confirm_op=CMD_MUSIC_SEEK;command.confirm_rail=rail;memcpy(command.request_id,request_id,4);
+    command.seek_id=playback_id;command.seek_ms=position_ms;command.seek_deadline=xTaskGetTickCount()+pdMS_TO_TICKS(7000);
+    return xQueueSend(s_command_queue,&command,pdMS_TO_TICKS(100))==pdTRUE;
 }

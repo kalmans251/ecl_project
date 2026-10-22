@@ -45,15 +45,27 @@ def request(controls, rail, operation, payload=b'', *, background=False, timeout
 
 
 def status(controls, rail, *, background=False):
-    data = request(controls, rail, Command.MUSIC_INFO, background=background,
+    data = request(controls, rail, Command.MUSIC_TIMELINE, background=background,
                    timeout=0.6 if background else None)
-    if len(data) < 6 or data[0] > 2 or data[5] > 95 or len(data) != 6 + data[5]:
-        raise ValueError('Malformed music status')
-    return {'railing_id': rail, 'state': ('idle', 'playing', 'paused')[data[0]],
-            'filename': data[6:].decode('utf-8', errors='replace') or None,
-            'position_ms': int.from_bytes(data[1:5], 'big'),
-            'duration_ms': None, 'position_basis': 'PCM submitted to I2S',
-            'note': 'idle retains last track; duration/seek not implemented'}
+    if len(data)<15 or data[0]>2 or data[13]>1 or data[14]>95 or len(data)!=15+data[14]:
+        raise ValueError('Malformed music timeline')
+    duration=int.from_bytes(data[5:9],'big')
+    return dict(railing_id=rail,state=('idle','playing','paused')[data[0]],
+                position_ms=int.from_bytes(data[1:5],'big'),duration_ms=duration or None,
+                playback_id=int.from_bytes(data[9:13],'big'),seekable=bool(data[13]),
+                filename=data[15:].decode('utf-8',errors='replace') or None,
+                position_basis='MP3 frames / PCM submitted to I2S')
+
+
+def seek(controls, rail, playback_id, position_ms, *, guard=None):
+    if type(playback_id) is not int or not 1<=playback_id<=0xffffffff or type(position_ms) is not int or not 0<=position_ms<=0xffffffff:
+        raise ValueError('Invalid playback ID or position')
+    payload=playback_id.to_bytes(4,'big')+position_ms.to_bytes(4,'big')
+    data=request(controls,rail,Command.MUSIC_SEEK,payload,guard=guard,timeout=8.0)
+    if len(data)!=9 or data[0]!=1 or data[1:5]!=payload[:4]:
+        raise ValueError('Seek confirmation does not match current playback')
+    return dict(railing_id=rail,state='playing',device_application_confirmed=True,
+                playback_id=playback_id,position_ms=int.from_bytes(data[5:9],'big'))
 
 
 def catalog(controls, rail, group=None):
@@ -100,7 +112,7 @@ def play(controls, rail, group, index, *, expected_version=None, guard=None):
     if track is None:
         raise ValueError('Track was not in the displayed list; refresh the required group')
     identity = listing['catalog_version'].to_bytes(4, 'big') + bytes([GROUPS[group]]) + index.to_bytes(2, 'big')
-    data = request(controls, rail, Command.MUSIC_PLAY, identity, guard=guard)
+    data = request(controls, rail, Command.MUSIC_PLAY, identity, guard=guard, timeout=8.0)
     if data != b'\x01' + identity:
         raise ValueError('Selected-track confirmation does not match; playback state unknown')
     return {'railing_id': rail, 'state': 'playing', 'device_application_confirmed': True,

@@ -115,6 +115,8 @@ typedef enum
     CMD_MUSIC_CATALOG = 0x31,
     CMD_MUSIC_TRACK = 0x32,
     CMD_MUSIC_PLAY = 0x33,
+    CMD_MUSIC_TIMELINE = 0x34,
+    CMD_MUSIC_SEEK = 0x35,
 
     CMD_PING =
         0x01,

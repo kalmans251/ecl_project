@@ -40,7 +40,8 @@ class MusicSync:
         try:
             data = status(self.controls, rail, background=True)
             message['state'] = dict(available=True, state=data['state'], filename=data['filename'],
-                                    position_ms=data['position_ms'])
+                                    position_ms=data['position_ms'],duration_ms=data['duration_ms'],
+                                    playback_id=data['playback_id'],seekable=data['seekable'])
         except (RuntimeError, ValueError, OSError):
             message['state'] = dict(available=False)
         # Timestamp after receiving confirmation, not before waiting for PLC.
@@ -142,7 +143,7 @@ class MusicPublisher:
             except asyncio.TimeoutError:
                 continue
             message = json.loads(raw)
-            if message.get('type') == 'command' and message.get('operation') in ('music.list','music.play') and self.remote:
+            if message.get('type') == 'command' and message.get('operation') in ('music.list','music.play','music.seek') and self.remote:
                 if self.command_task and not self.command_task.done():
                     await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='BUSY')))
                 else:

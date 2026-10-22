@@ -12,8 +12,8 @@ class MusicSyncTests(unittest.TestCase):
     def test_independent_rails_and_failed_sample(self):
         sync = MusicSync(None, [1, 2])
         with patch('music_sync.status', side_effect=[
-                dict(state='playing', filename='one.mp3', position_ms=100),
-                dict(state='paused', filename='two.mp3', position_ms=200), TimeoutError()]):
+                dict(state='playing', filename='one.mp3', position_ms=100,duration_ms=1000,playback_id=9,seekable=True),
+                dict(state='paused', filename='two.mp3', position_ms=200,duration_ms=1000,playback_id=10,seekable=False), TimeoutError()]):
             sync.sample(1); sync.sample(2); sync.sample(1)
         self.assertFalse(sync.snapshot()['1']['state']['available'])
         self.assertEqual(sync.snapshot()['2']['state']['filename'], 'two.mp3')

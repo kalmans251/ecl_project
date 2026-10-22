@@ -17,6 +17,7 @@ HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop cu
   led <id> on|off|basic|music     LED enable or mode
   led <id> basic [1..6] | music [1..3]  select animation
   led <id> weather clear|cloudy|rain|snow
+  music <id> seek <seconds>  move within current playing track
   music <id> list [default|10|20|30|40] | status
   music <id> play <default|10|20|30|40> <index>  use previously listed catalog
   music <id> start|stop|pause|resume|next
@@ -53,16 +54,20 @@ class DeviceControls:
         if not 1 <= rail <= 255:
             raise ValueError('railing_id must be 1..255')
         args = [p.lower() for p in parts[2:]]
-        if name == 'music' and args and args[0] in ('list', 'status', 'play'):
-            from music_info import GROUPS, catalog, status, play
+        if name == 'music' and args and args[0] in ('list', 'status', 'play', 'seek'):
+            from music_info import GROUPS, catalog, status, play, seek
             if len(args) == 3 and args[0] == 'play':
                 info = play(self, rail, args[1], args[2])
+            elif len(args)==2 and args[0]=='seek' and args[1].isascii() and args[1].isdecimal():
+                current=status(self,rail)
+                if not current['seekable']: raise ValueError('Seek requires playing music with a ready timeline')
+                info=seek(self,rail,current['playback_id'],int(args[1])*1000)
             elif args == ['status']:
                 info = status(self, rail)
             elif args == ['list'] or (len(args) == 2 and args[0] == 'list' and args[1] in GROUPS):
                 info = catalog(self, rail, args[1] if len(args) == 2 else None)
             else:
-                raise ValueError('music: status | list [group] | play <group> <index>')
+                raise ValueError('music: status | list [group] | play <group> <index> | seek <seconds>')
             return json.dumps(info, ensure_ascii=False, indent=2)
         frames = []
         def add(service, command, payload=b'', dst=Node.P4):
@@ -160,7 +165,7 @@ class DeviceControls:
                 try:
                     self.bus.send_frame(Frame(rail, Node.PI, original.dst, original.service,
                         Command.APPLY, token + bytes([original.command]) + original.payload))
-                    deadline = time.monotonic() + self.ack_timeout
+                    deadline = time.monotonic() + (max(8.0,self.ack_timeout) if original.service==Service.MUSIC and original.command in (Command.START,Command.NEXT) else self.ack_timeout)
                     with self.condition:
                         while self.result is None:
                             remaining = deadline - time.monotonic()
@@ -196,10 +201,10 @@ class DeviceControls:
                 return True
             expected, detail = pending[4:]
             # P4 can reject a downstream request, but never claim WROOM/S3 success.
-            policy = op not in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK, Command.MUSIC_PLAY) and status == 3 and frame.src == Node.P4 and frame.service == Service.MUSIC and detail is None
+            policy = op not in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK, Command.MUSIC_PLAY, Command.MUSIC_TIMELINE, Command.MUSIC_SEEK) and status == 3 and frame.src == Node.P4 and frame.service == Service.MUSIC and detail is None
             if frame.src != expected and not policy and not (frame.src == Node.P4 and status in (1, 2)):
                 return True
-            if status == 3 and (op in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK, Command.MUSIC_PLAY) or not (frame.src == Node.P4 and frame.service == Service.MUSIC
+            if status == 3 and (op in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK, Command.MUSIC_PLAY, Command.MUSIC_TIMELINE, Command.MUSIC_SEEK) or not (frame.src == Node.P4 and frame.service == Service.MUSIC
                     and detail is None)):
                 return True
             if status == 0 and detail is not None and frame.payload[6] != detail:

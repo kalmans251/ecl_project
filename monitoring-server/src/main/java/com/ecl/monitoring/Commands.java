@@ -31,7 +31,7 @@ public class Commands {
     }
     public static void validate(String operation,String value) {
         if(operation==null) throw Accounts.bad("Operation required");
-        if(MusicCommands.supports(operation)) { MusicCommands.parse(operation,value); return; }
+        if(MusicCommands.supports(operation)) { MusicCommands.validate(operation,value); return; }
         if(operation.equals("led.basic_pattern") || operation.equals("led.music_pattern")) {
             int max=operation.equals("led.basic_pattern")?5:2;
             if(value==null || !value.matches("[0-"+max+"]")) throw Accounts.bad("Unsupported LED pattern");

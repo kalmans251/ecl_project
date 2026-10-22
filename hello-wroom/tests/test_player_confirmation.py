@@ -14,10 +14,11 @@ class PlayerConfirmationTests(unittest.TestCase):
 #include "protocol.h"
 #include "music_player.h"
 #define MUSIC_PATH_MAX 256
+typedef unsigned TickType_t;
 #define pdTRUE 1
 #define ESP_LOGI(...) ((void)0)
 ''' + types + r'''
-static player_command_t queued,s_restart_confirmation,s_stop_confirmation;
+static player_command_t queued,s_restart_confirmation,s_stop_confirmation,s_seek_request;
 static bool has_command;
 static void *s_command_queue;
 static music_player_state_t s_state;

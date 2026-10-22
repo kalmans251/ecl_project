@@ -135,3 +135,23 @@ Pi 연결/실물 테스트 방법은 [MUSIC_SYNC.md](MUSIC_SYNC.md)를 참조한
 난간, operation, group/offset 또는 catalog version/index 및 필드 범위를 검증한다.
 만료/종결된 요청을 늦게 온 응답으로 성공 처리하지 않는다. 중복 요청은 Pi의 영속 기록으로
 재실행을 막으며, 연결 끊김/실패 시 자동 재전송하지 않는다. 메시지 4096바이트 제한을 유지한다.
+
+### Music timeline and seek
+
+Available `music_state.state` additionally carries `duration_ms` (null when unknown),
+`playback_id` (uint32), and `seekable` (boolean). Server also accepts legacy four-field
+state. New Pi requires updated P4/WROOM for timeline queries.
+
+`music.seek` value is `playback_id:position_ms`. Both are uint32; ID is nonzero.
+Success is `music_result` status `APPLIED` with exactly:
+`railing_id`, `playback_id`, `position_ms`, `state:"playing"`,
+`device_application_confirmed:true`. Position is the confirmed first output frame end,
+not a guessed requested value. Existing request journal/expiry/ownership rules apply.
+
+PLC MUSIC APPLY operations: `TIMELINE=0x34` request has no operation data;
+success data is state:u8, position:u32, duration:u32 (0 unknown), playback_id:u32,
+seekable:u8, name_length:u8, filename[0..95]. Maximum complete frame is 126 bytes.
+`SEEK=0x35` request data is playback_id:u32 + position_ms:u32; success data is
+state:u8 + playback_id:u32 + actual_position_ms:u32. Integers are big endian.
+Both use the existing four-byte request token and APPLY/RESULT envelope.
+Legacy INFO=0x30 stays unchanged. Playback identity is renewed on each opened file.

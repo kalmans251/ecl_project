@@ -7,7 +7,7 @@ import sqlite3
 import threading
 import time
 import uuid
-from music_info import GROUPS, page, play
+from music_info import GROUPS, page, play, seek
 
 
 class MusicRemote:
@@ -42,6 +42,9 @@ class MusicRemote:
                 elif op == 'music.play':
                     if len(parts)!=3 or parts[1] not in GROUPS or not parts[0].isascii() or not parts[0].isdecimal() or not 0 <= int(parts[0]) <= 0xffffffff or not parts[2].isascii() or not parts[2].isdecimal() or not 0 <= int(parts[2]) < 32:
                         raise ValueError('Invalid selection')
+                elif op == 'music.seek':
+                    if len(parts)!=2 or any(not p.isascii() or not p.isdecimal() for p in parts) or not 1<=int(parts[0])<=0xffffffff or not 0<=int(parts[1])<=0xffffffff:
+                        raise ValueError('Invalid seek')
                 else: raise ValueError('Unsupported operation')
                 expiry = datetime.fromisoformat(message['expires_at'].replace('Z', '+00:00')).timestamp()
                 ttl = expiry-time.time()
@@ -70,6 +73,9 @@ class MusicRemote:
                 if op == 'music.list':
                     result = page(self.controls,rail,parts[0],int(parts[1]),guard=guard)
                     answer.update(status='COMPLETED',data=result)
+                elif op == 'music.seek':
+                    result=seek(self.controls,rail,int(parts[0]),int(parts[1]),guard=guard)
+                    answer.update(status='APPLIED',data=result)
                 else:
                     result = play(self.controls,rail,parts[1],parts[2],expected_version=int(parts[0]),guard=guard)
                     answer.update(status='APPLIED',data=result)

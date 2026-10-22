@@ -61,8 +61,12 @@ bool music_player_confirm_end(void);
 typedef struct {
     music_player_state_t state;
     uint32_t position_ms;
+    uint32_t duration_ms, playback_id;
+    bool seekable;
     char filename[96];
 } music_player_info_t;
 void music_player_get_info(music_player_info_t *out);
 
 void music_player_confirm_selection(const uint8_t identity[7]);
+
+bool music_player_seek_confirmed(uint8_t rail,const uint8_t request_id[4],uint32_t playback_id,uint32_t position_ms);
