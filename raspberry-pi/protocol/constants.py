@@ -54,6 +54,9 @@ class Command(IntEnum):
     CALL_KEEPALIVE = 0x2A
     EVENT_POLL = 0x2B
     EVENT_REPLY = 0x2C
+    MUSIC_INFO = 0x30
+    MUSIC_CATALOG = 0x31
+    MUSIC_TRACK = 0x32
 
 
 class EmergencySource(IntEnum):

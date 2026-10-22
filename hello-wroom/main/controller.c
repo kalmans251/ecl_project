@@ -249,6 +249,52 @@ static void handle_music_apply(const protocol_frame_t *frame)
         send_reply(frame, CMD_APPLY_RESULT, response, sizeof(response));
         return;
     }
+    if (op == CMD_MUSIC_INFO && frame->payload_len == 5) {
+        music_player_info_t info;
+        music_player_get_info(&info);
+        uint8_t data[108] = {0};
+        memcpy(data, response, 5);
+        data[5] = 0;
+        data[6] = (uint8_t)info.state;
+        data[7] = info.position_ms >> 24; data[8] = info.position_ms >> 16;
+        data[9] = info.position_ms >> 8; data[10] = info.position_ms;
+        size_t n = strlen(info.filename);
+        data[11] = n;
+        memcpy(data + 12, info.filename, n);
+        send_reply(frame, CMD_APPLY_RESULT, data, 12 + n);
+        return;
+    }
+    if (op == CMD_MUSIC_CATALOG && frame->payload_len == 5 && sd_manager_is_ready()) {
+        uint8_t data[20] = {0};
+        memcpy(data, response, 5);
+        uint32_t version = playlist_manager_get_catalog_version();
+        data[6] = version >> 24; data[7] = version >> 16;
+        data[8] = version >> 8; data[9] = version;
+        for (int g = 0; g < 5; ++g) {
+            uint16_t n = playlist_manager_get_group_track_count((music_group_t)g);
+            data[10 + g * 2] = n >> 8; data[11 + g * 2] = n;
+        }
+        send_reply(frame, CMD_APPLY_RESULT, data, sizeof(data));
+        return;
+    }
+    if (op == CMD_MUSIC_TRACK && frame->payload_len == 12 && sd_manager_is_ready()) {
+        uint32_t version = playlist_manager_get_catalog_version();
+        uint32_t expected = ((uint32_t)frame->payload[5] << 24) |
+            ((uint32_t)frame->payload[6] << 16) | ((uint32_t)frame->payload[7] << 8) | frame->payload[8];
+        uint8_t group = frame->payload[9];
+        uint16_t index = ((uint16_t)frame->payload[10] << 8) | frame->payload[11];
+        char name[96];
+        if (expected == version && group <= 4 &&
+            playlist_manager_get_track_filename((music_group_t)group, index, name, sizeof(name))) {
+            uint8_t data[110] = {0};
+            memcpy(data, response, 5);
+            memcpy(data + 6, frame->payload + 5, 7);
+            size_t n = strlen(name); data[13] = n;
+            memcpy(data + 14, name, n);
+            send_reply(frame, CMD_APPLY_RESULT, data, 14 + n);
+            return;
+        }
+    }
     if (op == CMD_STOP && frame->payload_len == 5) {
         if (music_player_stop_confirmed(frame->railing_id, frame->payload)) return;
         response[5] = 2; // command queue failure

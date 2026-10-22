@@ -56,3 +56,11 @@ bool music_player_is_paused(void);
 /* Annotate synchronous playlist/player enqueue calls from the controller task. */
 void music_player_confirm_begin(uint8_t rail,const uint8_t id[4],uint8_t op);
 bool music_player_confirm_end(void);
+
+/* Actual worker snapshot; elapsed is decoded PCM submitted to I2S, not wall time. */
+typedef struct {
+    music_player_state_t state;
+    uint32_t position_ms;
+    char filename[96];
+} music_player_info_t;
+void music_player_get_info(music_player_info_t *out);

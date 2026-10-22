@@ -16,29 +16,40 @@ class MusicApplyTests(unittest.TestCase):
 #include <assert.h>
 #include <string.h>
 #include "protocol.h"
+#include "music_player.h"
 #define MUSIC_SET_VOLUME 3
 static bool voice, emergency, queue_ok=true;
 static unsigned replies, stops;
-static uint8_t volume, response[7], saved_id[4], saved_rail;
+static size_t reply_len;
+static uint8_t volume, response[128], saved_id[4], saved_rail;
 static bool voice_session_is_active(void) { return voice; }
 static bool emergency_alert_is_active(void) { return emergency; }
 static void audio_output_set_volume(uint8_t v) { volume=v; }
 static uint8_t audio_output_get_volume(void) { return volume; }
-static bool music_player_stop_confirmed(uint8_t rail,const uint8_t *id) {
+bool music_player_stop_confirmed(uint8_t rail,const uint8_t id[4]) {
  ++stops; saved_rail=rail; memcpy(saved_id,id,4); return queue_ok;
+}
+void music_player_get_info(music_player_info_t *out){
+ memset(out,0,sizeof(*out));out->state=MUSIC_PLAYER_PAUSED;out->position_ms=12345;strcpy(out->filename,"a.mp3");
+}
+static uint32_t playlist_manager_get_catalog_version(void){return 5;}
+static uint16_t playlist_manager_get_group_track_count(music_group_t g){return g==0?1:0;}
+static bool playlist_manager_get_track_filename(music_group_t g,uint16_t i,char *out,size_t n){
+ if(g!=0 || i!=0 || n<6)return false;
+ strcpy(out,"a.mp3");return true;
 }
 static bool sd_manager_is_ready(void){return true;}
 static bool playlist_manager_start(void){return true;}
 static bool playlist_manager_next(void){return true;}
-static bool music_player_pause(void){return true;}
-static bool music_player_resume(void){return true;}
-static void music_player_confirm_begin(uint8_t rail,const uint8_t *id,uint8_t op){(void)rail;(void)id;(void)op;}
-static bool music_player_confirm_end(void){return queue_ok;}
+bool music_player_pause(void){return true;}
+bool music_player_resume(void){return true;}
+void music_player_confirm_begin(uint8_t rail,const uint8_t id[4],uint8_t op){(void)rail;(void)id;(void)op;}
+bool music_player_confirm_end(void){return queue_ok;}
 static music_play_mode_t play_mode;
 static bool playlist_manager_set_mode(music_play_mode_t mode){play_mode=mode;return mode>=1 && mode<=3;}
 static music_play_mode_t playlist_manager_get_mode(void){return play_mode;}
 static void send_reply(const protocol_frame_t *f,uint8_t cmd,const uint8_t *p,size_t n) {
- (void)f; assert(cmd==CMD_APPLY_RESULT && n==7); memcpy(response,p,n); ++replies;
+ (void)f; assert(cmd==CMD_APPLY_RESULT && n<=128); reply_len=n; memcpy(response,p,n); ++replies;
 }
 ''' + handler + r'''
 int main(void) {
@@ -63,6 +74,15 @@ int main(void) {
  f.payload[4]=CMD_RESUME;handle_music_apply(&f);assert(replies==before);
  f.payload_len=7;f.payload[4]=CMD_SET;f.payload[5]=1;f.payload[6]=2;
  handle_music_apply(&f);assert(response[5]==0 && response[6]==2);
+ f.payload_len=5;f.payload[4]=CMD_MUSIC_INFO;handle_music_apply(&f);
+ assert(reply_len==17 && response[5]==0 && response[6]==MUSIC_PLAYER_PAUSED);
+ assert(response[9]==0x30 && response[10]==0x39 && response[11]==5);
+ f.payload[4]=CMD_MUSIC_CATALOG;handle_music_apply(&f);
+ assert(reply_len==20 && response[9]==5 && response[11]==1);
+ f.payload_len=12;f.payload[4]=CMD_MUSIC_TRACK;
+ memset(f.payload+5,0,7);f.payload[8]=5;handle_music_apply(&f);
+ assert(reply_len==19 && response[5]==0 && response[13]==5 && !memcmp(response+14,"a.mp3",5));
+ f.payload[8]=4;handle_music_apply(&f);assert(reply_len==7 && response[5]==1);
  f.src=NODE_PI;before=replies;handle_music_apply(&f);assert(replies==before);
  return 0;
 }
