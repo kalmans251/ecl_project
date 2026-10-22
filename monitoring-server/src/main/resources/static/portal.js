@@ -1,6 +1,6 @@
 'use strict';
 let csrf, me, site, view, selected=new Set(), dirty=new Map(), isSleepMode=false, currentCategory=0, map, markers=new Map(), activeCall, voiceSocket, audioContext, micStream, micNode, pcmQueue=[], playbackSources=new Set(), playAt=0, toastTimer, polling=false, lastEmergency=new Set(), modalRail, pttPressed=false;
-let musicReceivedAt=0;
+let musicReceivedAt=0, musicPage=null, musicBusy=false, musicSelectionKey=null;
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
 const newId=()=>crypto.randomUUID();
@@ -30,7 +30,51 @@ function switchCategoryTabUI(name,code,edit=true){currentCategory=code;document.
 function setSubModeUI(value){if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);else mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
 function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit)dirty.set('volume',String(value));}
 function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','age'][Number(value)]);}
-function updateAudioTrack(){toast('모니터링 화면의 트랙 선택 연동은 준비 중입니다.');}
+function resetMusicCatalog(){musicPage=null;fillMusicTracks();renderMusicCatalog();}
+function fillMusicTracks(){
+ const select=$('piTrackSelect');select.replaceChildren();
+ select.append(new Option(musicPage?.tracks.length?'곡을 선택하세요':'목록 미조회 또는 빈 폴더',''));
+ for(const track of musicPage?.tracks||[])select.append(new Option(`${track.index+1}. ${track.filename}`,String(track.index)));
+}
+function renderMusicCatalog(){
+ const items=rails(),r=items.length===1?items[0]:null,key=r?.id||null;
+ if(key!==musicSelectionKey){musicSelectionKey=key;musicPage=null;fillMusicTracks();}
+ const enabled=!!r?.online && view?.role!=='VIEWER' && !musicBusy;
+ $('musicListLoad').disabled=!enabled;$('piMusicGroup').disabled=!enabled;
+ $('piTrackSelect').disabled=!enabled||!musicPage;
+ $('musicTrackPlay').disabled=!enabled||!musicPage||$('piTrackSelect').value==='';
+ $('musicPagePrev').disabled=!enabled||!musicPage||musicPage.offset===0;
+ $('musicPageNext').disabled=!enabled||!musicPage||musicPage.offset+8>=musicPage.total;
+ text('musicPageInfo',musicBusy?'장치 응답 확인 중…':musicPage?`${musicPage.total}곡 · ${musicPage.total?musicPage.offset+1:0}–${Math.min(musicPage.offset+8,musicPage.total)}`:'목록 미조회');
+}
+async function musicRequest(r,operation,value){
+ const rows=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:[r.id],operation,value});
+ const id=rows[0].id,until=performance.now()+50000;
+ while(performance.now()<until){
+  const result=await api(`/api/portal/commands/${id}`);
+  if(['COMPLETED','APPLIED'].includes(result.status))return result.result;
+  if(!['QUEUED','SENT','RECEIVED'].includes(result.status))throw Error(`${r.name}: ${result.status} · 목록/장치 상태를 확인하세요. 자동 재시도하지 않습니다.`);
+  await new Promise(resolve=>setTimeout(resolve,500));
+ }
+ throw Error('응답 대기 종료 · 처리 내역을 확인하세요. 자동 재시도하지 않습니다.');
+}
+async function loadMusicPage(offset=0){
+ const r=requireSelection(true)[0],group=$('piMusicGroup').value;
+ if(musicBusy)return;musicBusy=true;musicPage=null;fillMusicTracks();renderMusicCatalog();
+ try {
+  const result=await musicRequest(r,'music.list',`${group}:${offset}`);
+  if(rails().length===1 && rails()[0].id===r.id && $('piMusicGroup').value===group){musicPage=result;fillMusicTracks();}
+ } finally {musicBusy=false;renderMusicCatalog();}
+}
+async function playSelectedMusic(){
+ const r=requireSelection(true)[0],index=$('piTrackSelect').value;
+ if(musicBusy||!musicPage||index===''||!musicPage.tracks.some(t=>String(t.index)===index))throw Error('목록을 조회하고 곡을 선택하세요.');
+ const value=`${musicPage.catalog_version}:${musicPage.group}:${index}`;
+ musicBusy=true;renderMusicCatalog();
+ try {const result=await musicRequest(r,'music.play',value);toast(`${r.name}: ${result.filename} · 장치 재생 시작 확인`);await poll();}
+ catch(e){musicPage=null;fillMusicTracks();throw e;}
+ finally {musicBusy=false;renderMusicCatalog();}
+}
 function toggleDeviceState(type,value){if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');mark('projector',value?'on':'off');document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(String(value))));}
 function switchDisplayView(mode,edit=true){$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);}
 async function applyAllUpdates(){await guarded(async()=>{requireSelection();if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){await send(op,value);if(dirty.get(op)===value)dirty.delete(op);}toast('변경 요청 접수 완료 · 장치 실제 적용 여부는 처리 내역을 확인하세요.');});}
@@ -46,6 +90,7 @@ function renderMap(){
  if(coords.length && !map._portalFitted){map.fitBounds(coords,{padding:[30,30],maxZoom:16});map._portalFitted=true;}map.invalidateSize();
 }
 function renderMusicStatus(){
+ renderMusicCatalog();
  const items=rails();
  if(items.length!==1){text('musicNowTitle','난간 하나를 선택하세요');text('musicNowState','--');text('musicNowTime','--:-- / --:--');return;}
  const r=items[0], d=musicDisplay(r.music_status,r.online,performance.now()-musicReceivedAt);
@@ -103,5 +148,5 @@ function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Err
  const infoLoad=async()=>{info.replaceChildren();const users=await api('/api/portal/admin/users'),gateways=await api('/api/portal/admin/gateways');const heading=document.createElement('h3');heading.textContent='등록 정보';info.append(heading);table(info,['사용자','ID'],users.map(u=>[u.NAME+' ('+u.USERNAME+')',u.ID]));table(info,['현장','ID'],me.sites.map(s=>[s.NAME,s.ID]));table(info,['Pi','현장 ID'],gateways.map(g=>[g.ID,g.SITE_ID]));table(info,['현재 현장 난간','ID'],(view?.rails||[]).map(r=>[r.name,r.id]));};await infoLoad();});}
 function loadContacts(){for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}
 function fillSites(){$('siteSelect').replaceChildren();for(const s of me.sites){const o=document.createElement('option');o.value=s.ID;o.textContent=s.NAME+' · '+s.ROLE;$('siteSelect').append(o);}if(me.sites.some(s=>s.ID===site))$('siteSelect').value=site;else site=$('siteSelect').value;}
-async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));$('piTrackSelect').append(new Option('서버 트랙 선택 연동 준비 중',''));const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!voiceSocket)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
+async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!voiceSocket)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
 init();

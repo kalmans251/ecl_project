@@ -31,6 +31,7 @@ public class Commands {
     }
     public static void validate(String operation,String value) {
         if(operation==null) throw Accounts.bad("Operation required");
+        if(MusicCommands.supports(operation)) { MusicCommands.parse(operation,value); return; }
         if(operation.equals("led.basic_pattern") || operation.equals("led.music_pattern")) {
             int max=operation.equals("led.basic_pattern")?5:2;
             if(value==null || !value.matches("[0-"+max+"]")) throw Accounts.bad("Unsupported LED pattern");
@@ -54,6 +55,7 @@ public class Commands {
             return prior.stream().map(this::result).toList();
         }
         boolean call=input.operation().startsWith("call.") || input.operation().startsWith("ptt.");
+        if(MusicCommands.supports(input.operation()) && rails.size()!=1) throw Accounts.bad("Music catalog/play requires one rail");
         if(call && rails.size()!=1) throw Accounts.bad("Calls require one rail");
         for(var rail:rails) {
             String gateway=(String)rail.get("GATEWAY_ID");
@@ -70,7 +72,7 @@ public class Commands {
         for(var rail:rails) {
             String id=UUID.randomUUID().toString();
             db.update("INSERT INTO commands(id,batch_id,user_id,gateway_id,rail_id,operation,args,created_at,expires_at,status) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                id,input.request_id().toString(),user,rail.get("GATEWAY_ID"),rail.get("ID"),input.operation(),input.value(),now,now+15000,"QUEUED");
+                id,input.request_id().toString(),user,rail.get("GATEWAY_ID"),rail.get("ID"),input.operation(),input.value(),now,now+(input.operation().equals("music.list")?45000:15000),"QUEUED");
             registry.audit(username,(String)rail.get("SITE_ID"),input.operation(),id);
             result.add(result(db.queryForMap("SELECT * FROM commands WHERE id=?",id)));
         }
@@ -120,6 +122,7 @@ public class Commands {
         if(!Set.of("RECEIVED","PLC_SENT","APPLIED","BUSY","FAILED","EXPIRED").contains(status))throw Accounts.bad("Invalid command acknowledgment");
         var row=rows.get(0);String current=(String)row.get("STATUS");if(current.equals(status))return true;
         if(!Set.of("SENT","RECEIVED").contains(current))throw Accounts.bad("Invalid command transition");
+        if(MusicCommands.supports((String)row.get("OPERATION")) && status.equals("APPLIED")) throw Accounts.bad("Music result identity required");
         if(status.equals("APPLIED") && !CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Firmware has no application confirmation for this operation");
         if(status.equals("PLC_SENT") && CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Await actual application confirmation for this operation");
         if(((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis())status="UNKNOWN";
@@ -132,6 +135,23 @@ public class Commands {
         } else if(!status.equals("RECEIVED")) uncertain(row);
         return true;
     }
+    public synchronized void musicResult(String gateway,tools.jackson.databind.JsonNode node) {
+        if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").intValue()!=1
+            || !node.path("type").asText().equals("music_result") || !node.path("message_id").isString()
+            || !node.path("status").isString() || !node.has("data")) throw Accounts.bad("Invalid music result");
+        var rows=db.queryForList("SELECT * FROM commands WHERE id=? AND gateway_id=?",node.path("message_id").asText(),gateway);
+        if(rows.isEmpty()) throw Accounts.bad("Unknown music request");
+        var row=rows.get(0);String operation=(String)row.get("OPERATION");
+        if(!MusicCommands.supports(operation)) throw Accounts.bad("Not a music request");
+        String status=node.path("status").asText();
+        var rail=registry.rail((String)row.get("RAIL_ID"));
+        MusicCommands.validateResult(operation,(String)row.get("ARGS"),((Number)rail.get("NUMBER")).intValue(),status,node.get("data"));
+        // Terminal results and late results never resurrect an expired request.
+        if(!Set.of("SENT","RECEIVED").contains(row.get("STATUS"))) return;
+        boolean expired=((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis();
+        db.update("UPDATE commands SET status=?,result_data=?,detail=? WHERE id=?",expired?"UNKNOWN":status,
+            expired?null:json.writeValueAsString(node.get("data")),expired?"Late music result; application unknown":"",row.get("ID"));
+    }
     private void uncertain(Map<String,Object> row) {
         if(((String)row.get("OPERATION")).startsWith("call.") || ((String)row.get("OPERATION")).startsWith("ptt."))
             db.update("UPDATE calls SET status='UNKNOWN' WHERE gateway_id=?",row.get("GATEWAY_ID"));
@@ -140,8 +160,16 @@ public class Commands {
         accounts.permit(username,site,false);
         return db.queryForList("SELECT c.* FROM commands c JOIN portal_gateways g ON g.id=c.gateway_id WHERE g.site_id=? ORDER BY c.created_at DESC LIMIT 100",site).stream().map(this::result).toList();
     }
+    public Map<String,Object> find(String username,String id) {
+        var rows=db.queryForList("SELECT * FROM commands WHERE id=?",id);
+        if(rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Command not found");
+        var row=rows.get(0);var rail=registry.rail((String)row.get("RAIL_ID"));
+        accounts.permit(username,(String)rail.get("SITE_ID"),false);
+        return result(row);
+    }
     private Map<String,Object> result(Map<String,Object> row) {
         var r=new LinkedHashMap<String,Object>();for(String k:List.of("ID","RAIL_ID","OPERATION","STATUS","DETAIL","CREATED_AT"))r.put(k.toLowerCase(),row.get(k));
+        if(row.get("RESULT_DATA")!=null) r.put("result",json.readTree((String)row.get("RESULT_DATA")));
         r.put("device_application_confirmed",row.get("STATUS").equals("APPLIED"));return r;
     }
 }

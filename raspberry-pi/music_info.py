@@ -6,7 +6,7 @@ from protocol import Command, Frame, Node, Service
 GROUPS = {'default': 0, '10': 1, '20': 2, '30': 3, '40': 4}
 
 
-def request(controls, rail, operation, payload=b'', *, background=False, timeout=None):
+def request(controls, rail, operation, payload=b'', *, background=False, timeout=None, guard=None):
     # Release bus ownership between tracks so event polling can run.
     with ExitStack() as stack:
         if background:
@@ -17,6 +17,8 @@ def request(controls, rail, operation, payload=b'', *, background=False, timeout
         else:
             stack.enter_context(controls.lock)
             stack.enter_context(getattr(controls.bus, 'transaction', nullcontext)())
+        if guard:
+            guard()
         controls._check_idle()
         controls.request_id = (controls.request_id + 1) & 0xffffffff
         token = controls.request_id.to_bytes(4, 'big')
@@ -85,19 +87,50 @@ def catalog(controls, rail, group=None):
     return result
 
 
-def play(controls, rail, group, index):
+def play(controls, rail, group, index, *, expected_version=None, guard=None):
     if group not in GROUPS or not index.isascii() or not index.isdecimal() or not 0 <= int(index) < 32:
         raise ValueError('music play: group default|10|20|30|40, zero-based index 0..31')
     index = int(index)
     listing = controls.music_catalogs.get(rail)
     if not listing:
         raise ValueError('Run music <id> list first in this process')
+    if expected_version is not None and listing['catalog_version'] != expected_version:
+        raise ValueError('Catalog version changed; refresh list')
     track = next((t for t in listing['tracks'] if t['group'] == group and t['index'] == index), None)
     if track is None:
         raise ValueError('Track was not in the displayed list; refresh the required group')
     identity = listing['catalog_version'].to_bytes(4, 'big') + bytes([GROUPS[group]]) + index.to_bytes(2, 'big')
-    data = request(controls, rail, Command.MUSIC_PLAY, identity)
+    data = request(controls, rail, Command.MUSIC_PLAY, identity, guard=guard)
     if data != b'\x01' + identity:
         raise ValueError('Selected-track confirmation does not match; playback state unknown')
     return {'railing_id': rail, 'state': 'playing', 'device_application_confirmed': True,
             'catalog_version': listing['catalog_version'], **track}
+
+
+def page(controls, rail, group, offset=0, *, guard=None):
+    """Eight tracks at a time; release PLC between each correlated read."""
+    if group not in GROUPS or offset not in (0, 8, 16, 24):
+        raise ValueError('Invalid catalog page')
+    previous = controls.music_catalogs.pop(rail, None)
+    data = request(controls, rail, Command.MUSIC_CATALOG, guard=guard)
+    if len(data) != 14:
+        raise ValueError('Malformed music catalog')
+    version = data[:4]
+    counts = [int.from_bytes(data[4+g*2:6+g*2], 'big') for g in range(5)]
+    if any(n > 32 for n in counts):
+        raise ValueError('Music catalog exceeds firmware limits')
+    tracks = []
+    for index in range(offset, min(offset+8, counts[GROUPS[group]])):
+        identity = version + bytes([GROUPS[group]]) + index.to_bytes(2, 'big')
+        item = request(controls, rail, Command.MUSIC_TRACK, identity, guard=guard)
+        if len(item) < 8 or item[:7] != identity or not 1 <= item[7] <= 95 or len(item) != 8+item[7]:
+            raise ValueError('Malformed or changed music track response')
+        tracks.append(dict(group=group, index=index, filename=item[8:].decode('utf-8', errors='replace')))
+    if request(controls, rail, Command.MUSIC_CATALOG, guard=guard) != data:
+        raise ValueError('Catalog changed; refresh list')
+    number = int.from_bytes(version, 'big')
+    cached = previous['tracks'] if previous and previous['catalog_version'] == number else []
+    cached = [t for t in cached if t['group'] != group or not offset <= t['index'] < offset+8]
+    controls.music_catalogs[rail] = dict(catalog_version=number, tracks=cached+tracks)
+    return dict(railing_id=rail, catalog_version=number, group=group, offset=offset,
+                total=counts[GROUPS[group]], tracks=tracks)

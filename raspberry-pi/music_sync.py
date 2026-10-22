@@ -73,12 +73,13 @@ class MusicSync:
 
 
 class MusicPublisher:
-    """Authenticated telemetry-only socket. No command execution or replay queue."""
-    def __init__(self, url, token):
+    """Authenticated music state and bounded list/play commands."""
+    def __init__(self, url, token, remote=None):
         validate_url(url)
         if not token:
             raise ValueError('Set MONITOR_GATEWAY_TOKEN')
         self.url, self.token = url, token
+        self.remote = remote
         self.stop = threading.Event()
         self.lock = threading.Lock()
         self.pending = {}
@@ -107,19 +108,14 @@ class MusicPublisher:
                 async with connect(self.url, additional_headers={'Authorization': 'Bearer ' + self.token},
                                    max_size=4096, open_timeout=5, close_timeout=1,
                                    ping_interval=20, ping_timeout=20) as ws:
-                    LOG.info('Music monitoring connection established (telemetry only)')
-                    while not self.stop.is_set():
-                        for message in self.drain():
-                            await ws.send(json.dumps(message, ensure_ascii=False))
-                        try:
-                            raw = await asyncio.wait_for(ws.recv(), timeout=.5)
-                        except asyncio.TimeoutError:
-                            continue
-                        message = json.loads(raw)
-                        if message.get('type') in ('command', 'cctv.enter', 'cctv.age'):
-                            # Explicit failure, never APPLIED/PLC_SENT: this connection is read-only.
-                            await ws.send(json.dumps(dict(version=1, type='ack',
-                                message_id=message['message_id'], status='FAILED')))
+                    LOG.info('Music monitoring connection established')
+                    alive = threading.Event(); alive.set()
+                    try:
+                        await self._connection(ws, alive)
+                    finally:
+                        alive.clear()
+                        if self.command_task:
+                            await self.command_task
             except Exception as exc:
                 LOG.warning('Music monitoring disconnected (%s); retrying', type(exc).__name__)
                 for _ in range(20):
@@ -127,7 +123,34 @@ class MusicPublisher:
                         return
                     await asyncio.sleep(.1)
 
+    async def _connection(self, ws, alive):
+        self.command_task = None
+        async def execute(message):
+            try:
+                result = await asyncio.to_thread(self.remote.handle, message,
+                    lambda: alive.is_set() and not self.stop.is_set())
+                if alive.is_set() and not self.stop.is_set():
+                    await ws.send(json.dumps(result, ensure_ascii=False))
+            except Exception as exc:
+                # Journal remains uncertain; never retry automatically.
+                LOG.warning('Music command result unavailable (%s)', type(exc).__name__)
+        while not self.stop.is_set():
+            for message in self.drain():
+                await ws.send(json.dumps(message, ensure_ascii=False))
+            try:
+                raw = await asyncio.wait_for(ws.recv(), timeout=.5)
+            except asyncio.TimeoutError:
+                continue
+            message = json.loads(raw)
+            if message.get('type') == 'command' and message.get('operation') in ('music.list','music.play') and self.remote:
+                if self.command_task and not self.command_task.done():
+                    await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='BUSY')))
+                else:
+                    self.command_task = asyncio.create_task(execute(message))
+            elif message.get('type') in ('command','cctv.enter','cctv.age'):
+                await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='FAILED')))
+
     def close(self):
         self.stop.set()
         if self.thread:
-            self.thread.join(7)
+            self.thread.join(10)

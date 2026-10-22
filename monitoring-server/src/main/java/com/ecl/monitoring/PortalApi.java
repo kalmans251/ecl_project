@@ -25,6 +25,7 @@ public class PortalApi {
         for(var call:calls){call.put("OWNED",call.remove("USER_ID").equals(user));}
         return Map.of("role",role,"rails",rails,"calls",calls,"commands",commands.list(p.getName(),site),"voice_available",voice.available(),"contacts",db.queryForList("SELECT label,phone FROM contacts WHERE site_id=?",site),"schedules",db.queryForList("SELECT s.rail_id,s.start_time,s.end_time,s.enabled FROM schedules s JOIN rails r ON r.id=s.rail_id JOIN portal_gateways g ON g.id=r.gateway_id WHERE g.site_id=?",site));
     }
+    @GetMapping("/api/portal/commands/{id}") public Map<String,Object> commandResult(Principal p,@PathVariable String id){return commands.find(p.getName(),id);}
     @PostMapping("/api/portal/commands") public List<Map<String,Object>> command(Principal p,@RequestBody Commands.Input input){return commands.submit(p.getName(),input);}
     public record Location(Double latitude,Double longitude,String address){}
     @PutMapping("/api/portal/rails/{id}/location") public void location(Principal p,@PathVariable String id,@RequestBody Location value){registry.location(p.getName(),id,value.latitude(),value.longitude(),value.address());}

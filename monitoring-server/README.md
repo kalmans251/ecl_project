@@ -3,7 +3,7 @@
 Spring Boot 4.1.1 / Java 17 / Maven 3.9+. 기존 모니터링 화면을 새 계정·현장 권한·장치 명령 구조에 연결했습니다.
 
 화면 이식 범위와 지원 상태는 [UI_MIGRATION.md](UI_MIGRATION.md), 새 Pi 어댑터 규격은 [DEVICE_PROTOCOL.md](DEVICE_PROTOCOL.md)를 확인하세요.
-음악 현재 상태는 실제 Pi 어댑터로 연결할 수 있습니다: [MUSIC_SYNC.md](MUSIC_SYNC.md). 원격 제어·CCTV·음성 서버 연결은 별도 통합 어댑터가 필요합니다.
+음악 현재 상태·목록 조회·선택 재생은 실제 Pi 어댑터로 연결할 수 있습니다: [MUSIC_SYNC.md](MUSIC_SYNC.md). 그 외 원격 제어·CCTV·음성 서버 연결은 별도 통합 어댑터가 필요합니다.
 
 ## 실행
 
