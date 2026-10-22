@@ -23,9 +23,9 @@
 #define PLC_UART_NUM            UART_NUM_1
 
 // PLC TX moved from GPIO48 after an abnormal unloaded output was observed.
-// GPIO46 must be exposed and unused by external hardware on the actual board.
-#define PLC_TX_PIN              46
-#define PLC_RX_PIN              47
+// PLC UART roles swapped for the current GPIO46/47 test wiring.
+#define PLC_TX_PIN              47
+#define PLC_RX_PIN              46
 
 #define PLC_BAUD_RATE           9600
 
