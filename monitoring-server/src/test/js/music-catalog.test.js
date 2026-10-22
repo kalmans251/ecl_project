@@ -34,3 +34,24 @@ test('unknown playback clears catalog without automatic retry',async()=>{
  api=async(path,method)=>{if(method==='POST'){count();return [{id:'request'}];}return {status:'UNKNOWN'};};`);
  await assert.rejects(a.run('playSelectedMusic()'),/UNKNOWN/);assert.equal(calls,1);assert.equal(a.run('musicPage'),null);
 });
+test('general control waits for each railing and reports partial failure without replay',async()=>{
+ const a=app(),posted=[];a.context.capture=x=>posted.push(x);
+ a.run(`selected=new Set(['rail-a','rail-b']);poll=async()=>{};toast=()=>{};
+ api=async(path,method,data)=>{if(method==='POST'){capture(data);return [{id:'a',status:'SENT'},{id:'b',status:'SENT'}];}
+ return path.endsWith('/a')?{id:'a',rail_id:'rail-a',status:'APPLIED'}:{id:'b',rail_id:'rail-b',status:'UNKNOWN'};};`);
+ await assert.rejects(a.run(`send('power','ac')`),/B: UNKNOWN/);
+ assert.equal(posted.length,1);assert.equal(a.run('controlBusy'),false);
+});
+test('policy-only completion remains distinct and blocks duplicate control while pending',async()=>{
+ const a=app();a.run(`poll=async()=>{};toast=()=>{};controlBusy=true;`);
+ await assert.rejects(a.run(`send('music.start')`),/이전 제어/);
+ a.run(`controlBusy=false;api=async(path,method)=>method==='POST'?[{id:'a',status:'SENT'}]:{id:'a',rail_id:'rail-a',status:'COMPLETED',detail:'P4 policy confirmed'};`);
+ const results=await a.run(`send('music.start')`);
+ assert.equal(results[0].status,'COMPLETED');
+});
+test('batch settings stop when selection changes while confirmation is pending',async()=>{
+ const a=app();let sent=0;a.context.count=()=>sent++;
+ a.run(`site='site-a';dirty=new Map([['led','basic'],['volume','20']]);guarded=async f=>f();toast=()=>{};
+ send=async()=>{count();selected=new Set(['rail-b']);return [];};`);
+ await assert.rejects(a.run('applyAllUpdates()'),/선택이 변경/);assert.equal(sent,1);
+});

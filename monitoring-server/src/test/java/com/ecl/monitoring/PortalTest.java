@@ -45,7 +45,11 @@ class PortalTest {
    var body=command(rail,"volume","20");var response=b.request("/api/portal/commands","POST",body,true);assertEquals(200,response.statusCode(),response.body());String id=json.readTree(device.next()).path("message_id").asText();assertFalse(json.readTree(response.body()).get(0).path("device_application_confirmed").asBoolean());
    assertEquals(id,json.readTree(b.request("/api/portal/commands","POST",body,true).body()).get(0).path("id").asText());assertNull(device.messages.poll(100,TimeUnit.MILLISECONDS));body.put("value","30");assertEquals(409,b.request("/api/portal/commands","POST",body,true).statusCode());
    assertFalse(commands.ack("wrong-gateway",id,"APPLIED")); // cannot confirm another gateway
-   device.ack(id,"APPLIED");assertTrue(commands.list(owner,"site-01").stream().filter(c->c.get("id").equals(id)).findFirst().get().get("device_application_confirmed").equals(true));
+   assertThrows(RuntimeException.class,()->commands.ack("gateway-01",id,"APPLIED"));
+   var applied=Map.of("railing_id",1,"operation","volume","value","20","device_application_confirmed",true,
+       "steps",List.of(Map.of("node",3,"service",2,"command",34,"status",0,"data","14")));
+   device.ws.sendText(json.writeValueAsString(Map.of("version",1,"type","control_result","message_id",id,"status","APPLIED","data",applied)),true).join();
+   waitMusic(b,id,"APPLIED");assertTrue(commands.list(owner,"site-01").stream().filter(c->c.get("id").equals(id)).findFirst().get().get("device_application_confirmed").equals(true));
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());var start=json.readTree(device.next());assertTrue(start.has("call_id"));assertEquals(409,o.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());device.ack(start.path("message_id").asText(),"APPLIED");
    String callId=start.path("call_id").asText();
    CompletableFuture<Integer> rejected=new CompletableFuture<>();

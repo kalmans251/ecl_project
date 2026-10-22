@@ -92,10 +92,10 @@ def parse_args() -> argparse.Namespace:
         help='Durable unresolved-call journal; keep the same path across restarts')
     parser.add_argument('--event-railings', default='1,2,3,4',
                         help='Comma-separated installed railing IDs to poll (default: 1,2,3,4)')
-    parser.add_argument('--music-journal', default='~/.local/state/ecl-railing/music-requests.sqlite3', help='Durable remote music command journal; do not delete to retry a request')
+    parser.add_argument('--music-journal', default='~/.local/state/ecl-railing/music-requests.sqlite3', help='Durable remote music/general command journal; do not delete to retry a request')
     parser.add_argument('--music-sync', action='store_true', help='Poll actual music state round-robin')
     parser.add_argument('--music-poll-interval', type=float, default=2.0, help='Seconds between rails (1..30)')
-    parser.add_argument('--monitor-url', help='Optional WSS music gateway URL; enables music sync/list/play')
+    parser.add_argument('--monitor-url', help='Optional WSS gateway URL; enables music sync and confirmed remote controls')
     args = parser.parse_args()
     if not 1 <= args.music_poll_interval <= 30:
         parser.error('--music-poll-interval must be 1..30')

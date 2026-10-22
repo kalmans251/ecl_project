@@ -155,3 +155,30 @@ seekable:u8, name_length:u8, filename[0..95]. Maximum complete frame is 126 byte
 state:u8 + playback_id:u32 + actual_position_ms:u32. Integers are big endian.
 Both use the existing four-byte request token and APPLY/RESULT envelope.
 Legacy INFO=0x30 stays unchanged. Playback identity is renewed on each opened file.
+
+### Confirmed general controls
+
+Pi handles power, projector, led, weather, led.basic_pattern, led.music_pattern,
+music.mode, music.start/stop/pause/resume/next, volume, sleep, detection and query
+through existing DeviceControls APPLY. Web LED patterns are zero-based (0..5/0..2),
+console patterns one-based. No shell execution; only configured rails are accepted.
+
+Result envelope: version=1, type=control_result, message_id, status, data.
+Success data: railing_id, operation, value (null for actions),
+device_application_confirmed, steps. Each step: node, service, command,
+status (0 device / 3 policy), data (lowercase hex). Power ac/battery requires ordered
+SET + START responses. Pi validates token/rail/service/command/source; server checks
+request ownership, identity, step count/order, source, scope and expiry.
+Plain APPLIED/PLC_SENT ack cannot finish these commands. Deploy Pi and server together.
+
+APPLIED: all steps device-confirmed. COMPLETED: SYSTEM query or P4-only music policy,
+not proof of playback. FAILED/UNKNOWN/EXPIRED: null data. Partial application/timeouts
+are UNKNOWN, not rollback. The --music-journal covers general controls, persists
+before transmission and prevents uncertain replay after restart. Connection/deadline
+is checked after locking the bus and before each step. Calls/emergencies block general controls.
+
+Multiple rails use separate request IDs/results and one gateway queue. Queued requests
+can expire. No automatic retries. Results do not replace physical telemetry or invent
+full device state. Query raw bytes are shown in request history.
+Web call/PTT/emergency-ack and CCTV delivery remain outside this adapter and return
+FAILED; existing local Pi voice controls are unchanged.
