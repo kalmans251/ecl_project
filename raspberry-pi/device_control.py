@@ -5,6 +5,7 @@ require WROOM application results; music policy operations report their scope ex
 forwards music settings to WROOM. General controls never queue behind a call.
 """
 from __future__ import annotations
+import json
 import threading
 from contextlib import nullcontext
 import secrets
@@ -16,6 +17,7 @@ HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop cu
   led <id> on|off|basic|music     LED enable or mode
   led <id> basic [1..6] | music [1..3]  select animation
   led <id> weather clear|cloudy|rain|snow
+  music <id> list [default|10|20|30|40] | status
   music <id> start|stop|pause|resume|next
   music <id> mode sequential|shuffle|age
   volume <id> <0..100>           shared WROOM music/voice volume (outside calls)
@@ -49,6 +51,15 @@ class DeviceControls:
         if not 1 <= rail <= 255:
             raise ValueError('railing_id must be 1..255')
         args = [p.lower() for p in parts[2:]]
+        if name == 'music' and args and args[0] in ('list', 'status'):
+            from music_info import GROUPS, catalog, status
+            if args == ['status']:
+                info = status(self, rail)
+            elif args == ['list'] or (len(args) == 2 and args[0] == 'list' and args[1] in GROUPS):
+                info = catalog(self, rail, args[1] if len(args) == 2 else None)
+            else:
+                raise ValueError('music: status or list [default|10|20|30|40]')
+            return json.dumps(info, ensure_ascii=False, indent=2)
         frames = []
         def add(service, command, payload=b'', dst=Node.P4):
             frames.append(Frame(rail, Node.PI, dst, service, command, payload))
@@ -181,11 +192,11 @@ class DeviceControls:
                 return True
             expected, detail = pending[4:]
             # P4 can reject a downstream request, but never claim WROOM/S3 success.
-            policy = status == 3 and frame.src == Node.P4 and frame.service == Service.MUSIC and detail is None
+            policy = op not in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK) and status == 3 and frame.src == Node.P4 and frame.service == Service.MUSIC and detail is None
             if frame.src != expected and not policy and not (frame.src == Node.P4 and status in (1, 2)):
                 return True
-            if status == 3 and not (frame.src == Node.P4 and frame.service == Service.MUSIC
-                    and detail is None):
+            if status == 3 and (op in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK) or not (frame.src == Node.P4 and frame.service == Service.MUSIC
+                    and detail is None)):
                 return True
             if status == 0 and detail is not None and frame.payload[6] != detail:
                 return True

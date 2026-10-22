@@ -2,6 +2,7 @@
 #include "music_eq.h"
 
 #include <fcntl.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -174,6 +175,22 @@ static volatile music_player_state_t
 s_state =
     MUSIC_PLAYER_IDLE;
 
+
+static portMUX_TYPE s_info_mux = portMUX_INITIALIZER_UNLOCKED;
+static music_player_info_t s_info;
+void music_player_get_info(music_player_info_t *out)
+{
+    portENTER_CRITICAL(&s_info_mux);
+    *out = s_info;
+    portEXIT_CRITICAL(&s_info_mux);
+}
+static void set_player_state(music_player_state_t state)
+{
+    portENTER_CRITICAL(&s_info_mux);
+    s_state = state;
+    s_info.state = state;
+    portEXIT_CRITICAL(&s_info_mux);
+}
 
 /* ============================================================
  * MP3 BUFFERS
@@ -473,8 +490,7 @@ static void process_control_commands(
                         true;
 
 
-                    s_state =
-                        MUSIC_PLAYER_PAUSED;
+                    set_player_state(MUSIC_PLAYER_PAUSED);
 
 
                     ESP_LOGI(
@@ -508,8 +524,7 @@ static void process_control_commands(
                         false;
 
 
-                    s_state =
-                        MUSIC_PLAYER_PLAYING;
+                    set_player_state(MUSIC_PLAYER_PLAYING);
 
 
                     ESP_LOGI(
@@ -610,8 +625,7 @@ static void wait_while_paused(
                     false;
 
 
-                s_state =
-                    MUSIC_PLAYER_PLAYING;
+                set_player_state(MUSIC_PLAYER_PLAYING);
 
 
                 ESP_LOGI(
@@ -756,6 +770,15 @@ static play_result_t play_mp3_file(
         return PLAY_RESULT_ERROR;
     }
 
+
+    char display_name[96] = {0};
+    const char *filename = strrchr(path, '/');
+    snprintf(display_name, sizeof(display_name), "%s", filename ? filename + 1 : path);
+    portENTER_CRITICAL(&s_info_mux);
+    memcpy(s_info.filename, display_name, sizeof(display_name));
+    s_info.position_ms = 0;
+    s_info.state = MUSIC_PLAYER_IDLE;
+    portEXIT_CRITICAL(&s_info_mux);
 
     music_eq_reset();
 
@@ -967,8 +990,7 @@ static play_result_t play_mp3_file(
                 audio_output_deinit();
 
 
-                s_state =
-                    MUSIC_PLAYER_IDLE;
+                set_player_state(MUSIC_PLAYER_IDLE);
 
 
                 send_music_event(
@@ -1079,8 +1101,7 @@ static play_result_t play_mp3_file(
                 audio_output_deinit();
 
 
-                s_state =
-                    MUSIC_PLAYER_IDLE;
+                set_player_state(MUSIC_PLAYER_IDLE);
 
 
                 send_music_event(
@@ -1147,8 +1168,7 @@ static play_result_t play_mp3_file(
                 audio_output_deinit();
 
 
-                s_state =
-                    MUSIC_PLAYER_IDLE;
+                set_player_state(MUSIC_PLAYER_IDLE);
 
 
                 send_music_event(
@@ -1188,8 +1208,7 @@ static play_result_t play_mp3_file(
                     );
 
 
-                    s_state =
-                        MUSIC_PLAYER_IDLE;
+                    set_player_state(MUSIC_PLAYER_IDLE);
 
 
                     send_music_event(
@@ -1205,8 +1224,7 @@ static play_result_t play_mp3_file(
                     true;
 
 
-                s_state =
-                    MUSIC_PLAYER_PLAYING;
+                set_player_state(MUSIC_PLAYER_PLAYING);
 
 
                 send_music_event(
@@ -1235,8 +1253,7 @@ static play_result_t play_mp3_file(
                     audio_output_deinit();
 
 
-                    s_state =
-                        MUSIC_PLAYER_IDLE;
+                    set_player_state(MUSIC_PLAYER_IDLE);
 
 
                     send_music_event(
@@ -1323,8 +1340,7 @@ static play_result_t play_mp3_file(
                 audio_output_deinit();
 
 
-                s_state =
-                    MUSIC_PLAYER_IDLE;
+                set_player_state(MUSIC_PLAYER_IDLE);
 
 
                 send_music_event(
@@ -1346,6 +1362,11 @@ static play_result_t play_mp3_file(
             decoded_sample_frames +=
                 (uint64_t)samples;
 
+
+            uint32_t position_ms = (uint32_t)(decoded_sample_frames * 1000 / (uint64_t)info.hz);
+            portENTER_CRITICAL(&s_info_mux);
+            s_info.position_ms = position_ms;
+            portEXIT_CRITICAL(&s_info_mux);
 
             uint32_t second =
                 (uint32_t)(
@@ -1453,8 +1474,7 @@ static play_result_t play_mp3_file(
     audio_output_deinit();
 
 
-    s_state =
-        MUSIC_PLAYER_IDLE;
+    set_player_state(MUSIC_PLAYER_IDLE);
     confirm_stopped(&s_stop_confirmation);
     memset(&s_stop_confirmation, 0, sizeof(s_stop_confirmation));
 

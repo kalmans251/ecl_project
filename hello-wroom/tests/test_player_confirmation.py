@@ -21,6 +21,7 @@ static player_command_t queued,s_restart_confirmation,s_stop_confirmation;
 static bool has_command;
 static void *s_command_queue;
 static music_player_state_t s_state;
+static void set_player_state(music_player_state_t state){s_state=state;}
 static protocol_frame_t reply;
 static unsigned replies;
 static bool router_enqueue(const protocol_frame_t *f){reply=*f;replies++;return true;}
