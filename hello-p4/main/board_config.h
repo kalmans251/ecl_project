@@ -22,7 +22,9 @@
 
 #define PLC_UART_NUM            UART_NUM_1
 
-#define PLC_TX_PIN              48
+// PLC TX moved from GPIO48 after an abnormal unloaded output was observed.
+// GPIO46 must be exposed and unused by external hardware on the actual board.
+#define PLC_TX_PIN              46
 #define PLC_RX_PIN              47
 
 #define PLC_BAUD_RATE           9600
