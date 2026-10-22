@@ -19,7 +19,7 @@ class MusicApplyTests(unittest.TestCase):
 #include "music_player.h"
 #define MUSIC_SET_VOLUME 3
 static bool voice, emergency, queue_ok=true;
-static unsigned replies, stops;
+static unsigned replies, stops, selections;
 static size_t reply_len;
 static uint8_t volume, response[128], saved_id[4], saved_rail;
 static bool voice_session_is_active(void) { return voice; }
@@ -39,6 +39,10 @@ static bool playlist_manager_get_track_filename(music_group_t g,uint16_t i,char 
  strcpy(out,"a.mp3");return true;
 }
 static bool sd_manager_is_ready(void){return true;}
+void music_player_confirm_selection(const uint8_t identity[7]){assert(identity[3]==5);}
+static bool playlist_manager_play_selected(uint32_t v,music_group_t g,uint16_t i){
+ assert(v==5 && g==0 && i==0);selections++;return queue_ok;
+}
 static bool playlist_manager_start(void){return true;}
 static bool playlist_manager_next(void){return true;}
 bool music_player_pause(void){return true;}
@@ -83,6 +87,11 @@ int main(void) {
  memset(f.payload+5,0,7);f.payload[8]=5;handle_music_apply(&f);
  assert(reply_len==19 && response[5]==0 && response[13]==5 && !memcmp(response+14,"a.mp3",5));
  f.payload[8]=4;handle_music_apply(&f);assert(reply_len==7 && response[5]==1);
+ f.payload[8]=5;f.payload[4]=CMD_MUSIC_PLAY;queue_ok=true;before=replies;
+ handle_music_apply(&f);assert(selections==1 && replies==before);
+ f.payload[8]=4;handle_music_apply(&f);assert(selections==1 && response[5]==1);
+ f.payload[8]=5;f.payload[11]=1;handle_music_apply(&f);assert(selections==1 && response[5]==1);
+ f.payload[11]=0;queue_ok=false;handle_music_apply(&f);assert(response[5]==2);
  f.src=NODE_PI;before=replies;handle_music_apply(&f);assert(replies==before);
  return 0;
 }

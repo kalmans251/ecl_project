@@ -46,6 +46,13 @@ int main(void){
  confirm_operation(&s_restart_confirmation,0,MUSIC_PLAYER_PLAYING);
  assert(replies==3 && reply.payload[4]==CMD_NEXT);
  confirm_operation(&s_restart_confirmation,0,MUSIC_PLAYER_PLAYING);assert(replies==3);
+ enqueue(PLAYER_CMD_START,CMD_MUSIC_PLAY);
+ queued.selection[3]=5;queued.selection[4]=2;queued.selection[6]=3;
+ process_control_commands(&paused,&stop,&restart,path,sizeof(path));
+ assert(replies==3); // enqueue/restart is not success
+ confirm_operation(&s_restart_confirmation,0,MUSIC_PLAYER_PLAYING);
+ assert(replies==4 && reply.payload_len==14 && reply.payload[4]==CMD_MUSIC_PLAY);
+ assert(reply.payload[10]==5 && reply.payload[11]==2 && reply.payload[13]==3);
  return 0;
 }
 '''

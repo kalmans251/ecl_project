@@ -751,6 +751,14 @@ static bool play_index(
  * SHUFFLE INDEX
  * ============================================================ */
 
+bool playlist_manager_play_selected(uint32_t version, music_group_t group, uint16_t index)
+{
+    if (!s_initialized || version != s_catalog_version || index > INT16_MAX) return false;
+    playlist_group_catalog_t *catalog = find_group(group);
+    if (!catalog || index >= catalog->count) return false;
+    return play_index(catalog, (int16_t)index);
+}
+
 static int16_t choose_shuffle_index(
     playlist_group_catalog_t *catalog
 )

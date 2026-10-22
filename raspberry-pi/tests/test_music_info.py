@@ -16,6 +16,8 @@ class Bus:
         op = f.payload[4]
         if op == Command.MUSIC_CATALOG:
             data = self.version + b'\x00\x01' + bytes(8)
+        elif op == Command.MUSIC_PLAY:
+            data = b'\x01' + f.payload[5:]
         elif op == Command.MUSIC_TRACK:
             identity = f.payload[5:12]
             if self.bad_identity: identity = bytes(7)
@@ -57,3 +59,18 @@ class MusicInfoTests(unittest.TestCase):
         for line in ('music 1 status 2', 'music 1 list 50', 'music 1 list default extra'):
             with self.assertRaises(ValueError): self.controls.execute(line.split())
         self.assertEqual(self.bus.sent, [])
+
+    def test_play_uses_displayed_catalog_and_exact_identity(self):
+        with self.assertRaises(ValueError): self.controls.execute('music 1 play default 0'.split())
+        self.controls.execute('music 1 list'.split())
+        result = json.loads(self.controls.execute('music 1 play default 0'.split()))
+        self.assertTrue(result['device_application_confirmed'])
+        self.assertEqual(self.bus.sent[-1].payload[4:], bytes([Command.MUSIC_PLAY]) + self.bus.version + bytes(3))
+        for command in ('music 1 play 10 0', 'music 1 play default -1', 'music 1 play default 32'):
+            with self.assertRaises(ValueError): self.controls.execute(command.split())
+
+    def test_failed_refresh_invalidates_previous_list(self):
+        self.controls.execute('music 1 list'.split())
+        self.bus.bad_identity = True
+        with self.assertRaises(ValueError): self.controls.execute('music 1 list'.split())
+        with self.assertRaises(ValueError): self.controls.execute('music 1 play default 0'.split())

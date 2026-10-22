@@ -64,3 +64,5 @@ typedef struct {
     char filename[96];
 } music_player_info_t;
 void music_player_get_info(music_player_info_t *out);
+
+void music_player_confirm_selection(const uint8_t identity[7]);

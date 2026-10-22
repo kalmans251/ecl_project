@@ -92,3 +92,5 @@ bool playlist_manager_get_track_filename(
     char *out,
     size_t out_size
 );
+/* One explicit track; subsequent automatic selection retains the configured mode. */
+bool playlist_manager_play_selected(uint32_t version, music_group_t group, uint16_t index);
