@@ -23,11 +23,11 @@ def request(controls, rail, operation, payload=b''):
                 while controls.result is None:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        raise TimeoutError('Music query timed out; no complete result')
+                        raise TimeoutError('Music request timed out; device state unknown; no automatic retry')
                     controls.condition.wait(remaining)
                 status, data, source = controls.result
             if status != 0 or source != Node.WROOM:
-                raise RuntimeError('WROOM music query rejected or failed; SD/catalog may have changed')
+                raise RuntimeError('Music request rejected/failed; check catalog, music session and pause/sleep policy')
             return data
         finally:
             with controls.condition:
@@ -46,6 +46,7 @@ def status(controls, rail):
 
 
 def catalog(controls, rail, group=None):
+    controls.music_catalogs.pop(rail, None)
     data = request(controls, rail, Command.MUSIC_CATALOG)
     if len(data) != 14:
         raise ValueError('Malformed music catalog')
@@ -69,5 +70,25 @@ def catalog(controls, rail, group=None):
     final = request(controls, rail, Command.MUSIC_CATALOG)
     if final != data:
         raise RuntimeError('Music catalog changed during query; refresh list')
-    return {'railing_id': rail, 'catalog_version': int.from_bytes(version, 'big'),
-            'counts': dict(zip(GROUPS, counts)), 'tracks': tracks}
+    result = {'railing_id': rail, 'catalog_version': int.from_bytes(version, 'big'),
+              'counts': dict(zip(GROUPS, counts)), 'tracks': tracks}
+    controls.music_catalogs[rail] = result
+    return result
+
+
+def play(controls, rail, group, index):
+    if group not in GROUPS or not index.isascii() or not index.isdecimal() or not 0 <= int(index) < 32:
+        raise ValueError('music play: group default|10|20|30|40, zero-based index 0..31')
+    index = int(index)
+    listing = controls.music_catalogs.get(rail)
+    if not listing:
+        raise ValueError('Run music <id> list first in this process')
+    track = next((t for t in listing['tracks'] if t['group'] == group and t['index'] == index), None)
+    if track is None:
+        raise ValueError('Track was not in the displayed list; refresh the required group')
+    identity = listing['catalog_version'].to_bytes(4, 'big') + bytes([GROUPS[group]]) + index.to_bytes(2, 'big')
+    data = request(controls, rail, Command.MUSIC_PLAY, identity)
+    if data != b'\x01' + identity:
+        raise ValueError('Selected-track confirmation does not match; playback state unknown')
+    return {'railing_id': rail, 'state': 'playing', 'device_application_confirmed': True,
+            'catalog_version': listing['catalog_version'], **track}

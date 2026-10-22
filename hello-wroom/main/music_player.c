@@ -90,6 +90,7 @@ typedef struct
     uint8_t confirm_op;
     uint8_t confirm_rail;
     uint8_t request_id[4];
+    uint8_t selection[7];
 
     char path[
         MUSIC_PATH_MAX
@@ -111,6 +112,12 @@ void music_player_confirm_begin(uint8_t rail,const uint8_t id[4],uint8_t op) {
     s_confirm_enqueued=false;s_confirm_owner=xTaskGetCurrentTaskHandle();
     portEXIT_CRITICAL(&s_confirm_mux);
 }
+void music_player_confirm_selection(const uint8_t identity[7]) {
+    portENTER_CRITICAL(&s_confirm_mux);
+    if (s_confirm_owner == xTaskGetCurrentTaskHandle())
+        memcpy(s_confirm_context.selection, identity, 7);
+    portEXIT_CRITICAL(&s_confirm_mux);
+}
 bool music_player_confirm_end(void) {
     portENTER_CRITICAL(&s_confirm_mux);bool ok=s_confirm_enqueued;s_confirm_owner=NULL;
     portEXIT_CRITICAL(&s_confirm_mux);return ok;
@@ -121,6 +128,10 @@ static void confirm_operation(player_command_t *cmd,uint8_t status,uint8_t detai
     protocol_frame_init(&result,cmd->confirm_rail,NODE_WROOM,NODE_P4,SERVICE_MUSIC,CMD_APPLY_RESULT);
     result.payload_len=7;memcpy(result.payload,cmd->request_id,4);
     result.payload[4]=cmd->confirm_op;result.payload[5]=status;result.payload[6]=detail;
+    if (cmd->confirm_op == CMD_MUSIC_PLAY) {
+        memcpy(result.payload + 7, cmd->selection, 7);
+        result.payload_len = 14;
+    }
     router_enqueue(&result);cmd->confirm_operation=false;
 }
 

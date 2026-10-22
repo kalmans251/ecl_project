@@ -18,6 +18,7 @@ HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop cu
   led <id> basic [1..6] | music [1..3]  select animation
   led <id> weather clear|cloudy|rain|snow
   music <id> list [default|10|20|30|40] | status
+  music <id> play <default|10|20|30|40> <index>  use previously listed catalog
   music <id> start|stop|pause|resume|next
   music <id> mode sequential|shuffle|age
   volume <id> <0..100>           shared WROOM music/voice volume (outside calls)
@@ -34,6 +35,7 @@ class DeviceControls:
         self.condition = threading.Condition()
         self.ack_timeout = ack_timeout
         self.request_id = secrets.randbits(32)
+        self.music_catalogs = {}
         self.pending = None
         self.result = None
 
@@ -51,14 +53,16 @@ class DeviceControls:
         if not 1 <= rail <= 255:
             raise ValueError('railing_id must be 1..255')
         args = [p.lower() for p in parts[2:]]
-        if name == 'music' and args and args[0] in ('list', 'status'):
-            from music_info import GROUPS, catalog, status
-            if args == ['status']:
+        if name == 'music' and args and args[0] in ('list', 'status', 'play'):
+            from music_info import GROUPS, catalog, status, play
+            if len(args) == 3 and args[0] == 'play':
+                info = play(self, rail, args[1], args[2])
+            elif args == ['status']:
                 info = status(self, rail)
             elif args == ['list'] or (len(args) == 2 and args[0] == 'list' and args[1] in GROUPS):
                 info = catalog(self, rail, args[1] if len(args) == 2 else None)
             else:
-                raise ValueError('music: status or list [default|10|20|30|40]')
+                raise ValueError('music: status | list [group] | play <group> <index>')
             return json.dumps(info, ensure_ascii=False, indent=2)
         frames = []
         def add(service, command, payload=b'', dst=Node.P4):
@@ -192,10 +196,10 @@ class DeviceControls:
                 return True
             expected, detail = pending[4:]
             # P4 can reject a downstream request, but never claim WROOM/S3 success.
-            policy = op not in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK) and status == 3 and frame.src == Node.P4 and frame.service == Service.MUSIC and detail is None
+            policy = op not in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK, Command.MUSIC_PLAY) and status == 3 and frame.src == Node.P4 and frame.service == Service.MUSIC and detail is None
             if frame.src != expected and not policy and not (frame.src == Node.P4 and status in (1, 2)):
                 return True
-            if status == 3 and (op in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK) or not (frame.src == Node.P4 and frame.service == Service.MUSIC
+            if status == 3 and (op in (Command.MUSIC_INFO, Command.MUSIC_CATALOG, Command.MUSIC_TRACK, Command.MUSIC_PLAY) or not (frame.src == Node.P4 and frame.service == Service.MUSIC
                     and detail is None)):
                 return True
             if status == 0 and detail is not None and frame.payload[6] != detail:

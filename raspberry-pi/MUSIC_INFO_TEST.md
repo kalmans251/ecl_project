@@ -1,8 +1,7 @@
 # Music information: first implementation stage
 
-Update Pi, P4 and WROOM together. S3 does not change. This stage adds read-only
-catalog and actual player queries; track selection, total duration, seeking and
-monitoring UI integration remain subsequent stages. No automatic music polling.
+Update Pi, P4 and WROOM together. S3 does not change. Stages 1 and 2 add catalog/player queries and selected-track playback.
+Total duration, seeking and monitoring UI integration remain subsequent stages. No automatic music polling.
 
 Run manual hardware_test.py with the usual port/local audio options, then:
 
@@ -57,3 +56,42 @@ Longest successful result: 6-byte envelope + 8-byte track metadata + 95-byte
 filename + 10-byte frame overhead = 119 bytes (below 128 bytes).
 Late replies, other rails, wrong source/token/op and changed catalog identities
 must not satisfy a pending request. CRC validation remains mandatory.
+
+## Stage 2: select a displayed track
+
+Pi, P4 and WROOM must all be updated. In the same running console:
+
+```
+led 1 music
+music 1 start
+music 1 list
+music 1 play default 0
+music 1 status
+music 1 play 20 2
+music 1 status
+```
+
+Use only indices actually returned by the list (zero-based). The example `20 2`
+requires at least three songs in that group. A successful list is cached per rail
+in this console process. A new/failed list invalidates the previous selection
+cache; a group-only list authorizes selecting only its displayed tracks. After
+restarting the console, list again. Playback never silently refreshes the version
+and selects the same index from a changed catalog.
+
+P4 requires an enabled music session, MUSIC LED mode, no sleep and no pause
+reason. Calls/emergencies reject selection at both Pi/P4 and WROOM. Use
+`music 1 resume` if user-paused. This command changes one track; subsequent NEXT
+and natural-end selection use the existing sequential/shuffle/age policy, not an
+implicit new mode. It does not force wake or clear pause reasons.
+
+CMD_MUSIC_PLAY=0x33 uses APPLY arguments version[4], group[1], index[2]. WROOM
+validates these against its catalog and queues the file path through the existing
+player. The player replies only after first successful PCM write, echoing
+state=1 and the seven-byte selection identity in the APPLY_RESULT detail (14-byte
+payload total). Queue acceptance is not a playback confirmation. Failures before
+PCM produce failure; a timeout leaves application unknown and is not retried.
+
+Check stale-version rejection (rescan/change SD while stopped, then select from
+old list), non-existent index rejection, and switching while already playing.
+Also repeat call/return and sleep/wake regression tests after selecting a track.
+Total duration, seeking and monitoring UI integration remain later stages.
