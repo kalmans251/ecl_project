@@ -23,9 +23,9 @@
 #define PLC_UART_NUM            UART_NUM_1
 
 // PLC TX moved from GPIO48 after an abnormal unloaded output was observed.
-// PLC UART roles swapped for the current GPIO46/47 test wiring.
-#define PLC_TX_PIN              47
-#define PLC_RX_PIN              46
+// Current wiring: GPIO46 TX -> modem RX, GPIO47 RX <- modem TX.
+#define PLC_TX_PIN              46
+#define PLC_RX_PIN              47
 
 #define PLC_BAUD_RATE           9600
 
