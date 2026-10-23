@@ -44,10 +44,12 @@ public final class Codec2 implements AutoCloseable {
             if (library == null || library.isBlank()) library = "codec2";
             // Prefer our firmware-pinned bundle over any unrelated system Codec2.
             String resource = "/" + Platform.RESOURCE_PREFIX + "/" + System.mapLibraryName("codec2");
-            if (library.equals("codec2") && Codec2.class.getResource(resource) != null) {
+            var location = Codec2.class.getResource(resource);
+            if (library.equals("codec2") && location != null) {
                 var extracted = Native.extractFromResourcePath(resource, Codec2.class.getClassLoader());
                 if (extracted == null) throw new IOException("Could not extract bundled Codec2");
-                extracted.deleteOnExit();
+                // For exploded Maven resources JNA returns the original file, not a temp copy.
+                if (!location.getProtocol().equals("file")) extracted.deleteOnExit();
                 library = extracted.getAbsolutePath();
             }
             api = Native.load(library, Api.class);
