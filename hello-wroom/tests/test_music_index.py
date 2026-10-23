@@ -33,6 +33,26 @@ int main(int argc,char **argv){
  lseek(fd,0,SEEK_SET);
  assert(music_index_scan_to(&idx,&dec,buf,4608,0,rd,&fd,10000));
  assert(lseek(fd,0,SEEK_CUR)<length/2);assert(music_index_locate(&idx,10000,&(uint32_t){0},&(uint64_t){0}));
+ /* Extend a prefix instead of re-reading the first ten seconds. */
+ uint32_t resume=idx.next_offset;assert(resume>0);
+ assert(lseek(fd,resume,SEEK_SET)==resume);
+ assert(music_index_extend_to(&idx,&dec,buf,sizeof(buf),resume,rd,&fd,200000));
+ assert(idx.total_samples*1000/idx.hz>200000);
+ assert(music_index_cache_save(argv[1],fd,0,&idx));
+ music_index_t cached={0};off_t cursor_saved=lseek(fd,0,SEEK_CUR);
+ assert(music_index_cache_load(argv[1],fd,0,&cached));
+ assert(lseek(fd,0,SEEK_CUR)==cursor_saved);
+ assert(cached.frames==idx.frames && cached.next_offset==idx.next_offset);
+ assert(!music_index_cache_load(argv[1],fd,1,&cached)); // wrong audio start
+ char sidecar[1024];snprintf(sidecar,sizeof(sidecar),"%s.eclidx",argv[1]);
+ FILE *bad=fopen(sidecar,"r+b");assert(bad);fputc(0,bad);fclose(bad);
+ assert(!music_index_cache_load(argv[1],fd,0,&cached)); // corrupt cache is ignored
+ assert(music_index_cache_save(argv[1],fd,0,&idx)); // replace previous cache
+ assert(music_index_cache_load(argv[1],fd,0,&cached));
+ FILE *changed=fopen(argv[1],"r+b");assert(changed);int original=fgetc(changed);
+ rewind(changed);fputc(original^1,changed);fflush(changed);
+ assert(!music_index_cache_load(argv[1],fd,0,&cached)); // source fingerprint mismatch
+ rewind(changed);fputc(original,changed);fclose(changed);
  lseek(fd,0,SEEK_SET);
  assert(music_index_scan(&idx,&dec,buf,sizeof(buf),0,rd,&fd));
  assert(idx.ready && idx.hz==44100 && idx.count<=128 && idx.stride>=128);

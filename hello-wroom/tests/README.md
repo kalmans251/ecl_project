@@ -80,3 +80,32 @@ failed DMA/decoder initialization, first-packet playback with deterministic
 PCM, and music-rate restoration. Real Codec2 integration tests additionally
 require `ECL_TEST_CODEC2_SRC` and the Codec2 library. Hardware validation is
 intentionally deferred.
+
+### Persistent MP3 seek index
+
+WROOM now builds a contiguous sparse index during ordinary playback, and extends
+that prefix (rather than rescanning the beginning) when seeking into unread audio.
+The existing 7-second command deadline and decoder reservoir warmup remain intact.
+A first seek into an unread region can still fail its deadline; the validated
+prefix survives, so an explicit retry continues the work. No automatic command retry.
+
+At normal track teardown (end, stop, or track change), WROOM writes a roughly 2 KB
+`<song>.mp3.eclidx` sidecar beside the MP3. Replaying the song loads that prefix,
+including after reboot. Let a track play to completion once, or seek through the
+required region and stop it normally, to prepare subsequent seeks. Power loss
+before teardown loses only newly collected offsets. Playback does not write cache
+files in its PCM loop. Read-only/full media or invalid sidecars fall back to RAM.
+
+The private cache format checks version, file size, modification time, first/last
+2 KB fingerprint, checksum, sample positions and offset bounds. Replacing files
+normally invalidates the cache. If editing a file in place while preserving its
+size, timestamp and ends, delete its `.eclidx` sidecar manually. Do not edit an MP3
+while WROOM is playing it. A failed/interrupted temporary write is not loaded.
+
+Hardware verification (WROOM firmware update only): use a track longer than 200 s,
+play it once to completion, verify `Seek cache saved`, replay and verify
+`Seek cache loaded`, then seek to 100 and 200 s and compare command latency and
+actual audio. Repeat after reboot. Test stop/PTT during first-time indexing and
+confirm that control remains responsive. Host fixtures cover real CBR/VBR PCM at
+200 s, prefix extension, reload, corrupted cache rejection and scan cancellation;
+actual SD latency and audible transitions still require device testing.
