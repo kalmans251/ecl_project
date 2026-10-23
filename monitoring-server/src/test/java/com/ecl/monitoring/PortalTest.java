@@ -44,6 +44,15 @@ class PortalTest {
   Device()throws Exception{ws=HttpClient.newHttpClient().newWebSocketBuilder().header("Authorization","Bearer gateway-012345678901234567890123456789").buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/gateways/gateway-01"),new WebSocket.Listener(){StringBuilder data=new StringBuilder();public void onOpen(WebSocket s){s.request(1);}public CompletionStage<?> onText(WebSocket s,CharSequence t,boolean last){data.append(t);if(last){messages.add(data.toString());data.setLength(0);}s.request(1);return null;}}).join();assertEquals("welcome",json.readTree(messages.poll(3,TimeUnit.SECONDS)).path("type").asText());}
   String next(){try{return messages.poll(3,TimeUnit.SECONDS);}catch(Exception e){throw new RuntimeException(e);}}
   void ack(String id,String status)throws Exception{ws.sendText(json.writeValueAsString(Map.of("version",1,"type","ack","message_id",id,"status",status)),true).join();long until=System.nanoTime()+2_000_000_000L;while(System.nanoTime()<until){if(status.equals(db.queryForObject("SELECT status FROM commands WHERE id=?",String.class,id)))return;Thread.sleep(10);}fail("ACK not received");}
+  void callAck(tools.jackson.databind.JsonNode message)throws Exception{
+   String id=message.path("message_id").asText(),op=message.path("operation").asText();
+   var data=Map.of("call_id",message.path("call_id").asText(),"railing_id",1,"session_id",123,"epoch",id,"direction",op.equals("call.end")?"IDLE":op.equals("ptt.on")?"CONTROL_TX":"FIELD_TX");
+   assertThrows(RuntimeException.class,()->commands.ack("gateway-01",id,"APPLIED"));
+   var wrong=new HashMap<String,Object>(data);wrong.put("call_id",UUID.randomUUID().toString());
+   assertThrows(RuntimeException.class,()->commands.callResult("gateway-01",json.valueToTree(Map.of("version",1,"type","call_result","message_id",id,"status","APPLIED","data",wrong))));
+   ws.sendText(json.writeValueAsString(Map.of("version",1,"type","call_result","message_id",id,"status","APPLIED","data",data)),true).join();
+   long until=System.nanoTime()+2_000_000_000L;while(System.nanoTime()<until){if("APPLIED".equals(db.queryForObject("SELECT status FROM commands WHERE id=?",String.class,id)))return;Thread.sleep(10);}fail("Call result not received");
+  }
   public void close(){ws.sendClose(1000,"done").join();}
  }
  @Test void commandDedupQueueAndCallOwnership()throws Exception{
@@ -57,7 +66,7 @@ class PortalTest {
        "steps",List.of(Map.of("node",3,"service",2,"command",34,"status",0,"data","14")));
    device.ws.sendText(json.writeValueAsString(Map.of("version",1,"type","control_result","message_id",id,"status","APPLIED","data",applied)),true).join();
    waitMusic(b,id,"APPLIED");assertTrue(commands.list(owner,"site-01").stream().filter(c->c.get("id").equals(id)).findFirst().get().get("device_application_confirmed").equals(true));
-   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());var start=json.readTree(device.next());assertTrue(start.has("call_id"));assertEquals(409,o.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());device.ack(start.path("message_id").asText(),"APPLIED");
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());var start=json.readTree(device.next());assertTrue(start.has("call_id"));assertEquals(409,o.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());device.callAck(start);
    String callId=start.path("call_id").asText();
    CompletableFuture<Integer> rejected=new CompletableFuture<>();
    var wrongVoice=o.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}public CompletionStage<?> onClose(WebSocket w,int status,String reason){rejected.complete(status);return null;}}).join();
@@ -68,12 +77,12 @@ class PortalTest {
    assertThrows(CompletionException.class,()->b.http.newWebSocketBuilder().header("Origin","https://attacker.example").buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){}).join());
    ownerVoice.sendClose(1000,"done").join();
    assertEquals(403,o.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());
-   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());device.ack(json.readTree(device.next()).path("message_id").asText(),"APPLIED");assertEquals("CONTROL_TX",db.queryForObject("SELECT direction FROM calls WHERE gateway_id='gateway-01'",String.class));
-   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());device.ack(json.readTree(device.next()).path("message_id").asText(),"APPLIED");assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());device.callAck(json.readTree(device.next()));assertEquals("CONTROL_TX",db.queryForObject("SELECT direction FROM calls WHERE gateway_id='gateway-01'",String.class));
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());device.callAck(json.readTree(device.next()));assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
   }
  }
  @Test void voiceEnvelopeValidation()throws Exception{
-  var v=new HashMap<String,Object>(Map.of("version",1,"type","voice","call_id",UUID.randomUUID().toString(),"railing_id",1,"direction","FIELD_TX","sequence",0,"codec2",Base64.getEncoder().encodeToString(new byte[48])));
+  var v=new HashMap<String,Object>(Map.of("version",1,"type","voice","call_id",UUID.randomUUID().toString(),"railing_id",1,"direction","FIELD_TX","epoch",UUID.randomUUID().toString(),"sequence",0,"codec2",Base64.getEncoder().encodeToString(new byte[48])));
   assertDoesNotThrow(()->voice.receive("gateway-01",json.valueToTree(v)));
   v.put("extra",true);assertThrows(Exception.class,()->voice.receive("gateway-01",json.valueToTree(v)));
  }

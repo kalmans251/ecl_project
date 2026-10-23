@@ -259,7 +259,7 @@ class AudioManager:
         return True
 
 
-    def start_call(self, railing_id: int) -> bool:
+    def start_call(self, railing_id: int, *, guard=lambda: None, reserved=lambda: None) -> bool:
         if not 1 <= railing_id <= 255:
             raise ValueError("railing_id must be 1..255")
         if self._railings.get_call_direction(railing_id) is not None:
@@ -268,12 +268,14 @@ class AudioManager:
             return False
         self._railings.reserve_call(railing_id)
         try:
-            return self._start_call(railing_id)
+            guard()
+            reserved()
+            return self._start_call(railing_id, guard=guard)
         except Exception:
             self._railings.call_request_failed(railing_id)
             raise
 
-    def _start_call(self, railing_id: int, *, request_frame=None, emergency=False) -> bool:
+    def _start_call(self, railing_id: int, *, request_frame=None, emergency=False, guard=lambda: None) -> bool:
         """Start a normal call; return False if this railing is already connected.
 
         Keep local audio disabled until the P4 CALL_STARTED event. This method
@@ -308,6 +310,7 @@ class AudioManager:
                     # Only the first request is known to start from idle. After
                     # a write attempt P4 may already be preparing or streaming
                     # FIELD_TX, even if its confirmation was lost.
+                    guard()
                     self._bus.send_control_frame(frame, wait_for_window=attempt > 1)
                 except TimeoutError:
                     with self._condition:
@@ -334,7 +337,7 @@ class AudioManager:
                 LOG.warning("No P4 call-start confirmation rail=%d attempt=%d", railing_id, attempt)
             raise TimeoutError("Call start was not confirmed by P4; the remote call may have started")
 
-    def set_direction(self, railing_id: int, direction: AudioDirection) -> None:
+    def set_direction(self, railing_id: int, direction: AudioDirection, *, guard=lambda: None) -> None:
         if direction not in (AudioDirection.FIELD_TX, AudioDirection.CONTROL_TX):
             raise ValueError(f"invalid audio direction: {direction}")
         with self._control_lock:
@@ -366,6 +369,7 @@ class AudioManager:
                     LOG.info("CALL direction request rail=%d direction=%s request=%d attempt=%d/%d",
                              railing_id, self._direction_name(int(direction)), request, attempt, self._attempts)
                     try:
+                        guard()
                         self._bus.send_control_frame(frame, wait_for_window=(
                             attempt > 1 or current == int(AudioDirection.FIELD_TX)))
                     except TimeoutError:
@@ -399,7 +403,7 @@ class AudioManager:
                     if not confirmed:
                         self._railings.call_direction_unknown(railing_id, session)
 
-    def end_call(self, railing_id: int) -> bool:
+    def end_call(self, railing_id: int, *, guard=lambda: None) -> bool:
         """Return True only after remote END; False means locally idle/no request."""
         if not 1 <= railing_id <= 255:
             raise ValueError("railing_id must be 1..255")
@@ -417,6 +421,7 @@ class AudioManager:
                         return True
                     frame = Frame(railing_id, Node.PI, Node.P4, Service.AUDIO, Command.STOP, self.session_bytes(railing_id))
                     try:
+                        guard()
                         self._bus.send_control_frame(frame, wait_for_window=(
                             attempt > 1 or uncertain or current == int(AudioDirection.FIELD_TX)))
                     except TimeoutError:
@@ -429,6 +434,7 @@ class AudioManager:
                                 self._condition.wait(min(0.1,self.recovery_delay(railing_id)))
                         if not self._railings.call_pending(railing_id):
                             return True
+                        guard()
                         self._bus.send_control_frame(frame, wait_for_window=False)
                     deadline = time.monotonic() + self._ack_timeout * 3
                     with self._condition:

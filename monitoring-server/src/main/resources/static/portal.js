@@ -14,9 +14,9 @@ async function api(path,method='GET',data){
 }
 function rails(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
 function requireSelection(single=false){const items=rails();if(!items.length || (single&&items.length!==1))throw Error(single?'난간 하나를 선택하세요.':'난간을 선택하세요.');if(view.role==='VIEWER')throw Error('조회 계정은 제어할 수 없습니다.');return items;}
-let controlBusy=false;
+let controlBusy=false,pttChanging=false;
 async function waitControlResults(rows){
- const deadline=performance.now()+20000;
+ const deadline=performance.now()+65000;
  let latest=rows;
  while(performance.now()<deadline){
   latest=await Promise.all(latest.map(r=>['QUEUED','SENT','RECEIVED'].includes(r.status)?api(`/api/portal/commands/${r.id}`):r));
@@ -33,7 +33,7 @@ async function send(operation,value,ids){
  try{
   const rows=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:ids||items.map(r=>r.id),operation,value:value??null});
   toast(`${operation}: 요청 접수 · 장치 응답 대기`);
-  if(!general){await poll();return rows;}
+  if(operation==='emergency.ack'){await poll();return rows;}
   const results=await waitControlResults(rows);await poll();
   const label=r=>view.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id;
   const failed=results.filter(r=>!['APPLIED','COMPLETED'].includes(r.status));
@@ -169,13 +169,13 @@ function acceptEmergencyCallFromModal(){guarded(async()=>{if(modalRail){selected
 function triggerMp3Alarm(){if(!audioContext)audioContext=new AudioContext();audioContext.resume();const o=audioContext.createOscillator(),g=audioContext.createGain();o.frequency.value=660;g.gain.value=.05;o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.3);}
 function drawRadar(targets){const c=$('ld2450RadarCanvas'),ctx=c.getContext('2d'),dpr=window.devicePixelRatio||1,w=c.clientWidth||400,h=c.clientHeight||250;c.width=w*dpr;c.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);const ox=w/2,oy=12,R=h-25;ctx.strokeStyle='#284558';for(let i=1;i<=6;i++){ctx.beginPath();ctx.arc(ox,oy,R*i/6,Math.PI/6,5*Math.PI/6);ctx.stroke();ctx.fillStyle='#73929e';ctx.font='11px system-ui';ctx.fillText(i+'m',ox+5,oy+R*i/6);}for(const t of targets){ctx.fillStyle='#00f2fe';ctx.shadowColor='#00f2fe';ctx.shadowBlur=12;ctx.beginPath();ctx.arc(ox+t.x*w/6,oy+t.y*R/6,6,0,Math.PI*2);ctx.fill();}ctx.shadowBlur=0;}
 async function ensureAudio(){if(!audioContext)audioContext=new AudioContext();await audioContext.resume();}
-async function openVoice(){if(!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available)return;if(voiceSocket && voiceSocket._callId===activeCall.ID && voiceSocket.readyState<2)return;closeVoice();await ensureAudio();const callId=activeCall.ID,ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/operator/voice/${callId}`);ws.binaryType='arraybuffer';ws._callId=callId;voiceSocket=ws;ws.onmessage=e=>{if(voiceSocket!==ws||!activeCall?.OWNED||activeCall.DIRECTION!=='FIELD_TX'||!(e.data instanceof ArrayBuffer)||e.data.byteLength!==2560)return;const input=new DataView(e.data),buffer=audioContext.createBuffer(1,1280,8000),channel=buffer.getChannelData(0);for(let i=0;i<1280;i++)channel[i]=input.getInt16(i*2,true)/32768;const now=audioContext.currentTime;if(playAt<now||playAt>now+1)playAt=now+.2;const source=audioContext.createBufferSource();source.buffer=buffer;source.connect(audioContext.destination);playbackSources.add(source);source.onended=()=>playbackSources.delete(source);source.start(playAt);playAt+=buffer.duration;};ws.onclose=()=>{if(voiceSocket===ws){voiceSocket=null;toast('음성 연결 종료 · 통화 상태를 확인하세요.');}};}
+async function openVoice(){if(!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available)return;if(voiceSocket && voiceSocket._callId===activeCall.ID && voiceSocket._epoch===activeCall.VOICE_EPOCH && voiceSocket.readyState<2)return;closeVoice();await ensureAudio();const callId=activeCall.ID,ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/operator/voice/${callId}`);ws.binaryType='arraybuffer';ws._callId=callId;ws._epoch=activeCall.VOICE_EPOCH;voiceSocket=ws;ws.onmessage=e=>{if(voiceSocket!==ws||!activeCall?.OWNED||activeCall.DIRECTION!=='FIELD_TX'||!(e.data instanceof ArrayBuffer)||e.data.byteLength!==2560)return;const input=new DataView(e.data),buffer=audioContext.createBuffer(1,1280,8000),channel=buffer.getChannelData(0);for(let i=0;i<1280;i++)channel[i]=input.getInt16(i*2,true)/32768;const now=audioContext.currentTime;if(playAt<now||playAt>now+1)playAt=now+.2;const source=audioContext.createBufferSource();source.buffer=buffer;source.connect(audioContext.destination);playbackSources.add(source);source.onended=()=>playbackSources.delete(source);source.start(playAt);playAt+=buffer.duration;};ws.onclose=()=>{if(voiceSocket===ws){voiceSocket=null;toast('음성 연결 종료 · 통화 상태를 확인하세요.');}};}
 function stopPlayback(){for(const s of playbackSources){try{s.stop();}catch(_){}}playbackSources.clear();playAt=0;}
 function closeVoice(){stopPlayback();if(voiceSocket){const old=voiceSocket;voiceSocket=null;old.close();}if(micNode){micNode.disconnect();micNode=null;}if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}pcmQueue=[];playAt=0;}
 async function microphone(){if(micNode)return;await ensureAudio();micStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});await audioContext.audioWorklet.addModule('/mic-worklet.js');micNode=new AudioWorkletNode(audioContext,'monitor-mic');micNode.port.onmessage=e=>{if(pttPressed && activeCall?.DIRECTION==='CONTROL_TX' && voiceSocket?.readyState===WebSocket.OPEN && voiceSocket.bufferedAmount<5120)voiceSocket.send(e.data);};audioContext.createMediaStreamSource(micStream).connect(micNode);micNode.connect(audioContext.destination);}
 function sendVoiceCallControl(start){guarded(async()=>{if(start){await ensureAudio();await send('call.start');}else{pttPressed=false;closeVoice();await send('call.end');}});}
-function startPttTalk(event){event?.preventDefault();if($('btnPttTalk').disabled||pttPressed)return;event?.currentTarget?.setPointerCapture(event.pointerId);pttPressed=true;stopPlayback();micNode?.port.postMessage('reset');guarded(async()=>{try{await openVoice();await microphone();if(pttPressed)await send('ptt.on');}catch(e){pttPressed=false;throw e;}});}
-function stopPttTalk(){if(!pttPressed)return;pttPressed=false;micNode?.port.postMessage('reset');guarded(()=>send('ptt.off'));}
+function startPttTalk(event){event?.preventDefault();if($('btnPttTalk').disabled||pttPressed||pttChanging)return;event?.currentTarget?.setPointerCapture(event.pointerId);pttPressed=true;pttChanging=true;stopPlayback();micNode?.port.postMessage('reset');guarded(async()=>{try{await microphone();if(pttPressed){await send('ptt.on');if(!pttPressed)await send('ptt.off');await openVoice();if(pttPressed)await microphone();}}catch(e){pttPressed=false;throw e;}finally{pttChanging=false;}});}
+function stopPttTalk(){if(!pttPressed)return;pttPressed=false;micNode?.port.postMessage('reset');if(pttChanging)return;guarded(async()=>{await send('ptt.off');await openVoice();});}
 window.addEventListener('blur',stopPttTalk);document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPttTalk();});
 function updateTotalDevicesCount(){if(me?.user.ADMIN)openAdmin('rail');else toast('등록된 난간만 표시합니다. 난간 추가는 관리자에게 요청하세요.');}
 const adminForms={

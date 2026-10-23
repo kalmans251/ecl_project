@@ -1,4 +1,5 @@
 'use strict';
+let webVoice;
 const $=id=>document.getElementById(id), pending=new Set(['QUEUED','SENT','RECEIVED']);
 let csrf, me, view=null, site='', selected=new Set(), busy=false, loading=false, epoch=0, page=null, received=-Infinity;
 const sections=[
@@ -43,7 +44,7 @@ function render(){
  document.querySelectorAll('[data-write]').forEach(b=>b.disabled=!writable());
  const single=writable()&&items().length===1;
  $('group').disabled=busy; $('list').disabled=!single; $('prev').disabled=!single||!page||page.offset===0;$('next').disabled=!single||!page||page.offset+8>=page.total;
- $('track').disabled=!single||!page;$('play').disabled=!single||!page||$('track').value==='';renderMusic();
+ $('track').disabled=!single||!page;$('play').disabled=!single||!page||$('track').value==='';renderMusic();renderCall();
 }
 function renderMusic(){
  const r=items().length===1?items()[0]:null,d=musicDisplay(r?.music_status,r?.online,performance.now()-received);
@@ -69,7 +70,7 @@ async function send(operation,value=null){
  if(!writable())throw Error(busy?'이전 명령 응답을 기다리는 중입니다.':'난간 선택·연결·제어 권한을 확인하세요.');
  const targets=items().map(r=>r.id);busy=true;render();notice(`${operation} 전송 중…`);
  try{const rows=await api('/api/portal/commands','POST',{request_id:crypto.randomUUID(),rail_ids:targets,operation,value});
- notice(`${operation} 접수 · 장치 응답 대기`);const results=await waitResults(rows,operation==='music.list'?55000:22000);
+ notice(`${operation} 접수 · 장치 응답 대기`);const results=await waitResults(rows,operation==='music.list'?55000:operation.startsWith('call.')||operation.startsWith('ptt.')?65000:22000);
  const fail=results.filter(r=>!['APPLIED','COMPLETED'].includes(r.status));
  if(fail.length)throw Error(fail.map(r=>`${view?.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id}: ${r.status}`).join(' / '));
  notice(results.map(r=>`${view?.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id}: ${r.status==='APPLIED'?'장치 적용 확인':r.detail||'응답 확인'}`).join(' / '));return results;
@@ -79,10 +80,27 @@ async function list(offset=0){const r=one(),group=$('group').value,token=epoch;r
  page=results[0].result;$('track').append(new Option('곡을 선택하세요',''));for(const t of page.tracks)$('track').append(new Option(`${t.index+1}. ${t.filename}`,String(t.index)));$('page').textContent=`총 ${page.total}곡 · ${page.offset+1}~${page.offset+page.tracks.length}`;render();}
 async function play(){one();const index=$('track').value;if(!page||index===''||!page.tracks.some(t=>String(t.index)===index))throw Error('목록에서 곡을 선택하세요.');await send('music.play',`${page.catalog_version}:${page.group}:${index}`);await refresh();}
 async function seek(){const r=one(),d=musicDisplay(r.music_status,r.online,performance.now()-received),v=$('seconds').value,n=Number(v);if(!d.fresh||!d.seekable||d.state!=='playing'||!d.durationMs||v===''||!Number.isInteger(n)||n<0||n*1000>=d.durationMs)throw Error('최신 재생 상태가 필요합니다. 곡 길이 안의 초 단위 위치를 입력하세요.');await send('music.seek',`${d.playbackId}:${n*1000}`);await refresh();}
+function selectedCall(){return (view?.calls||[]).find(c=>items().some(r=>r.id===c.RAIL_ID));}
+function renderCall(){
+ const call=selectedCall(),single=writable()&&items().length===1;
+ $('callState').textContent=call?`${call.STATUS} · ${call.DIRECTION} · ${call.OWNED?'내 통화':'다른 운영자 통화'}`:view?.voice_available?'통화 없음':'서버 Codec2 변환 서비스 미설정';
+ $('callStart').disabled=!single||!!call;
+ $('callEnd').disabled=!single||!call?.OWNED;
+ $('pttOn').disabled=!single||!call?.OWNED||call.STATUS!=='ACTIVE'||!view.voice_available;
+ $('pttOff').disabled=!single||!call?.OWNED||call.STATUS!=='ACTIVE';
+ if(webVoice && !busy)guarded(()=>webVoice.sync(call,view?.voice_available));
+}
+async function callControl(op){
+ one();webVoice.close();await webVoice.prepare();
+ if(op==='ptt.on')await webVoice.mic();
+ await send(op);await refresh();
+}
 async function changeSite(){epoch++;site=$('site').value;view=null;selected.clear();resetPage();render();await refresh();}
-async function init(){build();render();csrf=await api('/api/auth/csrf');me=await api('/api/portal/me');$('account').textContent=`${me.user.NAME} (${me.user.USERNAME})`;
+async function init(){webVoice=new WebVoice(notice);build();render();csrf=await api('/api/auth/csrf');me=await api('/api/portal/me');$('account').textContent=`${me.user.NAME} (${me.user.USERNAME})`;
  for(const s of me.sites)$('site').append(new Option(s.NAME+' · '+s.ROLE,s.ID));site=$('site').value;
  $('site').onchange=()=>guarded(changeSite);$('refresh').onclick=()=>guarded(refresh);$('group').onchange=()=>{resetPage();render();};$('track').onchange=render;
+ for(const [id,op] of [['callStart','call.start'],['callEnd','call.end'],['pttOn','ptt.on'],['pttOff','ptt.off']])$(id).onclick=()=>guarded(()=>callControl(op));
+ window.addEventListener('pagehide',()=>webVoice.close());
  $('list').onclick=()=>guarded(()=>list());$('prev').onclick=()=>guarded(()=>list(page.offset-8));$('next').onclick=()=>guarded(()=>list(page.offset+8));$('play').onclick=()=>guarded(play);$('seek').onclick=()=>guarded(seek);
  await refresh();notice(site?'난간을 선택한 뒤 테스트할 버튼을 누르세요.':'등록된 현장이 없습니다. 기존 모니터링의 관리 메뉴에서 현장·난간을 등록하세요.');
  setInterval(()=>{if($('auto').checked&&!busy)guarded(refresh);},2000);setInterval(renderMusic,1000);

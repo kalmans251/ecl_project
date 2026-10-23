@@ -72,7 +72,7 @@ public class Commands {
         for(var rail:rails) {
             String id=UUID.randomUUID().toString();
             db.update("INSERT INTO commands(id,batch_id,user_id,gateway_id,rail_id,operation,args,created_at,expires_at,status) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                id,input.request_id().toString(),user,rail.get("GATEWAY_ID"),rail.get("ID"),input.operation(),input.value(),now,now+(input.operation().equals("music.list")?45000:15000),"QUEUED");
+                id,input.request_id().toString(),user,rail.get("GATEWAY_ID"),rail.get("ID"),input.operation(),input.value(),now,now+(call?60000:input.operation().equals("music.list")?45000:15000),"QUEUED");
             registry.audit(username,(String)rail.get("SITE_ID"),input.operation(),id);
             result.add(result(db.queryForMap("SELECT * FROM commands WHERE id=?",id)));
         }
@@ -89,6 +89,7 @@ public class Commands {
             var c=calls.get(0);
             if(!c.get("USER_ID").equals(user) && !Boolean.TRUE.equals(accounts.user(username).get("ADMIN"))) throw new ResponseStatusException(HttpStatus.FORBIDDEN,"Call belongs to another operator");
             if(operation.startsWith("ptt.") && !c.get("STATUS").equals("ACTIVE")) throw new ResponseStatusException(HttpStatus.CONFLICT,"Call is not confirmed; retry hangup");
+            if(operation.startsWith("ptt.")) db.update("UPDATE calls SET status='SWITCHING',voice_epoch=NULL WHERE gateway_id=?",gateway);
             if(operation.equals("call.end")) db.update("UPDATE calls SET status='ENDING',touched_at=? WHERE gateway_id=?",System.currentTimeMillis(),gateway);
         }
     }
@@ -123,6 +124,7 @@ public class Commands {
         var row=rows.get(0);String current=(String)row.get("STATUS");if(current.equals(status))return true;
         if(!Set.of("SENT","RECEIVED").contains(current))throw Accounts.bad("Invalid command transition");
         if((MusicCommands.supports((String)row.get("OPERATION")) || ControlCommands.supports((String)row.get("OPERATION"))) && Set.of("APPLIED","PLC_SENT").contains(status)) throw Accounts.bad("Music result identity required");
+        if(status.equals("APPLIED") && (((String)row.get("OPERATION")).startsWith("call.") || ((String)row.get("OPERATION")).startsWith("ptt.")))throw Accounts.bad("Correlated call_result required");
         if(status.equals("APPLIED") && !CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Firmware has no application confirmation for this operation");
         if(status.equals("PLC_SENT") && CONFIRMABLE.contains(row.get("OPERATION")))throw Accounts.bad("Await actual application confirmation for this operation");
         if(((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis())status="UNKNOWN";
@@ -168,6 +170,37 @@ public class Commands {
             (op.equals("query")?"Device response confirmed":"P4 policy confirmed; WROOM playback not confirmed"):"";
         db.update("UPDATE commands SET status=?,result_data=?,detail=? WHERE id=?",expired?"UNKNOWN":status,
             expired?null:json.writeValueAsString(node.get("data")),detail,row.get("ID"));
+    }
+    public synchronized void disconnected(String gateway) {
+        db.update("UPDATE calls SET status='UNKNOWN',voice_epoch=NULL WHERE gateway_id=?",gateway);
+    }
+    public synchronized void callResult(String gateway,tools.jackson.databind.JsonNode node) {
+        if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1 ||
+           !node.path("type").asText().equals("call_result") || !node.path("message_id").isString())throw Accounts.bad("Invalid call result");
+        var rows=db.queryForList("SELECT * FROM commands WHERE id=? AND gateway_id=?",node.path("message_id").asText(),gateway);
+        if(rows.isEmpty())throw Accounts.bad("Unknown call request");
+        var row=rows.get(0);String op=(String)row.get("OPERATION"),status=node.path("status").asText();
+        if(!Set.of("call.start","call.end","ptt.on","ptt.off").contains(op) || !Set.of("APPLIED","FAILED","UNKNOWN","EXPIRED").contains(status))throw Accounts.bad("Invalid call operation/status");
+        if(!Set.of("SENT","RECEIVED").contains(row.get("STATUS")))return;
+        var calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=? AND rail_id=?",gateway,row.get("RAIL_ID"));
+        if(calls.isEmpty())throw Accounts.bad("No reserved call");
+        String expected=op.equals("call.end")?"IDLE":op.equals("ptt.on")?"CONTROL_TX":"FIELD_TX";
+        var data=node.path("data");
+        if(status.equals("APPLIED")){
+            var rail=registry.rail((String)row.get("RAIL_ID"));
+            if(data.size()!=5 || !data.path("call_id").asText().equals(calls.get(0).get("ID")) ||
+               !data.path("railing_id").isInt() || data.path("railing_id").asInt()!=((Number)rail.get("NUMBER")).intValue() ||
+               !data.path("session_id").isIntegralNumber() || data.path("session_id").asLong()<1 || data.path("session_id").asLong()>0xffffffffL ||
+               !data.path("direction").asText().equals(expected) || !data.path("epoch").asText().equals(row.get("ID")))throw Accounts.bad("Mismatched call confirmation");
+            var session=calls.get(0).get("PLC_SESSION");
+            if(session!=null && ((Number)session).longValue()!=data.path("session_id").asLong())throw Accounts.bad("Different PLC call session");
+        }else if(!data.isNull())throw Accounts.bad("Failure has no confirmation");
+        if(((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis())status="UNKNOWN";
+        db.update("UPDATE commands SET status=?,result_data=? WHERE id=?",status,status.equals("APPLIED")?json.writeValueAsString(data):null,row.get("ID"));
+        if(status.equals("APPLIED")){
+            if(op.equals("call.end"))db.update("DELETE FROM calls WHERE gateway_id=?",gateway);
+            else db.update("UPDATE calls SET status='ACTIVE',direction=?,voice_epoch=?,plc_session=?,touched_at=? WHERE gateway_id=?",expected,row.get("ID"),data.path("session_id").asLong(),System.currentTimeMillis(),gateway);
+        }else uncertain(row);
     }
     private void uncertain(Map<String,Object> row) {
         if(((String)row.get("OPERATION")).startsWith("call.") || ((String)row.get("OPERATION")).startsWith("ptt."))

@@ -194,6 +194,19 @@ class RailingManager:
             self._get_or_create_locked(railing_id).call.phase = "starting"
             self._save_calls_locked()
 
+    def recover_remote_call(self, railing_id, session_id):
+        """Restore a web journal's uncertain session solely for confirmed hangup."""
+        with self._lock:
+            if any(s.call.active or s.call.phase not in ("idle", "ended") for s in self._states.values()):
+                raise RuntimeError("Another session owns the bus")
+            call = self._get_or_create_locked(railing_id).call
+            call.session_id = session_id
+            call.phase = "unknown"
+            call.recovered = True
+            call.active = False
+            call.direction = None
+            self._save_calls_locked()
+
     def call_direction_pending(self, railing_id):
         with self._lock:
             self._get_or_create_locked(railing_id).call.phase = "switching"

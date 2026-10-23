@@ -76,12 +76,13 @@ class MusicSync:
 
 class MusicPublisher:
     """Authenticated music state and bounded device controls."""
-    def __init__(self, url, token, remote=None):
+    def __init__(self, url, token, remote=None, calls=None):
         validate_url(url)
         if not token:
             raise ValueError('Set MONITOR_GATEWAY_TOKEN')
         self.url, self.token = url, token
         self.remote = remote
+        self.calls = calls
         self.stop = threading.Event()
         self.lock = threading.Lock()
         self.pending = {}
@@ -116,8 +117,10 @@ class MusicPublisher:
                         await self._connection(ws, alive)
                     finally:
                         alive.clear()
+                        if self.calls: self.calls.disconnect()
                         if self.command_task:
                             await self.command_task
+                        if self.calls: self.calls.disconnect()
             except Exception as exc:
                 LOG.warning('Music monitoring disconnected (%s); retrying', type(exc).__name__)
                 for _ in range(20):
@@ -126,31 +129,57 @@ class MusicPublisher:
                     await asyncio.sleep(.1)
 
     async def _connection(self, ws, alive):
+        from call_remote import OPERATIONS as CALLS
         self.command_task = None
-        async def execute(message):
+        incoming = asyncio.Queue(maxsize=2)
+        async def execute(message, handler):
             try:
-                result = await asyncio.to_thread(self.remote.handle, message,
+                result = await asyncio.to_thread(handler.handle, message,
                     lambda: alive.is_set() and not self.stop.is_set())
                 if alive.is_set() and not self.stop.is_set():
                     await ws.send(json.dumps(result, ensure_ascii=False))
             except Exception as exc:
-                # Journal remains uncertain; never retry automatically.
                 LOG.warning('Gateway command result unavailable (%s)', type(exc).__name__)
-        while not self.stop.is_set():
-            for message in self.drain():
-                await ws.send(json.dumps(message, ensure_ascii=False))
-            try:
-                raw = await asyncio.wait_for(ws.recv(), timeout=.5)
-            except asyncio.TimeoutError:
-                continue
-            message = json.loads(raw)
-            if message.get('type') == 'command' and message.get('operation') in ({'music.list','music.play','music.seek'} | OPERATIONS) and self.remote:
-                if self.command_task and not self.command_task.done():
-                    await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='BUSY')))
-                else:
-                    self.command_task = asyncio.create_task(execute(message))
-            elif message.get('type') in ('command','cctv.enter','cctv.age'):
-                await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='FAILED')))
+        async def sender():
+            while not self.stop.is_set():
+                messages = self.drain() + (self.calls.drain() if self.calls else [])
+                for message in messages:
+                    await ws.send(json.dumps(message, ensure_ascii=False))
+                await asyncio.sleep(.02)
+        async def audio_worker():
+            while True:
+                at,message = await incoming.get()
+                if self.calls and alive.is_set() and time.monotonic()-at<.4:
+                    await asyncio.to_thread(self.calls.receive, message)
+        async def receiver():
+            while not self.stop.is_set():
+                raw = await ws.recv()
+                message = json.loads(raw)
+                if message.get('type')=='voice.pause' and self.calls:
+                    current=self.calls.current
+                    if current and message.get('call_id')==current[0]: self.calls.disconnect()
+                    continue
+                if message.get('type')=='voice' and self.calls:
+                    if not incoming.full(): incoming.put_nowait((time.monotonic(),message))
+                    continue
+                handler = self.calls if message.get('operation') in CALLS else self.remote
+                supported = CALLS if handler is self.calls and self.calls else ({'music.list','music.play','music.seek'} | OPERATIONS)
+                if message.get('type')=='command' and message.get('operation') in supported and handler:
+                    if self.command_task and not self.command_task.done():
+                        await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='BUSY')))
+                    else:
+                        self.command_task = asyncio.create_task(execute(message,handler))
+                elif message.get('type') in ('command','cctv.enter','cctv.age'):
+                    await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='FAILED')))
+        tasks = [asyncio.create_task(fn()) for fn in (sender,receiver,audio_worker)]
+        try:
+            done,_ = await asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
+            for task in done: task.result()
+        finally:
+            alive.clear()
+            if self.calls: self.calls.disconnect()
+            for task in tasks: task.cancel()
+            await asyncio.gather(*tasks,return_exceptions=True)
 
     def close(self):
         self.stop.set()
