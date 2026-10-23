@@ -50,6 +50,18 @@ class Codec2Test {
             }finally{pool.shutdownNow();}
         }
     }
+    @Test void streamLimitAndIdleCleanupFreeNativeStates() {
+        try(var codec=codec(System.getenv().getOrDefault("CODEC2_LIBRARY","codec2"))){
+            assertTrue(codec.available(),codec.unavailableReason());
+            for(int i=0;i<128;i++)codec.convert(id(),id(),true,new byte[2560]);
+            assertThrows(IllegalStateException.class,()->codec.convert(id(),id(),true,new byte[2560]));
+            var states=(java.util.Map<?,?>)org.springframework.test.util.ReflectionTestUtils.getField(codec,"states");
+            var first=states.values().iterator().next();
+            org.springframework.test.util.ReflectionTestUtils.setField(first,"touched",System.nanoTime()-61_000_000_000L);
+            codec.clean();assertEquals(127,codec.streamCount());
+            codec.convert(id(),id(),true,new byte[2560]);assertEquals(128,codec.streamCount());
+        }
+    }
     @Test void missingLibraryDisablesVoiceWithoutCrashingServer() {
         try(var codec=codec("/no-such-codec2/"+id()+".dll")){
             assertFalse(codec.available());assertNotNull(codec.unavailableReason());
