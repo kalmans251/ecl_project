@@ -3,6 +3,8 @@ package com.ecl.monitoring;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
+import com.sun.jna.Platform;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.HashMap;
@@ -39,11 +41,20 @@ public final class Codec2 implements AutoCloseable {
     public Codec2(PortalSettings settings) {
         try {
             String library = settings.codecLibrary();
-            api = Native.load(library == null || library.isBlank() ? "codec2" : library, Api.class);
+            if (library == null || library.isBlank()) library = "codec2";
+            // Prefer our firmware-pinned bundle over any unrelated system Codec2.
+            String resource = "/" + Platform.RESOURCE_PREFIX + "/" + System.mapLibraryName("codec2");
+            if (library.equals("codec2") && Codec2.class.getResource(resource) != null) {
+                var extracted = Native.extractFromResourcePath(resource, Codec2.class.getClassLoader());
+                if (extracted == null) throw new IOException("Could not extract bundled Codec2");
+                extracted.deleteOnExit();
+                library = extracted.getAbsolutePath();
+            }
+            api = Native.load(library, Api.class);
             Pointer probe = create();
             api.codec2_destroy(probe);
             LOG.info("Codec2 2400 ready in Spring Boot (8000 Hz, 160 samples / 6 bytes)");
-        } catch (LinkageError | RuntimeException e) {
+        } catch (LinkageError | RuntimeException | IOException e) {
             api = null;
             unavailable = e.toString();
             LOG.warn("Web voice unavailable: Codec2 native library could not load. Use the bundled native JAR or set CODEC2_LIBRARY. {}", unavailable);

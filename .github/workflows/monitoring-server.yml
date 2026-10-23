@@ -35,7 +35,14 @@ jobs:
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build gcc
       - run: mvn -B -ntp -Pnative-codec verify
-      - run: java -jar target/monitoring-server-0.1.0.jar --codec-self-test
+      - if: runner.os == 'Linux'
+        run: java -jar target/monitoring-server-0.1.0.jar --codec-self-test
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Prove the deployment JAR does not need the build toolchain's DLLs.
+          $env:PATH = ($env:PATH.Split(';') | Where-Object { $_ -notmatch '(?i)msys|mingw' }) -join ';'
+          java -jar target/monitoring-server-0.1.0.jar --codec-self-test
       - run: node --test src/test/js/*.test.js
       - run: node --check src/main/resources/static/portal.js
       - run: node --check src/main/resources/static/web-voice.js
