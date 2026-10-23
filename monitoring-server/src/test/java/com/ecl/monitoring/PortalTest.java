@@ -16,6 +16,19 @@ import tools.jackson.databind.json.JsonMapper;
  "monitoring.gateways[0].id=gateway-01","monitoring.gateways[0].token=gateway-012345678901234567890123456789"})
 class PortalTest {
  @Value("${local.server.port}")int port;@Autowired Accounts accounts;@Autowired Registry registry;@Autowired Commands commands;@Autowired JdbcTemplate db;@Autowired Telemetry telemetry;@Autowired Voice voice;
+ static final com.sun.net.httpserver.HttpServer codecServer;
+ static {
+  try {
+   codecServer=com.sun.net.httpserver.HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+   codecServer.createContext("/",exchange->{
+    byte[] input=exchange.getRequestBody().readAllBytes();boolean encode=exchange.getRequestURI().getPath().startsWith("/encode/");
+    if(!"Bearer codec-012345678901234567890123456789".equals(exchange.getRequestHeaders().getFirst("Authorization")) || input.length!=(encode?2560:48)){exchange.sendResponseHeaders(400,-1);exchange.close();return;}
+    byte[] output=new byte[encode?48:2560];Arrays.fill(output,(byte)7);exchange.sendResponseHeaders(200,output.length);exchange.getResponseBody().write(output);exchange.close();
+   });codecServer.start();
+  }catch(Exception e){throw new ExceptionInInitializerError(e);}
+ }
+ @org.springframework.test.context.DynamicPropertySource static void codecAddress(org.springframework.test.context.DynamicPropertyRegistry properties){properties.add("portal.codec-url",()->"http://127.0.0.1:"+codecServer.getAddress().getPort());}
+ @org.junit.jupiter.api.AfterAll static void stopCodec(){codecServer.stop(0);}
  final JsonMapper json=JsonMapper.builder().build();
  class Browser {
   final HttpClient http=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();String token,header;
@@ -71,13 +84,19 @@ class PortalTest {
    CompletableFuture<Integer> rejected=new CompletableFuture<>();
    var wrongVoice=o.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}public CompletionStage<?> onClose(WebSocket w,int status,String reason){rejected.complete(status);return null;}}).join();
    assertEquals(1008,rejected.get(3,TimeUnit.SECONDS));
-   CompletableFuture<Integer> ownerClosed=new CompletableFuture<>();
-   var ownerVoice=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}public CompletionStage<?> onClose(WebSocket w,int status,String reason){ownerClosed.complete(status);return null;}}).join();
+   CompletableFuture<Integer> ownerClosed=new CompletableFuture<>();BlockingQueue<byte[]> pcmReceived=new LinkedBlockingQueue<>();
+   var ownerVoice=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}public CompletionStage<?> onClose(WebSocket w,int status,String reason){ownerClosed.complete(status);return null;}public CompletionStage<?> onBinary(WebSocket w,java.nio.ByteBuffer data,boolean last){byte[] bytes=new byte[data.remaining()];data.get(bytes);pcmReceived.add(bytes);w.request(1);return null;}}).join();
    assertFalse(ownerClosed.isDone());
+   var field=new HashMap<String,Object>(Map.of("version",1,"type","voice","call_id",callId,"railing_id",1,"direction","FIELD_TX","epoch",start.path("message_id").asText(),"sequence",0,"codec2",Base64.getEncoder().encodeToString(new byte[48])));
+   voice.receive("gateway-01",json.valueToTree(field));var pcm=pcmReceived.poll(3,TimeUnit.SECONDS);assertNotNull(pcm);assertEquals(2560,pcm.length);assertEquals(7,pcm[0]);
+   voice.receive("gateway-01",json.valueToTree(field));assertNull(pcmReceived.poll(100,TimeUnit.MILLISECONDS));
+   field.put("sequence",1);field.put("epoch",UUID.randomUUID().toString());voice.receive("gateway-01",json.valueToTree(field));assertNull(pcmReceived.poll(100,TimeUnit.MILLISECONDS));
    assertThrows(CompletionException.class,()->b.http.newWebSocketBuilder().header("Origin","https://attacker.example").buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){}).join());
    ownerVoice.sendClose(1000,"done").join();
    assertEquals(403,o.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());
-   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());device.callAck(json.readTree(device.next()));assertEquals("CONTROL_TX",db.queryForObject("SELECT direction FROM calls WHERE gateway_id='gateway-01'",String.class));
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());var ptt=json.readTree(device.next());device.callAck(ptt);assertEquals("CONTROL_TX",db.queryForObject("SELECT direction FROM calls WHERE gateway_id='gateway-01'",String.class));
+   var talk=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}}).join();
+   talk.sendBinary(java.nio.ByteBuffer.wrap(new byte[2560]),true).join();var sent=json.readTree(device.next());assertEquals("voice",sent.path("type").asText());assertEquals(ptt.path("message_id").asText(),sent.path("epoch").asText());assertEquals(callId,sent.path("call_id").asText());assertEquals(48,Base64.getDecoder().decode(sent.path("codec2").asText()).length);talk.sendClose(1000,"done").join();
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());device.callAck(json.readTree(device.next()));assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
   }
  }
