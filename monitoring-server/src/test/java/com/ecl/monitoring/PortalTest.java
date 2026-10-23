@@ -38,6 +38,14 @@ class PortalTest {
  String newUser(String prefix,String role){String name=prefix+UUID.randomUUID().toString().substring(0,8);String id=(String)accounts.create(name,name,"integration-test-password",false).get("id");accounts.membership("admin",id,"site-01",role);return name;}
  Map<String,Object> command(String rail,String operation,String value){var b=new HashMap<String,Object>();b.put("request_id",UUID.randomUUID().toString());b.put("rail_ids",List.of(rail));b.put("operation",operation);b.put("value",value);return b;}
  String rail(){return registry.ensureRail("gateway-01",1);}
+ void awaitVoice(String callId,String epoch)throws Exception{
+  long until=System.nanoTime()+3_000_000_000L;
+  while(System.nanoTime()<until){
+   var peers=(Map<?,?>)org.springframework.test.util.ReflectionTestUtils.getField(voice,"peers");var peer=peers.get(callId);
+   if(peer!=null && epoch.equals(org.springframework.test.util.ReflectionTestUtils.getField(peer,"epoch")))return;
+   Thread.sleep(10);
+  }fail("Server voice peer not registered");
+ }
  @Test void functionTestPageRequiresLoginAndReturnsToTestPage()throws Exception{
   var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/function-test.html")).GET().build(),HttpResponse.BodyHandlers.ofString());
   assertEquals(302,response.statusCode());assertTrue(response.headers().firstValue("location").orElse("").endsWith("/login.html?next=function-test"));
@@ -86,7 +94,7 @@ class PortalTest {
    assertEquals(1008,rejected.get(3,TimeUnit.SECONDS));
    CompletableFuture<Integer> ownerClosed=new CompletableFuture<>();BlockingQueue<byte[]> pcmReceived=new LinkedBlockingQueue<>();
    var ownerVoice=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}public CompletionStage<?> onClose(WebSocket w,int status,String reason){ownerClosed.complete(status);return null;}public CompletionStage<?> onBinary(WebSocket w,java.nio.ByteBuffer data,boolean last){byte[] bytes=new byte[data.remaining()];data.get(bytes);pcmReceived.add(bytes);w.request(1);return null;}}).join();
-   assertFalse(ownerClosed.isDone());
+   assertFalse(ownerClosed.isDone());awaitVoice(callId,start.path("message_id").asText());
    var field=new HashMap<String,Object>(Map.of("version",1,"type","voice","call_id",callId,"railing_id",1,"direction","FIELD_TX","epoch",start.path("message_id").asText(),"sequence",0,"codec2",Base64.getEncoder().encodeToString(new byte[48])));
    voice.receive("gateway-01",json.valueToTree(field));var pcm=pcmReceived.poll(3,TimeUnit.SECONDS);assertNotNull(pcm);assertEquals(2560,pcm.length);assertEquals(7,pcm[0]);
    voice.receive("gateway-01",json.valueToTree(field));assertNull(pcmReceived.poll(100,TimeUnit.MILLISECONDS));
@@ -96,7 +104,7 @@ class PortalTest {
    assertEquals(403,o.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());var ptt=json.readTree(device.next());device.callAck(ptt);assertEquals("CONTROL_TX",db.queryForObject("SELECT direction FROM calls WHERE gateway_id='gateway-01'",String.class));
    var talk=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}}).join();
-   talk.sendBinary(java.nio.ByteBuffer.wrap(new byte[2560]),true).join();var sent=json.readTree(device.next());assertEquals("voice",sent.path("type").asText());assertEquals(ptt.path("message_id").asText(),sent.path("epoch").asText());assertEquals(callId,sent.path("call_id").asText());assertEquals(48,Base64.getDecoder().decode(sent.path("codec2").asText()).length);talk.sendClose(1000,"done").join();
+   awaitVoice(callId,ptt.path("message_id").asText());talk.sendBinary(java.nio.ByteBuffer.wrap(new byte[2560]),true).join();var sent=json.readTree(device.next());assertEquals("voice",sent.path("type").asText());assertEquals(ptt.path("message_id").asText(),sent.path("epoch").asText());assertEquals(callId,sent.path("call_id").asText());assertEquals(48,Base64.getDecoder().decode(sent.path("codec2").asText()).length);talk.sendClose(1000,"done").join();
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());device.callAck(json.readTree(device.next()));assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
   }
  }
