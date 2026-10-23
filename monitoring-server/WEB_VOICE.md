@@ -41,7 +41,7 @@ Docker/WSL을 별도 네트워크로 실행한다면 localhost가 같다고 가�
 ```bash
 cd ~/ecl_prj/ecl_project/raspberry-pi
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.txt -r requirements-monitoring.txt
 read -rsp 'Gateway token: ' MONITOR_GATEWAY_TOKEN; echo
 export MONITOR_GATEWAY_TOKEN
 python main.py --port /dev/serial0 --baud 9600 --event-railings 1 \

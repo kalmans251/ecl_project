@@ -139,6 +139,8 @@ class MusicPublisher:
                 if alive.is_set() and not self.stop.is_set():
                     await ws.send(json.dumps(result, ensure_ascii=False))
             except Exception as exc:
+                if self.calls and handler is self.calls:
+                    self.calls.disconnect()
                 LOG.warning('Gateway command result unavailable (%s)', type(exc).__name__)
         async def sender():
             while not self.stop.is_set():
