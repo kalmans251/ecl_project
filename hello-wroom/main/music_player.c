@@ -745,9 +745,10 @@ static bool prepare_seek_index(index_reader_t *reader,uint32_t start,uint32_t ta
 {
     mp3dec_t header_decoder;
     off_t saved=lseek(reader->fd,0,SEEK_CUR);
-    if(saved<0 || lseek(reader->fd,start,SEEK_SET)<0){reader->failure="SD seek failed";return false;}
-    bool ok=music_index_scan_to(&s_index,&header_decoder,(uint8_t *)s_stereo_pcm,sizeof(s_stereo_pcm),
-                               start,index_read,reader,target);
+    uint32_t resume=s_index.ready?s_index.next_offset:start;
+    if(saved<0 || lseek(reader->fd,resume,SEEK_SET)<0){reader->failure="SD seek failed";return false;}
+    bool ok=music_index_extend_to(&s_index,&header_decoder,(uint8_t *)s_stereo_pcm,sizeof(s_stereo_pcm),
+                               resume,index_read,reader,target);
     if(lseek(reader->fd,saved,SEEK_SET)<0){reader->failure="SD restore failed";*reader->stop=true;return false;}
     return ok;
 }
@@ -902,6 +903,9 @@ static play_result_t play_mp3_file(
     bool metadata=!reader.failure && fstat(fd,&file_stat)==0 && file_stat.st_size>audio_start &&
         music_header_probe(s_mp3_buffer,probe_size,(uint64_t)(file_stat.st_size-audio_start),&header);
     memset(&s_index,0,sizeof(s_index));
+    bool cached=audio_start>=0 && music_index_cache_load(path,fd,(uint32_t)audio_start,&s_index);
+    uint32_t saved_index_frames=cached?s_index.frames:0;
+    if(cached)ESP_LOGI(TAG,"Seek cache loaded coverage_ms=%lu",(unsigned long)(s_index.total_samples*1000/s_index.hz));
     bool indexed=false;
     if(!metadata && !reader.failure && audio_start>=0 && lseek(fd,audio_start,SEEK_SET)>=0)
         indexed=music_index_scan(&s_index,&s_decoder,s_mp3_buffer,sizeof(s_mp3_buffer),(uint32_t)audio_start,index_read,&reader);
@@ -1189,6 +1193,7 @@ static play_result_t play_mp3_file(
          * DECODE
          * ==================================================== */
 
+        off_t frame_file_offset=lseek(fd,0,SEEK_CUR)-(off_t)buffer_len;
         mp3dec_frame_info_t info =
         {
             0
@@ -1276,6 +1281,10 @@ static play_result_t play_mp3_file(
 
 
         uint64_t frame_begin=decoded_sample_frames;
+        if(samples>0 && info.layer==3 && frame_file_offset>=0 &&
+           (uint64_t)frame_file_offset+(unsigned)info.frame_bytes<=UINT32_MAX)
+            music_index_append(&s_index,(uint32_t)frame_file_offset+info.frame_offset,
+                (uint32_t)frame_file_offset+info.frame_bytes,frame_begin,info.hz,samples);
         if(timeline_frame_samples && info.hz>0 && info.frame_bytes>0)decoded_sample_frames+=timeline_frame_samples;
         else if(samples>0)decoded_sample_frames+=(uint64_t)samples;
         if(seeking && frame_begin<seek_target){if((frame_begin/s_index.frame_samples)%32==0)vTaskDelay(1);continue;} /* reservoir/filter warmup: no PCM or EQ output */
@@ -1587,6 +1596,12 @@ static play_result_t play_mp3_file(
      * CLOSE
      * ======================================================== */
 
+    /* Persist once at track teardown, never in the PCM write loop. */
+    if(audio_start>=0 && s_index.ready && s_index.frames!=saved_index_frames){
+        if(music_index_cache_save(path,fd,(uint32_t)audio_start,&s_index))
+            ESP_LOGI(TAG,"Seek cache saved coverage_ms=%lu",(unsigned long)(s_index.total_samples*1000/s_index.hz));
+        else ESP_LOGW(TAG,"Seek cache not saved; in-memory seeking remains available");
+    }
     close(
         fd
     );

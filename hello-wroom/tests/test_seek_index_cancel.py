@@ -41,7 +41,7 @@ int main(void){
  assert(r.bytes<4000*417/2);assert(yields==0); // no artificial delay tied to bytes read
  uint32_t offset;uint64_t sample;assert(music_index_locate(&s_index,10000,&offset,&sample));
  cancel_at=3;calls=0;assert(!prepare_seek_index(&r,0,90000));assert(paused && !strcmp(r.failure,"control interrupted"));
- assert(lseek(fd,0,SEEK_CUR)==7000);assert(!s_index.ready);
+ assert(lseek(fd,0,SEEK_CUR)==7000);assert(s_index.ready); // cancellation retains the verified prefix
  for(size_t i=0;i<sizeof(s_decoder);i++)assert(((uint8_t *)&s_decoder)[i]==0xa5);
  for(size_t i=0;i<sizeof(s_mp3_buffer);i++)assert(s_mp3_buffer[i]==0x5a);
  paused=false;cancel_at=0;ticks=700;r.failure=NULL;
