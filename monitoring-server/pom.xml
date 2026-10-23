@@ -4,6 +4,7 @@
   <groupId>com.ecl</groupId><artifactId>monitoring-server</artifactId><version>0.1.0</version>
   <properties><java.version>17</java.version></properties>
   <dependencies>
+    <dependency><groupId>net.java.dev.jna</groupId><artifactId>jna</artifactId><version>5.17.0</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-websocket</artifactId></dependency>
@@ -11,5 +12,13 @@
     <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
   </dependencies>
-  <build><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
+  <build><resources><resource><directory>src/main/resources</directory></resource><resource><directory>target/native-resources</directory></resource></resources><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
+  <profiles>
+    <profile><id>native-codec</id><build><plugins>
+      <plugin><groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.5.0</version><executions>
+        <execution><id>configure-codec</id><phase>generate-resources</phase><goals><goal>exec</goal></goals><configuration><executable>cmake</executable><arguments><argument>-S</argument><argument>native</argument><argument>-B</argument><argument>target/codec-build</argument><argument>-G</argument><argument>Ninja</argument><argument>-DCMAKE_BUILD_TYPE=Release</argument></arguments></configuration></execution>
+        <execution><id>build-codec</id><phase>generate-resources</phase><goals><goal>exec</goal></goals><configuration><executable>cmake</executable><arguments><argument>--build</argument><argument>target/codec-build</argument></arguments></configuration></execution>
+      </executions></plugin>
+    </plugins></build></profile>
+  </profiles>
 </project>

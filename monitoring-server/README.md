@@ -180,3 +180,9 @@ GitHub Actions에서도 monitoring-server 변경 시 별도 빌드합니다.
 VIEWER는 상태 조회만 가능하며 제어 API의 기존 권한·CSRF·명령 확인 절차를 그대로 사용합니다.
 APPLIED는 장치 적용, COMPLETED는 조회/정책 확인입니다. UNKNOWN은 자동 재전송하지 않습니다.
 명령 결과와 마지막 상태 수신값은 따로 표시하며, Pi 연결만으로 난간 상태를 정상으로 표시하지 않습니다.
+
+## Spring Boot 내부 Codec2 음성
+
+별도 Python 변환 프로세스 없이 Java/JNA에서 Codec2를 직접 호출합니다.
+Windows x64 및 Linux x64 네이티브 라이브러리 내장 배포 JAR, 소스 빌드·자기진단 방법은
+[WEB_VOICE.md](WEB_VOICE.md)를 확인하세요. 기존 Gateway 인증은 유지합니다.

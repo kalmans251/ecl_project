@@ -83,7 +83,7 @@ async function seek(){const r=one(),d=musicDisplay(r.music_status,r.online,perfo
 function selectedCall(){return (view?.calls||[]).find(c=>items().some(r=>r.id===c.RAIL_ID));}
 function renderCall(){
  const call=selectedCall(),single=writable()&&items().length===1;
- $('callState').textContent=call?`${call.STATUS} · ${call.DIRECTION} · ${call.OWNED?'내 통화':'다른 운영자 통화'}`:view?.voice_available?'통화 없음':'서버 Codec2 변환 서비스 미설정';
+ $('callState').textContent=call?`${call.STATUS} · ${call.DIRECTION} · ${call.OWNED?'내 통화':'다른 운영자 통화'}`:view?.voice_available?'통화 없음':'서버 Codec2 라이브러리 로드 실패';
  $('callStart').disabled=!single||!!call;
  $('callEnd').disabled=!single||!call?.OWNED;
  $('pttOn').disabled=!single||!call?.OWNED||call.STATUS!=='ACTIVE'||!view.voice_available;

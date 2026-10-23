@@ -67,26 +67,12 @@
 수신자 도착 확인이 아닙니다. 실패/타임아웃을 자동 재발송하지 않습니다.
 자동 테스트는 실제 문자를 보내지 않습니다.
 
-## 음성 변환 서비스 (서버 PC)
+## 서버 내부 음성 변환
 
-Linux/WSL에서 `sudo apt install libcodec2-dev` 후, Spring과 같은 머신에서:
+별도 Python 서비스는 제거되었습니다. Spring Boot가 JNA로 Codec2 라이브러리를 직접 호출합니다.
+Windows/Linux 배포 JAR과 개발 환경 빌드는 [WEB_VOICE.md](WEB_VOICE.md)를 따릅니다.
+브라우저 8kHz mono int16 LE PCM 2560바이트와 Codec2 2400 48바이트를 양방향 변환합니다.
+통화/방향/PTT epoch별 native 상태를 분리하며 사용 종료·유휴 상태를 해제합니다.
+`CODEC_TOKEN`, `CODEC_URL` 및 9200 포트 설정은 필요 없습니다.
 
-```bash
-export CODEC_TOKEN='<32자 이상의 별도 임의 토큰>'
-python tools/codec_adapter.py
-```
-
-Spring 터미널에도 같은 `CODEC_TOKEN`을 설정하고 재시작합니다.
-Windows 네이티브는 Codec2 DLL 경로를 `CODEC2_LIBRARY`로 지정할 수 있지만,
-현재 검증은 Linux libcodec2에서 수행했습니다. Docker Spring과 호스트의
-127.0.0.1은 다르므로 기본 compose는 음성 서비스를 포함하지 않습니다.
-음성 통합 테스트는 우선 같은 Linux/WSL 호스트의 JVM과 Python으로 진행하세요.
-
-브라우저는 8 kHz mono signed int16 little-endian 160ms PCM을 보냅니다.
-서버가 Codec2 2400의 8프레임(48바이트)으로 변환하여 Pi에 전달합니다.
-난간 음성도 반대 방향으로 변환합니다. 변환 서비스는 loopback 전용이며 별도 토큰이 필요합니다.
-각 통화/방향의 Codec2 상태를 분리하고 60초 유휴 상태를 정리합니다.
-실제 통화 권한과 방향이 확인되어야 브라우저 음성이 전달됩니다.
-
-음악 목록은 폴더별 8곡씩 조회하며 선택 곡 재생은 목록 버전·곡 번호와 실제 재생 확인을 연결합니다.
-[음악 연결 안내](MUSIC_SYNC.md)를 참고하세요. 일반 재생/정지 등 기존 버튼의 실제 Pi 서버 어댑터 연결은 별도 범위입니다.
+음악 목록·선택 재생 설정은 [음악 연결 안내](MUSIC_SYNC.md)를 참고하세요.
