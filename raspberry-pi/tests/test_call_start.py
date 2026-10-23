@@ -176,7 +176,10 @@ class CallStartTests(unittest.TestCase):
                     'call 1', 'ptt 1 on', 'ptt 1 off', 'hangup 1', 'quit']), \
                 redirect_stdout(output):
             self.assertEqual(main.main(), 0)
-        self.assertEqual([frame.command for frame, _ in bus.sent if frame.service == Service.AUDIO],
+        # The real background lease worker may interleave a keepalive.
+        # Assert console commands independently of thread scheduling.
+        self.assertEqual([frame.command for frame, _ in bus.sent
+                          if frame.service == Service.AUDIO and frame.command != Command.CALL_KEEPALIVE],
                          [Command.START, Command.SET, Command.SET, Command.STOP])
         self.assertIn('CALL confirmed rail=1', output.getvalue())
         self.assertIn('CALL already active rail=1', output.getvalue())
