@@ -8,7 +8,10 @@ permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: monitoring-server
@@ -20,11 +23,30 @@ jobs:
           java-version: '17'
           cache: maven
           cache-dependency-path: monitoring-server/pom.xml
-      - run: mvn -B -ntp verify
-      - run: |
-          node --test src/test/js/*.test.js
-          node --check src/main/resources/static/portal.js
-          node --check src/main/resources/static/mic-worklet.js
-          node --check src/main/resources/static/login.js
-      - run: sudo apt-get update && sudo apt-get install -y libcodec2-dev
-      - run: python3 -m unittest discover -s tools -p 'test_codec_adapter.py'
+      - if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja git
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: '"C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build gcc
+      - run: mvn -B -ntp -Pnative-codec verify
+      - if: runner.os == 'Linux'
+        run: java -jar target/monitoring-server-0.1.0.jar --codec-self-test
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # Prove the deployment JAR does not need the build toolchain's DLLs.
+          $env:PATH = ($env:PATH.Split(';') | Where-Object { $_ -notmatch '(?i)msys|mingw' }) -join ';'
+          java -jar target/monitoring-server-0.1.0.jar --codec-self-test
+      - run: node --test src/test/js/*.test.js
+      - run: node --check src/main/resources/static/portal.js
+      - run: node --check src/main/resources/static/web-voice.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: monitoring-server-${{ runner.os }}-x64
+          path: monitoring-server/target/monitoring-server-0.1.0.jar

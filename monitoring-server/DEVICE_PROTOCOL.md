@@ -68,7 +68,7 @@ CCTV와 음성은 별도 메시지이므로 Pi의 기존 통화 우선순위·�
 ## 음성
 
 ```json
-{"version":1,"type":"voice","call_id":"통화 UUID","railing_id":1,"direction":"FIELD_TX","sequence":27,"codec2":"48바이트 데이터의 base64"}
+{"version":1,"type":"voice","call_id":"통화 UUID","railing_id":1,"direction":"FIELD_TX","epoch":"확인된 PTT 명령 UUID","sequence":27,"codec2":"48바이트 데이터의 base64"}
 ```
 
 난간→서버는 FIELD_TX, 서버→Pi는 CONTROL_TX입니다.

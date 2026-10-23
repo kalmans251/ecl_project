@@ -38,5 +38,4 @@ portal:
   sms-key: ${SMS_API_KEY:}
   sms-secret: ${SMS_API_SECRET:}
   sms-from: ${SMS_FROM:}
-  codec-url: ${CODEC_URL:http://127.0.0.1:9200}
-  codec-token: ${CODEC_TOKEN:}
+  codec-library: ${CODEC2_LIBRARY:codec2}

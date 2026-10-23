@@ -4,34 +4,50 @@ Pi와 서버를 함께 업데이트합니다. 이 변경에는 P4/WROOM/S3 펌�
 브라우저의 마이크/스피커를 사용하므로 Pi USB 마이크와 AUX 스피커는 필요하지 않습니다.
 통화는 PLC 한 회선(게이트웨이)당 하나이며, 실제 음질과 전환 지연은 장비로 확인해야 합니다.
 
-## 1. 서버의 Codec2 변환 서비스
+## 1. Spring Boot 실행 (Codec2 내장)
 
-브라우저 PCM(8kHz, mono, int16 LE)을 Codec2 2400으로 변환하는 별도 프로세스가 필요합니다.
-Spring Boot와 **동일한 컴퓨터**에서 `tools/codec_adapter.py`를 실행합니다.
-Python 3와 Codec2 공유 라이브러리가 필요합니다. Linux에서는 `libcodec2-dev`를 설치합니다.
-Windows에서는 Python과 동일한 아키텍처의 Codec2 DLL 및 DLL의 종속 라이브러리를 준비하고
-`CODEC2_LIBRARY`를 DLL의 절대 경로로 설정합니다. Python 패키지 설치만으로 DLL이 설치되지는 않습니다.
+별도 Python 변환 서비스, `CODEC_TOKEN`, `CODEC_URL`, 9200 포트는 더 이상 사용하지 않습니다.
+Java JNA가 동일 JVM에서 Codec2를 직접 호출합니다. JAR에 포함된 네이티브 라이브러리는 임시 폴더에 풀어 로드합니다.
+통화/방향/PTT epoch별 상태를 분리하고 종료·소켓 해제·60초 유휴 시 native 메모리를 정리합니다.
 
-Windows PowerShell 예시(실제 DLL 경로로 변경):
+### Windows 운영: DLL이 포함된 JAR 사용
+
+GitHub Actions → **Monitoring server** → 병합된 최신 커밋의 성공한 실행 →
+**monitoring-server-Windows-x64** 아티팩트를 다운로드하고 압축을 풉니다.
+64비트 Java 17 이상이 필요합니다. Python, CMake, GCC는 운영 PC에 필요하지 않습니다.
+기존 서버를 종료한 뒤, **기존 monitoring-server 디렉터리에서** 다음을 실행합니다.
+DB 상대 경로를 유지하려면 기존 서버와 같은 작업 디렉터리를 사용해야 합니다.
 
 ```powershell
-cd monitoring-server
-$env:CODEC2_LIBRARY = "C:\codec2\bin\libcodec2.dll"
-$env:CODEC_TOKEN = Read-Host "Codec 전용 토큰 (32자 이상)"
-python tools/codec_adapter.py
+# JAR은 다운로드한 실제 경로를 사용하세요.
+java -jar .\monitoring-server-0.1.0.jar --codec-self-test
+java -jar .\monitoring-server-0.1.0.jar
 ```
 
-Spring Boot를 실행하는 **다른 PowerShell**에도 동일한 `CODEC_TOKEN`을 입력하고 재시작합니다.
-기존 관리자/게이트웨이 토큰 및 DB 설정은 유지합니다. Codec 토큰과 Gateway 토큰은 별개입니다.
+기존 `MONITOR_GATEWAY_TOKEN` 등 서버 환경변수는 그대로 설정합니다. 별도 Codec 토큰은 없습니다.
+시작 로그의 `Codec2 2400 ready in Spring Boot`를 확인합니다.
+다른 버전 DLL을 수동 사용하려면 `CODEC2_LIBRARY`에 절대 경로를 지정할 수 있습니다.
+내장 DLL을 사용할 때는 과거 `CODEC2_LIBRARY` 설정을 제거합니다.
+Linux x64에서는 **monitoring-server-Linux-x64** 아티팩트를 사용합니다.
+운영체제가 다른 아티팩트를 혼용하지 않습니다.
+
+### 소스에서 개발·빌드하는 경우
+
+Linux는 Git/GCC/CMake/Ninja, Windows는 Git/CMake/Ninja 및 **MinGW-w64 x64 GCC**가 PATH에 필요합니다.
+Windows에서 Visual Studio C 컴파일러 대신 MinGW-w64를 사용합니다.
 
 ```powershell
-$env:CODEC_TOKEN = Read-Host "위 Codec 서비스와 동일한 토큰"
+mvn -Pnative-codec verify
 mvn spring-boot:run
 ```
 
-Codec 서비스는 `127.0.0.1:9200`에서만 수신합니다. 공유기 포트 개방이나 Nginx 경로 추가가 필요 없습니다.
-`voice_available`은 토큰 설정 여부이며 Codec 프로세스/DLL 정상 동작을 보장하지 않습니다.
-Docker/WSL을 별도 네트워크로 실행한다면 localhost가 같다고 가정하지 말고 서버와 Codec 프로세스를 같은 환경에서 실행합니다.
+`native-codec` 프로파일은 펌웨어와 같은 고정 커밋의 Codec2를 빌드해 JAR에 포함합니다.
+`mvn clean` 후에는 다시 `-Pnative-codec`로 빌드합니다. 일반 `mvn spring-boot:run`만으로
+DLL을 새로 내려받거나 C 코드를 컴파일하지 않습니다. CI 배포 JAR은 이 준비를 완료한 결과물입니다.
+Dockerfile도 같은 프로파일로 라이브러리를 내장하므로 별도 변환 컨테이너가 필요 없습니다.
+
+라이브러리 로드 실패 시 웹 제어 서버는 시작되지만 `voice_available=false`가 됩니다.
+음성 성공으로 표시하지 않으며, 자기 진단으로 DLL 아키텍처·로드 오류를 확인할 수 있습니다.
 
 ## 2. Pi 실행
 
@@ -61,7 +77,7 @@ python main.py --port /dev/serial0 --baud 9600 --event-railings 1 \
 5. 통화 종료 → 실제 종료 확인 후 통화 항목이 사라지는지 확인합니다.
 
 HTTPS 인증서와 Nginx `/ws/` WebSocket Upgrade 설정이 정상이어야 합니다.
-권한 거부 또는 Codec 서비스 오류가 발생하면 종료 버튼으로 정리한 뒤 다시 시작합니다.
+권한 거부 또는 Codec2 로드 오류가 발생하면 종료 버튼으로 정리한 뒤 다시 시작합니다.
 브라우저 음성 연결이 사라진 통화는 15초 유예 후 상태 불명으로 전환하고 Pi 통화 갱신을 중단합니다.
 장비 종료를 추정하여 성공 표시하지 않으며, 재연결 후 **명시적으로 통화 종료**하여 확인해야 합니다.
 

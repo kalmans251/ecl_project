@@ -3,11 +3,12 @@
 Spring Boot 4.1.1 / Java 17 / Maven 3.9+. 기존 모니터링 화면을 새 계정·현장 권한·장치 명령 구조에 연결했습니다.
 
 화면 이식 범위와 지원 상태는 [UI_MIGRATION.md](UI_MIGRATION.md), 새 Pi 어댑터 규격은 [DEVICE_PROTOCOL.md](DEVICE_PROTOCOL.md)를 확인하세요.
-음악 현재 상태·목록 조회·선택 재생은 실제 Pi 어댑터로 연결할 수 있습니다: [MUSIC_SYNC.md](MUSIC_SYNC.md). 그 외 원격 제어·CCTV·음성 서버 연결은 별도 통합 어댑터가 필요합니다.
+음악 현재 상태·목록 조회·선택 재생은 실제 Pi 어댑터로 연결할 수 있습니다: [MUSIC_SYNC.md](MUSIC_SYNC.md). 일반 제어와 웹 통화는 Pi 어댑터로 연결됩니다. 웹 통화 실행은 [WEB_VOICE.md](WEB_VOICE.md)를 확인하세요.
 
 ## 실행
 
-Java 17과 Maven 3.9+를 설치합니다. 기본은 **127.0.0.1:8080**에만 바인딩됩니다.
+운영 시에는 [Windows/Linux 내장 JAR 실행 안내](WEB_VOICE.md)를 권장합니다. Java만 설치하면 됩니다.
+아래는 소스 빌드 예시입니다. Java 17, Maven 3.9+, Git/CMake/Ninja/GCC(Windows는 MinGW-w64 x64)가 필요합니다. 기본은 **127.0.0.1:8080**에만 바인딩됩니다.
 인증 토큰이 비어 있거나, 서로 같거나, 32자 미만이면 시작하지 않습니다.
 각 토큰은 비밀번호처럼 관리하고 Git에 저장하지 않습니다.
 
@@ -21,7 +22,7 @@ $env:MONITOR_ANALYTICS_TOKEN = New-Token
 $env:MONITOR_GATEWAY_TOKEN = New-Token
 $env:MONITOR_BOOTSTRAP_USER = "admin"
 $env:MONITOR_BOOTSTRAP_PASSWORD = Read-Host "최초 관리자 비밀번호 (12자 이상)"
-mvn verify
+mvn -Pnative-codec verify
 mvn spring-boot:run
 ```
 
@@ -31,8 +32,8 @@ mvn spring-boot:run
 다른 테스트 터미널에는 해당 역할의 토큰만 같은 값으로 설정합니다.
 서버를 다시 실행할 때 기존 토큰을 다시 설정해야 합니다. 토큰은 URL이나 로그에 넣지 않습니다.
 
-Linux/macOS에서는 세 토큰과 최초 관리자 비밀번호 환경변수를 export한 뒤 같은 Maven 명령으로 실행합니다.
-패키징: `mvn verify`, 실행: `java -jar target/monitoring-server-0.1.0.jar`.
+Linux에서는 세 토큰과 최초 관리자 비밀번호 환경변수를 export한 뒤 같은 Maven 명령으로 실행합니다.
+패키징: `mvn -Pnative-codec verify`, 실행: `java -jar target/monitoring-server-0.1.0.jar`.
 Docker: 세 토큰과 최초 관리자 비밀번호 환경변수를 설정하고 `docker compose up --build`.
 Docker 볼륨에는 DB가 보존되며 `down -v`는 이벤트 번호/기록을 삭제하므로 운영 중 사용하지 않습니다.
 
@@ -158,7 +159,7 @@ DB는 단일 서버 로컬 H2이며 전달 기록 10만 건에서 신규 입력�
 
 ## 검증 범위와 다음 작업
 
-`mvn verify`에는 실제 HTTP/WebSocket 연결을 사용하는 인증·권한·메시지 전달·번호 매칭·중복·ack 테스트가 포함됩니다.
+`mvn -Pnative-codec verify`에는 실제 HTTP/WebSocket 연결을 사용하는 인증·권한·메시지 전달·번호 매칭·중복·ack 테스트가 포함됩니다.
 GitHub Actions에서도 monitoring-server 변경 시 별도 빌드합니다.
 다음 단계는 난간 Pi의 WSS 어댑터와 실제 분석 프로그램 송신 어댑터입니다.
 일반 제어/통화/화면의 서버 처리는 구현되어 있고, 실물 장치 적용 확인은 Pi 연동 후 검증합니다.
@@ -180,3 +181,9 @@ GitHub Actions에서도 monitoring-server 변경 시 별도 빌드합니다.
 VIEWER는 상태 조회만 가능하며 제어 API의 기존 권한·CSRF·명령 확인 절차를 그대로 사용합니다.
 APPLIED는 장치 적용, COMPLETED는 조회/정책 확인입니다. UNKNOWN은 자동 재전송하지 않습니다.
 명령 결과와 마지막 상태 수신값은 따로 표시하며, Pi 연결만으로 난간 상태를 정상으로 표시하지 않습니다.
+
+## Spring Boot 내부 Codec2 음성
+
+별도 Python 변환 프로세스 없이 Java/JNA에서 Codec2를 직접 호출합니다.
+Windows x64 및 Linux x64 네이티브 라이브러리 내장 배포 JAR, 소스 빌드·자기진단 방법은
+[WEB_VOICE.md](WEB_VOICE.md)를 확인하세요. 기존 Gateway 인증은 유지합니다.
