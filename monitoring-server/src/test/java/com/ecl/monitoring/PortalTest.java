@@ -25,6 +25,13 @@ class PortalTest {
  String newUser(String prefix,String role){String name=prefix+UUID.randomUUID().toString().substring(0,8);String id=(String)accounts.create(name,name,"integration-test-password",false).get("id");accounts.membership("admin",id,"site-01",role);return name;}
  Map<String,Object> command(String rail,String operation,String value){var b=new HashMap<String,Object>();b.put("request_id",UUID.randomUUID().toString());b.put("rail_ids",List.of(rail));b.put("operation",operation);b.put("value",value);return b;}
  String rail(){return registry.ensureRail("gateway-01",1);}
+ @Test void functionTestPageRequiresLoginAndReturnsToTestPage()throws Exception{
+  var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/function-test.html")).GET().build(),HttpResponse.BodyHandlers.ofString());
+  assertEquals(302,response.statusCode());assertTrue(response.headers().firstValue("location").orElse("").endsWith("/login.html?next=function-test"));
+  var browser=new Browser("admin");var page=browser.request("/function-test.html","GET",null,false);
+  assertEquals(200,page.statusCode());assertTrue(page.body().contains("/function-test.js"));
+  assertEquals(200,browser.request("/function-test.js","GET",null,false).statusCode());
+ }
  @Test void sessionCsrfAndSiteIsolation()throws Exception{
   var anonymous=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/portal/me")).GET().build(),HttpResponse.BodyHandlers.ofString());assertEquals(401,anonymous.statusCode());
   String viewer=newUser("viewer","VIEWER");var b=new Browser(viewer);assertEquals(200,b.request("/api/portal/sites/site-01/state","GET",null,false).statusCode());assertEquals(403,b.request("/api/portal/sites/foreign/state","GET",null,false).statusCode());assertEquals(403,b.request("/api/portal/commands","POST",command(rail(),"volume","20"),true).statusCode());assertEquals(403,b.request("/api/portal/admin/users","GET",null,false).statusCode());assertEquals(403,b.request("/api/portal/commands","POST",command(rail(),"volume","20"),false).statusCode());

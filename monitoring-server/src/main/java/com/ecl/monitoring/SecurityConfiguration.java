@@ -20,7 +20,7 @@ public class SecurityConfiguration {
             .requestCache(c -> c.disable())
             .exceptionHandling(e -> e.authenticationEntryPoint((q,r,x) -> {
                 if(q.getRequestURI().startsWith("/api/") || q.getRequestURI().startsWith("/ws/")) r.sendError(401);
-                else r.sendRedirect("/login.html");
+                else r.sendRedirect(q.getRequestURI().equals("/function-test.html") ? "/login.html?next=function-test" : "/login.html");
             }))
             .formLogin(f -> f.loginPage("/login.html").loginProcessingUrl("/api/auth/login")
                 .successHandler((q,r,a) -> {r.setContentType("application/json");r.getWriter().write("{\"authenticated\":true}");})
