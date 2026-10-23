@@ -95,6 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--music-journal', default='~/.local/state/ecl-railing/music-requests.sqlite3', help='Durable remote music/general command journal; do not delete to retry a request')
     parser.add_argument('--music-sync', action='store_true', help='Poll actual music state round-robin')
     parser.add_argument('--music-poll-interval', type=float, default=2.0, help='Seconds between rails (1..30)')
+    parser.add_argument('--web-voice', action='store_true', help='Enable WSS call/Codec2 bridge; excludes local audio and TCP voice listener')
     parser.add_argument('--monitor-url', help='Optional WSS gateway URL; enables music sync and confirmed remote controls')
     args = parser.parse_args()
     if not 1 <= args.music_poll_interval <= 30:
@@ -175,6 +176,9 @@ def main() -> int:
         port=args.voice_port,
     )
 
+    if args.web_voice and (not args.monitor_url or args.local_audio):
+        LOG.error('--web-voice requires --monitor-url and cannot be combined with --local-audio')
+        return 1
     controls = DeviceControls(bus, railings, voice)
     local_audio = None
 
@@ -246,7 +250,7 @@ def main() -> int:
         )
         return 1
 
-    if not args.disable_voice_relay:
+    if not args.disable_voice_relay and not args.web_voice:
         try:
             voice.start()
         except Exception:
@@ -274,7 +278,12 @@ def main() -> int:
             if args.monitor_url:
                 from music_remote import MusicRemote
                 remote = MusicRemote(controls, args.event_railings, args.music_journal)
-                publisher = MusicPublisher(args.monitor_url, os.environ['MONITOR_GATEWAY_TOKEN'], remote)
+                calls = None
+                if args.web_voice:
+                    from call_remote import CallRemote
+                    calls = CallRemote(audio, voice, railings, args.event_railings, remote.path)
+                    voice.set_field_handler(calls.field)
+                publisher = MusicPublisher(args.monitor_url, os.environ['MONITOR_GATEWAY_TOKEN'], remote, calls)
                 publisher.start()
             music_sync = MusicSync(controls, args.event_railings, args.music_poll_interval,
                                    publisher.publish if publisher else None)
@@ -367,6 +376,9 @@ def main() -> int:
                 continue
 
 
+            if args.web_voice and command in ("call", "ptt", "hangup", "ack"):
+                print("Web voice owns call controls; use monitoring call/hangup buttons")
+                continue
             if command == "call":
                 if len(parts) != 2:
                     print("usage: call <railing_id>")

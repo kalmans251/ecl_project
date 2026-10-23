@@ -16,6 +16,7 @@ public class DeviceSocket extends TextWebSocketHandler {
     @Override public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         session.setTextMessageSizeLimit(4096);
         session.setBinaryMessageSizeLimit(4096);
+        commands.disconnected(id(session));
         gateways.connect(id(session),session);
         gateways.send(id(session),json.writeValueAsString(Map.of("version",1,"type","welcome","gateway_id",id(session))));
     }
@@ -32,6 +33,7 @@ public class DeviceSocket extends TextWebSocketHandler {
                 if (count>30) throw new IllegalArgumentException("Too many acknowledgments");
             }
             var node=json.readTree(message.getPayload());
+            if(node.path("type").asText().equals("call_result")){commands.callResult(id(session),node);return;}
             if(node.path("type").asText().equals("control_result")){commands.controlResult(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("music_result")){commands.musicResult(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("music_state")){music.accept(id(session),session.getId(),node);return;}
@@ -47,9 +49,11 @@ public class DeviceSocket extends TextWebSocketHandler {
         gateways.pong(id(session),session.getId());
     }
     @Override public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        if(gateways.isCurrent(id(session),session.getId()))commands.disconnected(id(session));
         gateways.disconnect(id(session),session.getId());
     }
     @Override public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
+        if(gateways.isCurrent(id(session),session.getId()))commands.disconnected(id(session));
         gateways.disconnect(id(session),session.getId()); session.close(CloseStatus.SERVER_ERROR);
     }
 }

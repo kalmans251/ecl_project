@@ -84,3 +84,7 @@ CREATE TABLE IF NOT EXISTS sms_requests(id VARCHAR(36) PRIMARY KEY, user_id VARC
 
 -- Music results remain bound to the durable command and its site permissions.
 ALTER TABLE commands ADD COLUMN IF NOT EXISTS result_data VARCHAR(8192);
+
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS voice_epoch VARCHAR(36);
+
+ALTER TABLE calls ADD COLUMN IF NOT EXISTS plc_session BIGINT;
