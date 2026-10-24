@@ -30,3 +30,11 @@ test('confirmed talk reuses prepared microphone and sends only after socket open
   assert.equal(v.transmit,false);assert.equal(stops,1);assert.equal(disconnects,1);
  }finally{global.location=priorLocation;global.WebSocket=priorSocket;}
 });
+test('diagnostics distinguish capture from socket transmission and report signed PCM peak',()=>{
+ const messages=[],v=new WebVoice(()=>{},s=>messages.push(s));v.context={state:'running'};
+ let sends=0;v.socket={readyState:1,bufferedAmount:0,send(){sends++;}};
+ const pcm=new ArrayBuffer(2560);new DataView(pcm).setInt16(0,-32768,true);
+ v.pcm(pcm);assert.equal(v.captured,1);assert.equal(v.sent,0);assert.match(messages[0],/peak 32768/);
+ v.transmit=true;v.pcm(pcm);assert.equal(v.sent,1);assert.equal(sends,1);
+ v.socket.bufferedAmount=5120;v.pcm(pcm);assert.equal(v.captured,3);assert.equal(v.sent,1);
+});
