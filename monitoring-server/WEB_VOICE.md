@@ -133,3 +133,21 @@ Pi가 일치하는 END를 수신하고 서버가 call ID·난간·명령 ID·세
 다른 통화가 실제로 활성화되어 있거나 P4/WROOM/S3가 응답하지 않으면 UNKNOWN을 유지합니다.
 실패 후 종료 재시도는 같은 복구 세션을 사용하며, 시간 경과만으로 종료 성공을 표시하지 않습니다.
 이 복구는 현재 펌웨어의 세션별 STOP/장치 readiness를 사용하므로 펌웨어 변경은 없습니다.
+
+### Persistent operator voice connection
+
+The operator socket stays open across PTT changes on both portal pages. While P4
+confirms a change, capture transmission/playback is paused and queued PCM is
+cleared. The browser then sends `{type:"bind",epoch,direction}`; Spring Boot
+acknowledges `{type:"ready",epoch,direction}` only for the owner's confirmed
+ACTIVE call. PCM resumes only after that acknowledgement. Each binary message
+contains the 36-byte ASCII epoch followed by 2560 bytes of 8 kHz mono PCM16LE.
+Old epochs are discarded in both directions, including worklet messages queued
+before the switch. Pi's Codec2 envelope and all firmware protocols are unchanged.
+
+Deploy server and static resources together and hard-refresh existing browser
+pages (Ctrl+F5); older pages using bare PCM are not compatible. Verify that one
+`/ws/operator/voice/<call>` connection survives listen → talk → listen, and that
+server `VOICE bound` messages share a socket ID with changing epochs. End the
+call to close the socket. UNKNOWN, logout, permission loss, or transport failure
+still close the media connection; physical playback requires an on-device test.
