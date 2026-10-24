@@ -110,6 +110,11 @@ static uint8_t s_health_mask;
 static int64_t s_health_due, s_health_deadline, s_health_retry;
 static void handle_health(const protocol_frame_t *f);
 static int64_t s_prepare_deadline, s_next_probe;
+/* Pi waits at least 1 s after a call command. Leave time for the 200 ms
+ * receive grant and modem delivery; never emit a late unsolicited reply. */
+#define CALL_FIRST_REPLY_US 700000
+static int64_t s_first_reply_until;
+static bool s_stop_polled_only;
 static bool end_call(bool polled_only);
 static void lock_manager(void);
 static void unlock_manager(void);
@@ -119,6 +124,7 @@ static void begin_prepare(uint8_t operation, uint8_t direction) {
     s_operation=operation;s_target=direction;s_ready_mask=0;
     s_failed_node=s_failed_reason=0;s_preparing=true;
     s_prepare_deadline=esp_timer_get_time()+4000000;
+    s_first_reply_until=esp_timer_get_time()+CALL_FIRST_REPLY_US;
     s_next_probe=esp_timer_get_time()+200000;
     unlock_manager();
 }
@@ -825,6 +831,7 @@ static bool end_call(bool polled_only) {
     if(!call_manager_is_active())return finalize_end(polled_only);
     if(s_operation!=CMD_STOP) {
         begin_prepare(CMD_STOP,0);
+        s_stop_polled_only=polled_only;
         request_audio_stop();
         return true;
     }
@@ -964,7 +971,21 @@ void call_manager_tick(void)
 {
     int64_t now=esp_timer_get_time();
     health_tick(now);
-    if(s_fault_stopping && s_operation==CMD_STOP && s_ready_mask==3)end_call(true);
+    /* Complete the original request as soon as BOTH endpoints are ready.
+     * Previously only a duplicate Pi command called finish_prepare(), making
+     * every successful operation wait for a timeout and retransmission.
+     * Autonomous fault/lease stops remain outbox-only on the shared bus. */
+    if(s_preparing && s_ready_mask==3 && !s_failed_node) {
+        if(s_operation==CMD_STOP && s_stop_polled_only) {
+            end_call(true);
+        } else if(now < s_first_reply_until && now < s_call_lease_until_us) {
+            if(s_operation==CMD_STOP)end_call(false);
+            else if(finish_prepare()) {
+                notify_pi_call_event(s_operation==CMD_START ? AUDIO_EVENT_CALL_STARTED :
+                                     AUDIO_EVENT_DIRECTION_CHANGED,s_call_origin,s_target);
+            }
+        }
+    }
     if(s_preparing && s_ready_mask!=3 && !s_failed_node && now>=s_prepare_deadline) {
         s_failed_node=(s_ready_mask&1)?NODE_S3:NODE_WROOM;s_failed_reason=3;
     }
