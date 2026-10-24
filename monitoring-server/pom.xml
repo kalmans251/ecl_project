@@ -2,7 +2,7 @@
   <modelVersion>4.0.0</modelVersion>
   <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.1</version><relativePath/></parent>
   <groupId>com.ecl</groupId><artifactId>monitoring-server</artifactId><version>0.1.0</version>
-  <properties><java.version>17</java.version><codec.windows.skip>false</codec.windows.skip></properties>
+  <properties><java.version>17</java.version><codec.windows.skip>false</codec.windows.skip><codec.native.tests>false</codec.native.tests></properties>
   <dependencies>
     <dependency><groupId>net.java.dev.jna</groupId><artifactId>jna</artifactId><version>5.17.0</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-security</artifactId></dependency>
@@ -12,10 +12,10 @@
     <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>runtime</scope></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
   </dependencies>
-  <build><resources><resource><directory>src/main/resources</directory></resource><resource><directory>target/native-resources</directory></resource></resources><plugins><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
+  <build><resources><resource><directory>src/main/resources</directory></resource><resource><directory>target/native-resources</directory></resource></resources><plugins><plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><configuration><systemPropertyVariables><codec.native.tests>${codec.native.tests}</codec.native.tests></systemPropertyVariables></configuration></plugin><plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin></plugins></build>
   <profiles>
-    <profile><id>windows-codec-auto</id>
-      <activation><os><family>Windows</family></os></activation>
+    <profile><id>windows-codec-auto</id><properties><codec.native.tests>true</codec.native.tests></properties>
+      <!-- Optional legacy native self-test profile; browser voice needs no DLL. -->
       <build><plugins><plugin>
         <groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.5.0</version>
         <executions><execution><id>prepare-windows-codec</id><phase>generate-resources</phase><goals><goal>exec</goal></goals>
@@ -28,7 +28,7 @@
         </execution></executions>
       </plugin></plugins></build>
     </profile>
-    <profile><id>native-codec</id><properties><codec.windows.skip>true</codec.windows.skip></properties><build><plugins>
+    <profile><id>native-codec</id><properties><codec.native.tests>true</codec.native.tests><codec.windows.skip>true</codec.windows.skip></properties><build><plugins>
       <plugin><groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.5.0</version><executions>
         <execution><id>configure-codec</id><phase>generate-resources</phase><goals><goal>exec</goal></goals><configuration><executable>cmake</executable><arguments><argument>-S</argument><argument>native</argument><argument>-B</argument><argument>target/codec-build</argument><argument>-G</argument><argument>Ninja</argument><argument>-DCMAKE_BUILD_TYPE=Release</argument></arguments></configuration></execution>
         <execution><id>build-codec</id><phase>generate-resources</phase><goals><goal>exec</goal></goals><configuration><executable>cmake</executable><arguments><argument>--build</argument><argument>target/codec-build</argument></arguments></configuration></execution>

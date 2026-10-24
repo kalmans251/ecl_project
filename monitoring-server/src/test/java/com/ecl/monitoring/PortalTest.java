@@ -109,9 +109,9 @@ class PortalTest {
    assertEquals(1008,rejected.get(3,TimeUnit.SECONDS));
    CompletableFuture<Integer> ownerClosed=new CompletableFuture<>();BlockingQueue<byte[]> pcmReceived=new LinkedBlockingQueue<>();
    var ownerVoice=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}public CompletionStage<?> onClose(WebSocket w,int status,String reason){ownerClosed.complete(status);return null;}public CompletionStage<?> onText(WebSocket w,CharSequence text,boolean last){w.request(1);return null;}public CompletionStage<?> onBinary(WebSocket w,java.nio.ByteBuffer data,boolean last){byte[] bytes=new byte[data.remaining()];data.get(bytes);pcmReceived.add(bytes);w.request(1);return null;}}).join();
-   assertTrue(voice.available(),"Native Codec2 must load for this integration test");assertFalse(ownerClosed.isDone());ownerVoice.sendText(json.writeValueAsString(Map.of("type","bind","epoch",start.path("message_id").asText(),"direction","FIELD_TX")),true).join();awaitVoice(callId,start.path("message_id").asText());
+   assertTrue(voice.available(),"Browser Codec2 must be bundled");assertFalse(ownerClosed.isDone());ownerVoice.sendText(json.writeValueAsString(Map.of("type","bind","codec","codec2-2400-v1","epoch",start.path("message_id").asText(),"direction","FIELD_TX")),true).join();awaitVoice(callId,start.path("message_id").asText());
    var field=new HashMap<String,Object>(Map.of("version",1,"type","voice","call_id",callId,"railing_id",1,"direction","FIELD_TX","epoch",start.path("message_id").asText(),"sequence",0,"codec2",Base64.getEncoder().encodeToString(new byte[48])));
-   voice.receive("gateway-01",json.valueToTree(field));var pcm=pcmReceived.poll(3,TimeUnit.SECONDS);assertNotNull(pcm);assertEquals(2596,pcm.length);assertEquals(start.path("message_id").asText(),new String(pcm,0,36,java.nio.charset.StandardCharsets.US_ASCII));
+   voice.receive("gateway-01",json.valueToTree(field));var pcm=pcmReceived.poll(3,TimeUnit.SECONDS);assertNotNull(pcm);assertEquals(84,pcm.length);assertArrayEquals(new byte[48],Arrays.copyOfRange(pcm,36,84));assertEquals(start.path("message_id").asText(),new String(pcm,0,36,java.nio.charset.StandardCharsets.US_ASCII));
    voice.receive("gateway-01",json.valueToTree(field));assertNull(pcmReceived.poll(100,TimeUnit.MILLISECONDS));
    field.put("sequence",1);field.put("epoch",UUID.randomUUID().toString());voice.receive("gateway-01",json.valueToTree(field));assertNull(pcmReceived.poll(100,TimeUnit.MILLISECONDS));
    assertThrows(CompletionException.class,()->b.http.newWebSocketBuilder().header("Origin","https://attacker.example").buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){}).join());
@@ -119,21 +119,21 @@ class PortalTest {
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());var ptt=json.readTree(device.next());
    voice.clean();assertFalse(ownerClosed.isDone(),"SWITCHING must preserve owner socket");
    device.callAck(ptt);assertEquals("CONTROL_TX",db.queryForObject("SELECT direction FROM calls WHERE gateway_id='gateway-01'",String.class));
-   ownerVoice.sendText(json.writeValueAsString(Map.of("type","bind","epoch",ptt.path("message_id").asText(),"direction","CONTROL_TX")),true).join();
+   ownerVoice.sendText(json.writeValueAsString(Map.of("type","bind","codec","codec2-2400-v1","epoch",ptt.path("message_id").asText(),"direction","CONTROL_TX")),true).join();
    awaitVoice(callId,ptt.path("message_id").asText());
    // The previous epoch is rejected even on the same transport after rebind.
-   ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(2596).put(start.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[2560]).flip(),true).join();
+   ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(84).put(start.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[48]).flip(),true).join();
    assertNull(device.messages.poll(100,TimeUnit.MILLISECONDS));
-   ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(2596).put(ptt.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[2560]).flip(),true).join();
-   var sent=json.readTree(device.next());assertEquals("voice",sent.path("type").asText());assertEquals(ptt.path("message_id").asText(),sent.path("epoch").asText());assertEquals(callId,sent.path("call_id").asText());assertEquals(48,Base64.getDecoder().decode(sent.path("codec2").asText()).length);
+   ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(84).put(ptt.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[48]).flip(),true).join();
+   var sent=json.readTree(device.next());assertEquals("voice",sent.path("type").asText());assertEquals(ptt.path("message_id").asText(),sent.path("epoch").asText());assertEquals(callId,sent.path("call_id").asText());assertArrayEquals(new byte[48],Base64.getDecoder().decode(sent.path("codec2").asText()));
    // Short arrival gaps (including back-to-back packets) must not terminate speech.
-   for(int burst=0;burst<2;burst++)ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(2596).put(ptt.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[2560]).flip(),true).join();
+   for(int burst=0;burst<2;burst++)ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(84).put(ptt.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[48]).flip(),true).join();
    for(int burst=0;burst<2;burst++)assertEquals("voice",json.readTree(device.next()).path("type").asText());
    assertFalse(ownerClosed.isDone(),"Jitter must not close the voice socket");
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.off",null),true).statusCode());var listen=json.readTree(device.next());device.callAck(listen);
-   ownerVoice.sendText(json.writeValueAsString(Map.of("type","bind","epoch",listen.path("message_id").asText(),"direction","FIELD_TX")),true).join();awaitVoice(callId,listen.path("message_id").asText());
+   ownerVoice.sendText(json.writeValueAsString(Map.of("type","bind","codec","codec2-2400-v1","epoch",listen.path("message_id").asText(),"direction","FIELD_TX")),true).join();awaitVoice(callId,listen.path("message_id").asText());
    field.put("epoch",listen.path("message_id").asText());field.put("sequence",0);voice.receive("gateway-01",json.valueToTree(field));
-   var resumed=pcmReceived.poll(3,TimeUnit.SECONDS);assertNotNull(resumed);assertEquals(2596,resumed.length);assertFalse(ownerClosed.isDone(),"PTT round trip uses original socket");
+   var resumed=pcmReceived.poll(3,TimeUnit.SECONDS);assertNotNull(resumed);assertEquals(84,resumed.length);assertFalse(ownerClosed.isDone(),"PTT round trip uses original socket");
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());var end=json.readTree(device.next());assertTrue(end.path("recover").asBoolean());assertEquals(123,end.path("session_id").asLong());device.callAck(end);assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));voice.clean();assertEquals(1008,ownerClosed.get(3,TimeUnit.SECONDS));
   }
  }
