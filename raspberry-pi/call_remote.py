@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import queue
+import secrets
 import sqlite3
 import threading
 import time
@@ -36,6 +37,13 @@ class CallRemote:
                 message.get('version') != 1 or message.get('type') != 'command' or op not in OPERATIONS or
                 type(rail) is not int or rail not in self.rails or message.get('value') is not None):
                 return result
+            recovery = message.get('recover', False)
+            supplied_session = message.get('session_id')
+            if (type(recovery) is not bool or
+                (recovery and op != 'call.end') or
+                (supplied_session is not None and (not recovery or
+                 type(supplied_session) is not int or not 1 <= supplied_session <= 0xffffffff))):
+                return result
             expiry = datetime.fromisoformat(message['expires_at'].replace('Z', '+00:00')).timestamp()
             ttl = expiry-time.time()
             if not 0 < ttl <= 65:
@@ -47,7 +55,9 @@ class CallRemote:
         def guard():
             if not connected() or time.monotonic() >= deadline:
                 raise TimeoutError('Web call connection/deadline expired')
-        fingerprint = hashlib.sha256(json.dumps([call_id, rail, op, message['expires_at']]).encode()).hexdigest()
+        identity = [call_id, rail, op, message['expires_at']]
+        if recovery: identity += [recovery, supplied_session]
+        fingerprint = hashlib.sha256(json.dumps(identity).encode()).hexdigest()
         with sqlite3.connect(self.path) as db:
             old = db.execute('SELECT fingerprint,result FROM requests WHERE id=?', (ident,)).fetchone()
             if old:
@@ -66,7 +76,27 @@ class CallRemote:
                                (ident,fingerprint,expiry,json.dumps(rejected)))
                     LOG.warning('Web call rejected before execution rail=%s; local call unresolved or journal full', rail)
                     return rejected
-            elif not binding or binding[0] != rail:
+            elif not binding:
+                if not recovery:
+                    LOG.warning('Web call mapping missing rail=%s call=%s; server recovery required', rail, call_id)
+                    return result
+                # Do not adopt a different local/web owner merely because the server lost its journal.
+                pending = [(int(r), v['call']) for r,v in self.states.snapshot().items()
+                           if v['call']['phase'] not in ('idle','ended') or v['call']['active']]
+                if (any(r != rail or c['session_id'] != supplied_session for r,c in pending) or
+                    db.execute('SELECT 1 FROM web_calls WHERE ended=0 LIMIT 1').fetchone()):
+                    LOG.warning('Web hangup recovery refused: another session owns the bus rail=%s', rail)
+                    return result
+                session = supplied_session or (secrets.randbelow(0xffffffff)+1)
+                guard()
+                if db.execute('SELECT COUNT(*) FROM web_calls').fetchone()[0]>=10000:
+                    return result
+                db.execute('INSERT INTO web_calls(id,rail,session,epoch) VALUES(?,?,?,?)',
+                           (call_id,rail,session,ident))
+                binding = (rail,session,ident,0)
+                LOG.warning('Web hangup recovery rail=%s session=%s; waiting for physical END confirmation', rail, session)
+            elif binding[0] != rail or (supplied_session is not None and binding[1] != supplied_session):
+                LOG.warning('Web call session mismatch rail=%s call=%s', rail, call_id)
                 return result
             db.execute('DELETE FROM requests WHERE expires<?', (time.time()-86400,))
             if db.execute('SELECT COUNT(*) FROM requests').fetchone()[0] >= 10000: return result
@@ -90,7 +120,8 @@ class CallRemote:
                 else:
                     _, session, _, ended = binding
                     call = self.states.snapshot(rail).get('call', {})
-                    if not ended and call.get('session_id') != session:
+                    if not ended and (call.get('session_id') != session or
+                                      (recovery and call.get('phase') in ('idle','ended'))):
                         if op!='call.end': raise RuntimeError('Different local call owns the rail')
                         self.states.recover_remote_call(rail,session)
                         call=self.states.snapshot(rail)['call']
