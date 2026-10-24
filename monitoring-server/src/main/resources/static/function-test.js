@@ -102,7 +102,7 @@ async function callControl(op){
   if(op!=='call.end')await webVoice.prepare();
   if(op==='ptt.on')await webVoice.mic();
   await send(op,null,true);
- }finally{
+ }catch(e){webVoice.report?.('통화 전환 실패: '+e.name+' · '+e.message);throw e;}finally{
   try{
    // An older poll may still be in flight. Fetch again after it settles.
    if(loading)await loading.catch(()=>{});
@@ -111,7 +111,7 @@ async function callControl(op){
  }
 }
 async function changeSite(){epoch++;site=$('site').value;view=null;selected.clear();resetPage();render();await refresh();}
-async function init(){webVoice=new WebVoice(notice);build();render();csrf=await api('/api/auth/csrf');me=await api('/api/portal/me');$('account').textContent=`${me.user.NAME} (${me.user.USERNAME})`;
+async function init(){webVoice=new WebVoice(notice,message=>{$('voiceDiagnostics').textContent=message;});build();render();csrf=await api('/api/auth/csrf');me=await api('/api/portal/me');$('account').textContent=`${me.user.NAME} (${me.user.USERNAME})`;
  for(const s of me.sites)$('site').append(new Option(s.NAME+' · '+s.ROLE,s.ID));site=$('site').value;
  $('site').onchange=()=>guarded(changeSite);$('refresh').onclick=()=>guarded(refresh);$('group').onchange=()=>{resetPage();render();};$('track').onchange=render;
  for(const [id,op] of [['callStart','call.start'],['callEnd','call.end'],['pttOn','ptt.on'],['pttOff','ptt.off']])$(id).onclick=()=>guarded(()=>callControl(op));
