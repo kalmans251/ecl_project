@@ -97,7 +97,7 @@ function renderCall(){
 }
 async function callControl(op){
  if(callChanging||busy)throw Error('이전 통화 전환을 기다려 주세요.');
- one();callChanging=true;render();webVoice.close();
+ one();callChanging=true;render();if(op==='call.end')webVoice.close();else webVoice.pause();
  try{
   if(op!=='call.end')await webVoice.prepare();
   if(op==='ptt.on')await webVoice.mic();
