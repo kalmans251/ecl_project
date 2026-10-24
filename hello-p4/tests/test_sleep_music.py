@@ -87,6 +87,15 @@ int main(void) {
     before=commands;radar_wake();assert(commands==before); // non-music mode stays quiet
     setup();sleep_via_led(true);before=commands;music_manager_on_wake();
     assert(commands==before); // do not resume before actual wake
+    setup();music_manager_stop();music_policy_on_stopped();before=commands;
+    music_manager_selected_prepared();assert(commands==before && music_manager_is_session_enabled());
+    assert(music_policy_get_pause_reasons() & MUSIC_PAUSE_REASON_USER);
+    assert(music_manager_start());assert(commands==before+1 && last_command==CMD_RESUME);
+    music_policy_on_resumed();before=commands;assert(music_manager_start());assert(commands==before);
+    music_manager_user_pause();music_policy_on_paused();before=commands;
+    assert(music_manager_start());assert(commands==before+1 && last_command==CMD_RESUME);
+    music_manager_selected_prepared();music_policy_add_pause_reason(MUSIC_PAUSE_REASON_CALL);
+    before=commands;assert(music_manager_start());assert(commands==before); // don't bypass call
     return 0;
 }
 '''

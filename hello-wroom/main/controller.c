@@ -258,6 +258,7 @@ static void handle_music_apply(const protocol_frame_t *frame)
             index < playlist_manager_get_group_track_count((music_group_t)group)) {
             music_player_confirm_begin(frame->railing_id, frame->payload, op);
             music_player_confirm_selection(frame->payload + 5);
+            music_player_confirm_prepare(!music_player_is_playing() || music_player_is_paused());
             bool ok = playlist_manager_play_selected(version, (music_group_t)group, index);
             bool queued = music_player_confirm_end();
             if (ok && queued) return; /* First PCM write owns the final confirmation. */

@@ -44,6 +44,7 @@ bool music_manager_is_session_enabled(void);
  * USER PAUSE
  * ============================================================ */
 
+void music_manager_selected_prepared(void);
 void music_manager_user_pause(void);
 
 void music_manager_user_resume(void);

@@ -95,3 +95,18 @@ Check stale-version rejection (rescan/change SD while stopped, then select from
 old list), non-existent index rejection, and switching while already playing.
 Also repeat call/return and sleep/wake regression tests after selecting a track.
 Total duration, seeking and monitoring UI integration remain later stages.
+
+
+## 선택곡 준비와 재생 (P4/WROOM/Pi/server 함께 업데이트)
+
+- 재생 중 `music 1 play default 0`: 선택곡으로 전환해 재생합니다.
+- 일시정지 또는 정지 후 같은 명령: WROOM이 파일·디코더·첫 PCM·I2S를 준비하고,
+  PCM 출력 전에 대기합니다. 확인 응답의 상태는 `paused`, 위치는 0초입니다.
+- `music 1 start` 또는 `music 1 resume`: 준비한 첫 PCM부터 재생합니다.
+- 새 곡을 선택하지 않은 일시정지는 기존 위치에서 재개됩니다.
+- 준비 중 다른 곡 선택 또는 정지로 취소할 수 있습니다. 통화·비상·슬립·비음악 모드의 차단은 유지됩니다.
+- 목록 선택 버튼은 ‘선택 곡 적용’, 준비 확인 메시지는 ‘선택곡 준비 완료 · 재생 대기’입니다.
+  통계의 `paused`는 일반 일시정지와 준비 대기를 모두 나타냅니다.
+- 실제 검증: 음악 모드에서 정지→선택→무음/0초 확인→시작, 일시정지→선택→재개,
+  재생 중 선택, 준비 상태에서 다시 선택/정지, 선택 없이 재개를 각각 확인하세요.
+  준비 완료는 출력 전 확인이며, 스피커에서 소리가 난다는 의미가 아닙니다.

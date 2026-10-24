@@ -22,7 +22,11 @@ static bool session=true, blocked, call, emergency;
 typedef struct {int led_mode;bool sleep_active;} p4_system_state_t;
 static p4_system_state_t state={3,false};
 static protocol_frame_t sent;
-static unsigned starts;
+static unsigned starts,prepared;
+#define MUSIC_PAUSE_REASON_USER 1
+static uint32_t reasons;
+static uint32_t music_policy_get_pause_reasons(void){return blocked?2:reasons;}
+static void music_manager_selected_prepared(void){prepared++;session=true;}
 static int xQueueSend(int q,const protocol_frame_t *f,int t){(void)q;(void)t;sent=*f;return 1;}
 static void system_state_get(p4_system_state_t *out){*out=state;}
 static bool music_manager_is_session_enabled(void){return session;}
@@ -42,10 +46,12 @@ int main(void){
  bool *guards[]={&blocked,&call,&emergency,&state.sleep_active};
  for(unsigned i=0;i<4;i++){*guards[i]=true;handle_music(&f);
  assert(sent.dst==NODE_PI && sent.command==CMD_APPLY_RESULT && sent.payload[5]==1);*guards[i]=false;}
- session=false;handle_music(&f);assert(sent.payload[5]==1);session=true;
+ session=false;handle_music(&f);assert(sent.dst==NODE_WROOM);session=true;
+ reasons=1;handle_music(&f);assert(sent.dst==NODE_WROOM);reasons=0;
  state.led_mode=1;handle_music(&f);assert(sent.payload[5]==1);state.led_mode=3;
  f.src=NODE_WROOM;f.command=CMD_APPLY_RESULT;f.length=14;f.payload[5]=0;f.payload[6]=1;
  handle_music(&f);assert(sent.src==NODE_WROOM && sent.dst==NODE_PI && sent.length==14 && starts==1);
+ f.payload[6]=2;handle_music(&f);assert(prepared==1 && starts==1);
  return 0;
 }
 '''

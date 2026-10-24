@@ -98,7 +98,7 @@ async function playSelectedMusic(){
  if(musicBusy||!musicPage||index===''||!musicPage.tracks.some(t=>String(t.index)===index))throw Error('목록을 조회하고 곡을 선택하세요.');
  const value=`${musicPage.catalog_version}:${musicPage.group}:${index}`;
  musicBusy=true;renderMusicCatalog();
- try {const result=await musicRequest(r,'music.play',value);toast(`${r.name}: ${result.filename} · 장치 재생 시작 확인`);await poll();}
+ try {const result=await musicRequest(r,'music.play',value);toast(`${r.name}: ${result.filename} · ${result.state==='paused'?'선택곡 준비 완료 · 재생 대기':'장치 재생 시작 확인'}`);await poll();}
  catch(e){musicPage=null;fillMusicTracks();throw e;}
  finally {musicBusy=false;renderMusicCatalog();}
 }
@@ -133,7 +133,7 @@ function renderMusicStatus(){
  if(items.length!==1){$('musicSeek').disabled=true;$('musicSeekApply').disabled=true;text('musicNowTitle','난간 하나를 선택하세요');text('musicNowState','--');text('musicNowTime','--:-- / --:--');return;}
  const r=items[0], d=musicDisplay(r.music_status,r.online,performance.now()-musicReceivedAt);
  text('musicNowTitle',d.filename);
- text('musicNowState',d.fresh?({playing:'재생 중 · 추정 경과 시간',paused:'일시정지',idle:'정지 · 마지막 곡'})[d.state]:'상태 확인 대기 · 마지막 수신값');
+ text('musicNowState',d.fresh?({playing:'재생 중 · 추정 경과 시간',paused:'일시정지 / 재생 대기',idle:'정지 · 마지막 곡'})[d.state]:'상태 확인 대기 · 마지막 수신값');
  text('musicNowTime',`${musicTime(d.positionMs)} / ${musicTime(d.durationMs)}`);
  const key=`${r.id}:${d.playbackId}`;
  if(key!==musicSeekKey){musicSeekKey=key;musicSeekEditing=false;}

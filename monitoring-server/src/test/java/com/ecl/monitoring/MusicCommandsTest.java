@@ -10,6 +10,7 @@ class MusicCommandsTest {
   for(String v:List.of("4294967296:default:0","5:default:32","-1:default:0"))assertThrows(RuntimeException.class,()->MusicCommands.parse("music.play",v));
   var result=json.valueToTree(Map.of("railing_id",1,"catalog_version",5,"group","default","index",0,"filename","a.mp3","state","playing","device_application_confirmed",true));
   MusicCommands.validateResult("music.play","5:default:0",1,"APPLIED",result);
+  MusicCommands.validateResult("music.play","5:default:0",1,"APPLIED",json.readTree(result.toString().replace("playing","paused")));
   assertThrows(RuntimeException.class,()->MusicCommands.validateResult("music.play","6:default:0",1,"APPLIED",result));
   assertThrows(RuntimeException.class,()->MusicCommands.validateResult("music.play","5:default:0",2,"APPLIED",result));
   assertThrows(RuntimeException.class,()->MusicCommands.validateResult("music.play","5:default:0",1,"COMPLETED",result));

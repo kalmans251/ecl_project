@@ -113,9 +113,9 @@ def play(controls, rail, group, index, *, expected_version=None, guard=None):
         raise ValueError('Track was not in the displayed list; refresh the required group')
     identity = listing['catalog_version'].to_bytes(4, 'big') + bytes([GROUPS[group]]) + index.to_bytes(2, 'big')
     data = request(controls, rail, Command.MUSIC_PLAY, identity, guard=guard, timeout=8.0)
-    if data != b'\x01' + identity:
+    if len(data)!=8 or data[0] not in (1,2) or data[1:]!=identity:
         raise ValueError('Selected-track confirmation does not match; playback state unknown')
-    return {'railing_id': rail, 'state': 'playing', 'device_application_confirmed': True,
+    return {'railing_id': rail, 'state': 'playing' if data[0]==1 else 'paused', 'device_application_confirmed': True,
             'catalog_version': listing['catalog_version'], **track}
 
 

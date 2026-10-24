@@ -17,7 +17,7 @@ class Bus:
         if op == Command.MUSIC_CATALOG:
             data = self.version + b'\x00\x01' + bytes(8)
         elif op == Command.MUSIC_PLAY:
-            data = b'\x01' + f.payload[5:]
+            data = bytes([getattr(self,'play_state',1)]) + f.payload[5:]
         elif op == Command.MUSIC_TRACK:
             identity = f.payload[5:12]
             if self.bad_identity: identity = bytes(7)
@@ -72,6 +72,15 @@ class MusicInfoTests(unittest.TestCase):
         self.assertEqual(self.bus.sent[-1].payload[4:], bytes([Command.MUSIC_PLAY]) + self.bus.version + bytes(3))
         for command in ('music 1 play 10 0', 'music 1 play default -1', 'music 1 play default 32'):
             with self.assertRaises(ValueError): self.controls.execute(command.split())
+
+    def test_prepared_selection_is_confirmed_without_claiming_playback(self):
+        self.controls.execute('music 1 list'.split())
+        self.bus.play_state=2
+        result=json.loads(self.controls.execute('music 1 play default 0'.split()))
+        self.assertEqual(result['state'],'paused')
+        self.assertTrue(result['device_application_confirmed'])
+        self.bus.play_state=0
+        with self.assertRaises(ValueError):self.controls.execute('music 1 play default 0'.split())
 
     def test_failed_refresh_invalidates_previous_list(self):
         self.controls.execute('music 1 list'.split())

@@ -466,10 +466,11 @@ bool music_manager_start(void)
 
         ESP_LOGI(
             TAG,
-            "START ignored: session already enabled"
+            "START -> resume current selection"
         );
 
 
+        music_manager_user_resume();
         return true;
     }
 
@@ -706,6 +707,13 @@ bool music_manager_is_session_enabled(void)
 /* ============================================================
  * USER PAUSE
  * ============================================================ */
+
+void music_manager_selected_prepared(void)
+{
+    lock_manager();s_session_enabled=true;s_next_on_wake=false;unlock_manager();
+    music_policy_on_paused();
+    music_policy_add_pause_reason(MUSIC_PAUSE_REASON_USER);
+}
 
 void music_manager_user_pause(void)
 {

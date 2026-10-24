@@ -1507,6 +1507,8 @@ static void handle_music(
         if(frame->payload[5]==0) {
             if(frame->payload[4]==CMD_START || frame->payload[4]==CMD_NEXT ||
                (frame->payload[4]==CMD_MUSIC_PLAY && frame->length==14 && frame->payload[6]==1))music_policy_on_started();
+            else if(frame->payload[4]==CMD_MUSIC_PLAY && frame->length==14 && frame->payload[6]==2)
+                music_manager_selected_prepared();
             else if(frame->payload[4]==CMD_PAUSE)music_policy_on_paused();
             else if(frame->payload[4]==CMD_RESUME)music_policy_on_resumed();
         }
@@ -1529,6 +1531,11 @@ static void handle_music(
             system_state_get(&state);
             valid = valid && music_manager_is_session_enabled() &&
                 state.led_mode == LED_MODE_MUSIC && !state.sleep_active && !music_policy_is_blocked();
+            if(op==CMD_MUSIC_PLAY) {
+                valid = frame->length==12 && frame->payload[9]<=4 &&
+                    state.led_mode==LED_MODE_MUSIC && !state.sleep_active &&
+                    !(music_policy_get_pause_reasons() & ~MUSIC_PAUSE_REASON_USER);
+            }
         }
         if (!valid || call_manager_is_active() || emergency_manager_is_active()) {
             protocol_frame_t result = *frame;
