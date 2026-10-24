@@ -23,18 +23,19 @@ jobs:
           java-version: '17'
           cache: maven
           cache-dependency-path: monitoring-server/pom.xml
-      - if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja git
-      - if: runner.os == 'Windows'
-        shell: pwsh
-        run: '"C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append'
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y cmake ninja-build gcc
-      - run: mvn -B -ntp -Pnative-codec verify
+      - if: runner.os == 'Linux'
+        run: mvn -B -ntp -Pnative-codec verify
+      - if: runner.os == 'Windows'
+        run: mvn -B -ntp verify
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          # Exercise the unchanged user command lifecycle and cached preparation on PS 5.1.
+          mvn -B -ntp spring-boot:run "-Dspring-boot.run.arguments=--codec-self-test"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path target/classes/win32-x86-64/codec2.dll)) { throw 'Missing native resource' }
       - if: runner.os == 'Linux'
         run: java -jar target/monitoring-server-0.1.0.jar --codec-self-test
       - if: runner.os == 'Windows'
@@ -43,6 +44,9 @@ jobs:
           # Prove the deployment JAR does not need the build toolchain's DLLs.
           $env:PATH = ($env:PATH.Split(';') | Where-Object { $_ -notmatch '(?i)msys|mingw' }) -join ';'
           java -jar target/monitoring-server-0.1.0.jar --codec-self-test
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: ./tools/test-codec-windows.ps1
       - run: node --test src/test/js/*.test.js
       - run: node --check src/main/resources/static/portal.js
       - run: node --check src/main/resources/static/web-voice.js

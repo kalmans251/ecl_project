@@ -10,7 +10,29 @@ Pi와 서버를 함께 업데이트합니다. 이 변경에는 P4/WROOM/S3 펌�
 Java JNA가 동일 JVM에서 Codec2를 직접 호출합니다. JAR에 포함된 네이티브 라이브러리는 임시 폴더에 풀어 로드합니다.
 통화/방향/PTT epoch별 상태를 분리하고 종료·소켓 해제·60초 유휴 시 native 메모리를 정리합니다.
 
-### Windows 운영: DLL이 포함된 JAR 사용
+### Windows: Git 업데이트 후 기존 Maven 명령으로 실행 (권장)
+
+Java 17 x64, Maven 3.9+, Git이 설치되어 있으면 됩니다. 기존 서버를 종료하고,
+토큰이 설정된 동일한 PowerShell 창의 `monitoring-server` 폴더에서 실행하세요.
+
+```powershell
+git pull
+mvn spring-boot:run
+```
+
+Windows용 Maven 프로파일이 자동 활성화되어 최초 실행 시 약 40 MB의
+w64devkit 2.5.0을 공식 GitHub에서 내려받고 고정 SHA-256을 검증한 뒤 압축을 풉니다.
+관리자 권한, CMake/Ninja/MSYS2 수동 설치, Actions 아티팩트 수동 다운로드는 필요 없습니다.
+컴파일러는 `%LOCALAPPDATA%/ecl-monitoring-tools`에 보관하고 시스템 PATH는 변경하지 않습니다.
+펌웨어와 같은 Codec2 커밋을 받아 2400 모드 DLL을 빌드하고 Maven 리소스에 포함합니다.
+두 번째 실행부터 DLL 해시·빌드 스크립트가 일치하면 캐시를 사용합니다.
+`mvn clean` 이후에도 같은 명령으로 자동 재생성합니다. 다운로드/빌드 실패 시 서버 실행을 중단합니다.
+
+`mvn verify`로 테스트·JAR 생성도 가능합니다. 기존 DB와 토큰은 그대로 사용합니다.
+과거 `CODEC2_LIBRARY`를 별도로 지정했다면 해당 값이 내장 DLL보다 우선하므로,
+내장 DLL을 쓰려면 현재 PowerShell에서 `Remove-Item Env:CODEC2_LIBRARY -ErrorAction SilentlyContinue`로 해제하세요.
+
+### Windows 운영: DLL이 포함된 JAR 사용 (선택)
 
 GitHub Actions → **Monitoring server** → 병합된 최신 커밋의 성공한 실행 →
 **monitoring-server-Windows-x64** 아티팩트를 다운로드하고 압축을 풉니다.
@@ -31,20 +53,18 @@ java -jar .\monitoring-server-0.1.0.jar
 Linux x64에서는 **monitoring-server-Linux-x64** 아티팩트를 사용합니다.
 운영체제가 다른 아티팩트를 혼용하지 않습니다.
 
-### 소스에서 개발·빌드하는 경우
+### Linux 또는 수동 CMake 빌드
 
-Linux는 Git/GCC/CMake/Ninja, Windows는 Git/CMake/Ninja 및 **MinGW-w64 x64 GCC**가 PATH에 필요합니다.
-Windows에서 Visual Studio C 컴파일러 대신 MinGW-w64를 사용합니다.
+Linux는 Git/GCC/CMake/Ninja를 설치하고 아래 명령을 사용합니다.
+Windows에서도 이 프로파일을 명시하면 자동 준비 대신 기존 MinGW-w64 x64/CMake/Ninja를 사용합니다.
 
-```powershell
+```sh
 mvn -Pnative-codec verify
 mvn spring-boot:run
 ```
 
-`native-codec` 프로파일은 펌웨어와 같은 고정 커밋의 Codec2를 빌드해 JAR에 포함합니다.
-`mvn clean` 후에는 다시 `-Pnative-codec`로 빌드합니다. 일반 `mvn spring-boot:run`만으로
-DLL을 새로 내려받거나 C 코드를 컴파일하지 않습니다. CI 배포 JAR은 이 준비를 완료한 결과물입니다.
-Dockerfile도 같은 프로파일로 라이브러리를 내장하므로 별도 변환 컨테이너가 필요 없습니다.
+`native-codec` 프로파일과 Dockerfile은 같은 펌웨어 고정 커밋을 사용합니다.
+Windows 자동 빌드 스크립트와 CMake 빌드 모두 라이선스 및 대응 소스를 JAR에 포함합니다.
 
 라이브러리 로드 실패 시 웹 제어 서버는 시작되지만 `voice_available=false`가 됩니다.
 음성 성공으로 표시하지 않으며, 자기 진단으로 DLL 아키텍처·로드 오류를 확인할 수 있습니다.

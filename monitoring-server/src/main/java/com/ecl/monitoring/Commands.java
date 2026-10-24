@@ -184,6 +184,7 @@ public class Commands {
     public synchronized void disconnected(String gateway) {
         db.update("UPDATE calls SET status='UNKNOWN',voice_epoch=NULL WHERE gateway_id=?",gateway);
     }
+    @org.springframework.transaction.annotation.Transactional
     public synchronized void callResult(String gateway,tools.jackson.databind.JsonNode node) {
         if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1 ||
            !node.path("type").asText().equals("call_result") || !node.path("message_id").isString())throw Accounts.bad("Invalid call result");

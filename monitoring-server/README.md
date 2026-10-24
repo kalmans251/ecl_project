@@ -8,7 +8,7 @@ Spring Boot 4.1.1 / Java 17 / Maven 3.9+. 기존 모니터링 화면을 새 계�
 ## 실행
 
 운영 시에는 [Windows/Linux 내장 JAR 실행 안내](WEB_VOICE.md)를 권장합니다. Java만 설치하면 됩니다.
-아래는 소스 빌드 예시입니다. Java 17, Maven 3.9+, Git/CMake/Ninja/GCC(Windows는 MinGW-w64 x64)가 필요합니다. 기본은 **127.0.0.1:8080**에만 바인딩됩니다.
+아래는 소스 빌드 예시입니다. Windows는 Java 17 x64, Maven 3.9+, Git이 필요하며 Codec2 컴파일 도구와 DLL은 자동 준비됩니다. Linux는 추가로 CMake/Ninja/GCC가 필요합니다. 기본은 **127.0.0.1:8080**에만 바인딩됩니다.
 인증 토큰이 비어 있거나, 서로 같거나, 32자 미만이면 시작하지 않습니다.
 각 토큰은 비밀번호처럼 관리하고 Git에 저장하지 않습니다.
 
@@ -22,7 +22,7 @@ $env:MONITOR_ANALYTICS_TOKEN = New-Token
 $env:MONITOR_GATEWAY_TOKEN = New-Token
 $env:MONITOR_BOOTSTRAP_USER = "admin"
 $env:MONITOR_BOOTSTRAP_PASSWORD = Read-Host "최초 관리자 비밀번호 (12자 이상)"
-mvn -Pnative-codec verify
+mvn verify
 mvn spring-boot:run
 ```
 
@@ -33,7 +33,7 @@ mvn spring-boot:run
 서버를 다시 실행할 때 기존 토큰을 다시 설정해야 합니다. 토큰은 URL이나 로그에 넣지 않습니다.
 
 Linux에서는 세 토큰과 최초 관리자 비밀번호 환경변수를 export한 뒤 같은 Maven 명령으로 실행합니다.
-패키징: `mvn -Pnative-codec verify`, 실행: `java -jar target/monitoring-server-0.1.0.jar`.
+Windows 패키징: `mvn verify` (최초 실행 시 약 40 MB 도구 자동 다운로드 및 SHA-256 검증). Linux 패키징: `mvn -Pnative-codec verify`, 실행: `java -jar target/monitoring-server-0.1.0.jar`.
 Docker: 세 토큰과 최초 관리자 비밀번호 환경변수를 설정하고 `docker compose up --build`.
 Docker 볼륨에는 DB가 보존되며 `down -v`는 이벤트 번호/기록을 삭제하므로 운영 중 사용하지 않습니다.
 
