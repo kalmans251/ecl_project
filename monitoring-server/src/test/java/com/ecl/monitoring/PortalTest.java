@@ -126,6 +126,10 @@ class PortalTest {
    assertNull(device.messages.poll(100,TimeUnit.MILLISECONDS));
    ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(2596).put(ptt.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[2560]).flip(),true).join();
    var sent=json.readTree(device.next());assertEquals("voice",sent.path("type").asText());assertEquals(ptt.path("message_id").asText(),sent.path("epoch").asText());assertEquals(callId,sent.path("call_id").asText());assertEquals(48,Base64.getDecoder().decode(sent.path("codec2").asText()).length);
+   // Short arrival gaps (including back-to-back packets) must not terminate speech.
+   for(int burst=0;burst<2;burst++)ownerVoice.sendBinary(java.nio.ByteBuffer.allocate(2596).put(ptt.path("message_id").asText().getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(new byte[2560]).flip(),true).join();
+   for(int burst=0;burst<2;burst++)assertEquals("voice",json.readTree(device.next()).path("type").asText());
+   assertFalse(ownerClosed.isDone(),"Jitter must not close the voice socket");
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.off",null),true).statusCode());var listen=json.readTree(device.next());device.callAck(listen);
    ownerVoice.sendText(json.writeValueAsString(Map.of("type","bind","epoch",listen.path("message_id").asText(),"direction","FIELD_TX")),true).join();awaitVoice(callId,listen.path("message_id").asText());
    field.put("epoch",listen.path("message_id").asText());field.put("sequence",0);voice.receive("gateway-01",json.valueToTree(field));
