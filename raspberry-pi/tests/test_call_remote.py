@@ -82,3 +82,65 @@ class WebCallTests(unittest.TestCase):
     def test_existing_binding_rejection_cannot_release_call(self):
         self.assertEqual('APPLIED',self.remote.handle(self.message('call.start'))['status'])
         self.assertEqual('FAILED',self.remote.handle(self.message('call.start'))['status'])
+
+    def recovery(self, session=None):
+        message=self.message('call.end');message['recover']=True
+        if session is not None: message['session_id']=session
+        return message
+
+    def test_missing_mapping_known_session_requires_physical_end(self):
+        message=self.recovery(123456)
+        result=self.remote.handle(message)
+        self.assertEqual('APPLIED',result['status'])
+        self.assertEqual(123456,result['data']['session_id'])
+        self.assertTrue(self.bus.sent)
+        self.assertTrue(all(f.command==Command.STOP for f,_ in self.bus.sent))
+        self.assertEqual(bytes.fromhex('0001e240'),self.bus.sent[0][0].payload)
+        count=len(self.bus.sent)
+        self.assertEqual(result,self.remote.handle(message))
+        self.assertEqual(count,len(self.bus.sent))
+
+    def test_missing_both_sessions_probes_idle_without_start(self):
+        result=self.remote.handle(self.recovery())
+        self.assertEqual('APPLIED',result['status'])
+        self.assertGreater(result['data']['session_id'],0)
+        self.assertTrue(all(f.command==Command.STOP for f,_ in self.bus.sent))
+
+    def test_recovery_no_reply_stays_unknown_then_retries_same_session(self):
+        callback=self.bus.callback;self.bus.callback=lambda f:None
+        self.assertEqual('UNKNOWN',self.remote.handle(self.recovery())['status'])
+        sid=self.states.snapshot(1)['call']['session_id']
+        self.assertEqual('unknown',self.states.snapshot(1)['call']['phase'])
+        self.bus.callback=callback
+        result=self.remote.handle(self.recovery())
+        self.assertEqual('APPLIED',result['status'])
+        self.assertEqual(sid,result['data']['session_id'])
+
+    def test_recovery_does_not_take_over_other_local_session(self):
+        self.states.reserve_call(1)
+        sid=self.states.snapshot(1)['call']['session_id']
+        self.assertEqual('FAILED',self.remote.handle(self.recovery())['status'])
+        wrong=(sid % 0xffffffff)+1
+        self.assertEqual('FAILED',self.remote.handle(self.recovery(wrong))['status'])
+        self.assertFalse(self.bus.sent)
+        self.assertEqual(sid,self.states.snapshot(1)['call']['session_id'])
+        self.assertEqual('APPLIED',self.remote.handle(self.recovery(sid))['status'])
+
+    def test_recovery_does_not_take_over_other_web_call(self):
+        self.remote.handle(self.message('call.start'))
+        self.cid=str(uuid.uuid4());count=len(self.bus.sent)
+        self.assertEqual('FAILED',self.remote.handle(self.recovery())['status'])
+        self.assertEqual(count,len(self.bus.sent))
+
+    def test_recovery_rejects_invalid_session_and_wrong_operation(self):
+        for value in [0,True,-1,0x100000000,'123']:
+            self.assertEqual('FAILED',self.remote.handle(self.recovery(value))['status'])
+        message=self.recovery(123);message['operation']='ptt.on'
+        self.assertEqual('FAILED',self.remote.handle(message)['status'])
+        self.assertFalse(self.bus.sent)
+
+    def test_recovery_binding_session_mismatch_never_sends(self):
+        self.remote.handle(self.message('call.start'));count=len(self.bus.sent)
+        sid=self.states.snapshot(1)['call']['session_id']
+        self.assertEqual('FAILED',self.remote.handle(self.recovery((sid%0xffffffff)+1))['status'])
+        self.assertEqual(count,len(self.bus.sent))

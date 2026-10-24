@@ -83,8 +83,12 @@ class PortalTest {
    assertEquals("UNKNOWN",db.queryForObject("SELECT status FROM calls",String.class));
    assertEquals(409,b.request("/api/portal/commands","POST",command(rail,"volume","20"),true).statusCode());
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());
-   device.callAck(json.readTree(device.next()));
+   var end=json.readTree(device.next());assertTrue(end.path("recover").asBoolean());assertFalse(end.has("session_id"));
+   assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
+   device.callAck(end);
    assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"query","p4"),true).statusCode());
+   var query=json.readTree(device.next());device.ack(query.path("message_id").asText(),"FAILED");
   }
  }
  @Test void commandDedupQueueAndCallOwnership()throws Exception{
@@ -116,7 +120,7 @@ class PortalTest {
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"ptt.on",null),true).statusCode());var ptt=json.readTree(device.next());device.callAck(ptt);assertEquals("CONTROL_TX",db.queryForObject("SELECT direction FROM calls WHERE gateway_id='gateway-01'",String.class));
    var talk=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+callId),new WebSocket.Listener(){public void onOpen(WebSocket w){w.request(1);}}).join();
    awaitVoice(callId,ptt.path("message_id").asText());talk.sendBinary(java.nio.ByteBuffer.wrap(new byte[2560]),true).join();var sent=json.readTree(device.next());assertEquals("voice",sent.path("type").asText());assertEquals(ptt.path("message_id").asText(),sent.path("epoch").asText());assertEquals(callId,sent.path("call_id").asText());assertEquals(48,Base64.getDecoder().decode(sent.path("codec2").asText()).length);talk.sendClose(1000,"done").join();
-   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());device.callAck(json.readTree(device.next()));assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());var end=json.readTree(device.next());assertTrue(end.path("recover").asBoolean());assertEquals(123,end.path("session_id").asLong());device.callAck(end);assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
   }
  }
  @Test void voiceEnvelopeValidation()throws Exception{

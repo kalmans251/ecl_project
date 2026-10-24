@@ -109,7 +109,17 @@ public class Commands {
             catch(ResponseStatusException e) {db.update("UPDATE commands SET status='FAILED',detail='Permission revoked' WHERE id=?",row.get("ID"));uncertain(row);continue;}
             var message=new LinkedHashMap<String,Object>();message.put("version",1);message.put("type","command");message.put("message_id",row.get("ID"));
             message.put("railing_id",rail.get("NUMBER"));message.put("operation",row.get("OPERATION"));
-            if(((String)row.get("OPERATION")).startsWith("call.") || ((String)row.get("OPERATION")).startsWith("ptt.")){var calls=db.queryForList("SELECT id FROM calls WHERE gateway_id=?",gateway);if(!calls.isEmpty())message.put("call_id",calls.get(0).get("ID"));}
+            if(((String)row.get("OPERATION")).startsWith("call.") || ((String)row.get("OPERATION")).startsWith("ptt.")){
+                var calls=db.queryForList("SELECT id,plc_session FROM calls WHERE gateway_id=?",gateway);
+                if(!calls.isEmpty()){
+                    message.put("call_id",calls.get(0).get("ID"));
+                    if(row.get("OPERATION").equals("call.end")){
+                        // Recovery is termination-only and still requires a correlated device END.
+                        message.put("recover",true);
+                        if(calls.get(0).get("PLC_SESSION")!=null)message.put("session_id",calls.get(0).get("PLC_SESSION"));
+                    }
+                }
+            }
             if(row.get("ARGS")!=null)message.put("value",row.get("ARGS"));
             message.put("expires_at",Instant.ofEpochMilli(((Number)row.get("EXPIRES_AT")).longValue()).toString());
             db.update("UPDATE commands SET status='SENT' WHERE id=?",row.get("ID"));
