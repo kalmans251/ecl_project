@@ -33,7 +33,7 @@ jobs:
         shell: powershell
         run: |
           # Exercise the unchanged user command lifecycle and cached preparation on PS 5.1.
-          mvn -B -ntp test-compile
+          mvn -B -ntp spring-boot:run "-Dspring-boot.run.arguments=--codec-self-test"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path target/classes/win32-x86-64/codec2.dll)) { throw 'Missing native resource' }
       - if: runner.os == 'Linux'

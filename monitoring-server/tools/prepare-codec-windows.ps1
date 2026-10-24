@@ -2,6 +2,10 @@
 param([string]$ProjectDir = (Split-Path $PSScriptRoot -Parent), [string]$Skip = 'false')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+# Maven may inherit PowerShell 7's module path while launching Windows PowerShell 5.1.
+# Load this host's own built-in modules rather than a different edition's modules.
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Utility\Microsoft.PowerShell.Utility.psd1') -Force
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Management\Microsoft.PowerShell.Management.psd1') -Force
 if ($Skip -eq 'true') { exit 0 }
 if (-not [Environment]::Is64BitOperatingSystem) { throw 'Codec2 requires Windows x64.' }
 $revision = '3e347e0b70fc72af9357fbbd32b10a125321d6c5'
