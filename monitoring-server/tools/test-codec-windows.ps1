@@ -1,5 +1,12 @@
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
+$originalPath = $env:PATH
+# GitHub runners have unrelated MinGW tools installed. Hide them to match user PCs.
+$gitBin = Split-Path (Get-Command git.exe).Source -Parent
+$javaBin = Split-Path (Get-Command java.exe).Source -Parent
+$env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$PSHOME;$gitBin;$javaBin"
+try {
+if (Get-Command as.exe -ErrorAction SilentlyContinue) { throw 'Test PATH unexpectedly contains an assembler' }
 $probe = Join-Path $project 'target\probe with spaces'
 New-Item -ItemType Directory -Force -Path (Join-Path $probe 'native') | Out-Null
 Copy-Item (Join-Path $project 'native\NOTICE.md') (Join-Path $probe 'native')
@@ -19,3 +26,5 @@ try {
     & java -jar (Join-Path $project 'target\monitoring-server-0.1.0.jar') --codec-self-test
     if ($LASTEXITCODE -ne 0) { throw 'Rebuilt DLL self-test failed' }
 } finally { $env:CODEC2_LIBRARY = $previous }
+
+} finally { $env:PATH = $originalPath }

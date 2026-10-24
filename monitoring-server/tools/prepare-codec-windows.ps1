@@ -48,7 +48,8 @@ try {
     $archive = Join-Path $cache 'w64devkit-x64-2.5.0.7z.exe'
     $toolDir = Join-Path $cache 'w64devkit-2.5.0'
     $gcc = Join-Path $toolDir 'w64devkit\bin\gcc.exe'
-    if (-not (Test-Path -LiteralPath $gcc)) {
+    $toolBin = Split-Path $gcc -Parent
+    if (@('gcc.exe','as.exe','ld.exe') | Where-Object { -not (Test-Path -LiteralPath (Join-Path $toolBin $_)) }) {
         if (-not (Test-Path -LiteralPath $archive)) {
             Write-Host 'Downloading pinned portable compiler (~40 MB); first run only.'
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -63,7 +64,7 @@ try {
         New-Item -ItemType Directory -Force -Path $toolDir | Out-Null
         # Verified official 7-Zip self-extractor. Quoted output path supports spaces.
         $extract = Start-Process -FilePath $archive -ArgumentList @('-y', ('-o"' + $toolDir + '"')) -Wait -PassThru
-        if ($extract.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $gcc)) { throw 'Portable compiler extraction failed.' }
+        if ($extract.ExitCode -ne 0 -or @('gcc.exe','as.exe','ld.exe').Where({ -not (Test-Path -LiteralPath (Join-Path $toolBin $_)) }).Count -gt 0) { throw 'Portable compiler extraction failed or incomplete.' }
     }
     $source = Join-Path $target 'codec-windows-source'
     if (-not (Test-Path -LiteralPath (Join-Path $source '.git'))) {
@@ -78,7 +79,7 @@ try {
     $sources = @(& git -C $source ls-files 'src/*.c')
     if ($LASTEXITCODE -ne 0 -or $sources.Count -eq 0) { throw 'Codec2 source file list is empty.' }
     $tempDll = Join-Path $dllDir 'codec2-new.dll'
-    $arguments = @('-shared','-O2','-std=gnu11','-fsingle-precision-constant','-static-libgcc',
+    $arguments = @('-B', ($toolBin.Replace('\','/') + '/'), '-shared','-O2','-std=gnu11','-fsingle-precision-constant','-static-libgcc',
         '-Wl,--export-all-symbols','-DCODEC2_MODE_EN_DEFAULT=0','-DCODEC2_MODE_2400_EN=1',
         '-I', (Join-Path $source 'src'), '-o', $tempDll)
     $arguments += @($sources | ForEach-Object { Join-Path $source $_ })
@@ -88,8 +89,13 @@ try {
     $lines = @($arguments | ForEach-Object { '"' + $_.Replace('\','/').Replace('"','\"') + '"' })
     [IO.File]::WriteAllLines($response, $lines, (New-Object Text.UTF8Encoding($false)))
     Write-Host 'Building firmware-pinned Codec2 2400 Windows DLL...'
-    & $gcc "@$response"
-    if ($LASTEXITCODE -ne 0) { throw 'Codec2 compile failed. Server startup stopped.' }
+    # GCC's driver also launches as/ld. An absolute gcc path alone is insufficient.
+    $previousPath = $env:PATH
+    try {
+        $env:PATH = "$toolBin;$previousPath"
+        & $gcc "@$response"
+        if ($LASTEXITCODE -ne 0) { throw 'Codec2 compile failed. Server startup stopped.' }
+    } finally { $env:PATH = $previousPath }
     Move-Item -LiteralPath $tempDll -Destination $dll -Force
     $licenseDir = Join-Path $bundle 'META-INF\codec2'
     New-Item -ItemType Directory -Force -Path (Join-Path $licenseDir 'source') | Out-Null
