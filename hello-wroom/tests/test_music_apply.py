@@ -40,6 +40,10 @@ static bool playlist_manager_get_track_filename(music_group_t g,uint16_t i,char 
  strcpy(out,"a.mp3");return true;
 }
 static bool sd_manager_is_ready(void){return true;}
+static bool playing=true,paused,prepare;
+bool music_player_is_playing(void){return playing;}
+bool music_player_is_paused(void){return paused;}
+void music_player_confirm_prepare(bool value){prepare=value;}
 void music_player_confirm_selection(const uint8_t identity[7]){assert(identity[3]==5);}
 static bool playlist_manager_play_selected(uint32_t v,music_group_t g,uint16_t i){
  assert(v==5 && g==0 && i==0);selections++;return queue_ok;
@@ -89,6 +93,7 @@ int main(void) {
  assert(reply_len==19 && response[5]==0 && response[13]==5 && !memcmp(response+14,"a.mp3",5));
  f.payload[8]=4;handle_music_apply(&f);assert(reply_len==7 && response[5]==1);
  f.payload[8]=5;f.payload[4]=CMD_MUSIC_PLAY;queue_ok=true;before=replies;
+ playing=false;handle_music_apply(&f);assert(prepare);playing=true;paused=true;handle_music_apply(&f);assert(prepare);paused=false;handle_music_apply(&f);assert(!prepare);selections=0;
  handle_music_apply(&f);assert(selections==1 && replies==before);
  f.payload[8]=4;handle_music_apply(&f);assert(selections==1 && response[5]==1);
  f.payload[8]=5;f.payload[11]=1;handle_music_apply(&f);assert(selections==1 && response[5]==1);

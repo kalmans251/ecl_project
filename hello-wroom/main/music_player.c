@@ -90,6 +90,7 @@ typedef struct
 {
     player_command_type_t type;
     bool confirm_stop;
+    bool prepare_only;
     bool confirm_operation;
     uint8_t confirm_op;
     uint8_t confirm_rail;
@@ -124,6 +125,11 @@ void music_player_confirm_selection(const uint8_t identity[7]) {
     portENTER_CRITICAL(&s_confirm_mux);
     if (s_confirm_owner == xTaskGetCurrentTaskHandle())
         memcpy(s_confirm_context.selection, identity, 7);
+    portEXIT_CRITICAL(&s_confirm_mux);
+}
+void music_player_confirm_prepare(bool prepare) {
+    portENTER_CRITICAL(&s_confirm_mux);
+    if(s_confirm_owner==xTaskGetCurrentTaskHandle())s_confirm_context.prepare_only=prepare;
     portEXIT_CRITICAL(&s_confirm_mux);
 }
 bool music_player_confirm_end(void) {
@@ -1373,12 +1379,21 @@ static play_result_t play_mp3_file(
                     true;
 
 
-                set_player_state(MUSIC_PLAYER_PLAYING);
-
-
-                send_music_event(
-                    MUSIC_EVENT_STARTED
-                );
+                if(s_start_confirmation.prepare_only) {
+                    s_start_confirmation.prepare_only=false;
+                    paused=true;
+                    set_player_state(MUSIC_PLAYER_PAUSED);
+                    /* File, decoder, first PCM and I2S are ready, but no PCM
+                     * may reach the speaker before explicit RESUME/START. */
+                    confirm_operation(&s_start_confirmation,0,MUSIC_PLAYER_PAUSED);
+                    send_music_event(MUSIC_EVENT_PAUSED);
+                    wait_while_paused(&paused,&stop_requested,&restart_requested,
+                                      restart_path,restart_path_size);
+                    if(stop_requested || restart_requested)break;
+                } else {
+                    set_player_state(MUSIC_PLAYER_PLAYING);
+                    send_music_event(MUSIC_EVENT_STARTED);
+                }
 
 
                 ESP_LOGI(

@@ -56,7 +56,7 @@ final class MusicCommands {
                     || !track.path("index").isInt() || track.path("index").intValue()!=index++ || !filename(track.path("filename"))) throw Accounts.bad("Invalid track");
             }
         } else if(!status.equals("APPLIED") || data.size()!=7 || data.path("catalog_version").asLong()!=choice.version()
-            || !data.path("index").isInt() || data.path("index").intValue()!=choice.index() || !data.path("state").asText().equals("playing")
+            || !data.path("index").isInt() || data.path("index").intValue()!=choice.index() || !Set.of("playing","paused").contains(data.path("state").asText())
             || !data.path("device_application_confirmed").isBoolean() || !data.path("device_application_confirmed").booleanValue()
             || !filename(data.path("filename"))) throw Accounts.bad("Selected track not confirmed");
     }

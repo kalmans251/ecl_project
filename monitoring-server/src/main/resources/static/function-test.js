@@ -48,7 +48,7 @@ function render(){
 }
 function renderMusic(){
  const r=items().length===1?items()[0]:null,d=musicDisplay(r?.music_status,r?.online,performance.now()-received);
- $('musicNow').textContent=r?`${d.filename} · ${d.state} · ${Math.floor((d.positionMs||0)/1000)}초 / ${d.durationMs?Math.floor(d.durationMs/1000)+'초':'길이 미확인'} · ${d.fresh?'최신 수신':'오래된 정보 / 미수신'}`:'난간 하나를 선택하세요.';
+ $('musicNow').textContent=r?`${d.filename} · ${({playing:"재생 중",paused:"일시정지 / 재생 대기",idle:"정지"})[d.state]||d.state} · ${Math.floor((d.positionMs||0)/1000)}초 / ${d.durationMs?Math.floor(d.durationMs/1000)+'초':'길이 미확인'} · ${d.fresh?'최신 수신':'오래된 정보 / 미수신'}`:'난간 하나를 선택하세요.';
  $('seek').disabled=!(writable()&&r&&d.fresh&&d.seekable&&d.state==='playing'&&d.durationMs);
 }
 function renderResults(rows){
