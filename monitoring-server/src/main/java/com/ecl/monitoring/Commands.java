@@ -180,12 +180,22 @@ public class Commands {
         var rows=db.queryForList("SELECT * FROM commands WHERE id=? AND gateway_id=?",node.path("message_id").asText(),gateway);
         if(rows.isEmpty())throw Accounts.bad("Unknown call request");
         var row=rows.get(0);String op=(String)row.get("OPERATION"),status=node.path("status").asText();
-        if(!Set.of("call.start","call.end","ptt.on","ptt.off").contains(op) || !Set.of("APPLIED","FAILED","UNKNOWN","EXPIRED").contains(status))throw Accounts.bad("Invalid call operation/status");
+        if(!Set.of("call.start","call.end","ptt.on","ptt.off").contains(op) || !Set.of("APPLIED","FAILED","UNKNOWN","EXPIRED","NOT_STARTED").contains(status))throw Accounts.bad("Invalid call operation/status");
         if(!Set.of("SENT","RECEIVED").contains(row.get("STATUS")))return;
         var calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=? AND rail_id=?",gateway,row.get("RAIL_ID"));
         if(calls.isEmpty())throw Accounts.bad("No reserved call");
         String expected=op.equals("call.end")?"IDLE":op.equals("ptt.on")?"CONTROL_TX":"FIELD_TX";
         var data=node.path("data");
+        if(status.equals("NOT_STARTED")){
+            var rail=registry.rail((String)row.get("RAIL_ID"));
+            if(!op.equals("call.start") || calls.get(0).get("PLC_SESSION")!=null ||
+               data.size()!=3 || !data.path("call_id").asText().equals(calls.get(0).get("ID")) ||
+               !data.path("railing_id").isInt() || data.path("railing_id").asInt()!=((Number)rail.get("NUMBER")).intValue() ||
+               !data.path("epoch").asText().equals(row.get("ID")))throw Accounts.bad("Invalid not-started proof");
+            db.update("UPDATE commands SET status='FAILED',detail='Pi rejected call before PLC execution; check --web-voice and local call state' WHERE id=?",row.get("ID"));
+            db.update("DELETE FROM calls WHERE gateway_id=? AND id=?",gateway,data.path("call_id").asText());
+            return;
+        }
         if(status.equals("APPLIED")){
             var rail=registry.rail((String)row.get("RAIL_ID"));
             if(data.size()!=5 || !data.path("call_id").asText().equals(calls.get(0).get("ID")) ||

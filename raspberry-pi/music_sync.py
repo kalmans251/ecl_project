@@ -164,6 +164,13 @@ class MusicPublisher:
                 if message.get('type')=='voice' and self.calls:
                     if not incoming.full(): incoming.put_nowait((time.monotonic(),message))
                     continue
+                if message.get('type')=='command' and message.get('operation')=='call.start' and not self.calls:
+                    LOG.warning('Web call not started: restart main.py with --web-voice')
+                    await ws.send(json.dumps(dict(version=1,type='call_result',
+                        message_id=message['message_id'],status='NOT_STARTED',
+                        data=dict(call_id=message.get('call_id'),railing_id=message.get('railing_id'),
+                                  epoch=message['message_id']))))
+                    continue
                 handler = self.calls if message.get('operation') in CALLS else self.remote
                 supported = CALLS if handler is self.calls and self.calls else ({'music.list','music.play','music.seek'} | OPERATIONS)
                 if message.get('type')=='command' and message.get('operation') in supported and handler:

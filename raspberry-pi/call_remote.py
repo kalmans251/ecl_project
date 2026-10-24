@@ -3,6 +3,7 @@ import base64
 from datetime import datetime
 import hashlib
 import json
+import logging
 import queue
 import sqlite3
 import threading
@@ -10,6 +11,8 @@ import time
 import uuid
 from protocol import AudioDirection, Codec2Mode
 from voice.packet import VoicePacket
+
+LOG = logging.getLogger('call.remote')
 
 OPERATIONS = frozenset(('call.start', 'call.end', 'ptt.on', 'ptt.off'))
 
@@ -39,6 +42,7 @@ class CallRemote:
                 return dict(result, status='EXPIRED')
         except (KeyError, TypeError, ValueError, AttributeError):
             return result
+        LOG.info('Web call request rail=%s operation=%s call=%s', rail, op, call_id)
         deadline = time.monotonic()+ttl
         def guard():
             if not connected() or time.monotonic() >= deadline:
@@ -51,9 +55,17 @@ class CallRemote:
                 return json.loads(old[1]) if old[1] else dict(result, status='UNKNOWN')
             binding = db.execute('SELECT rail,session,epoch,ended FROM web_calls WHERE id=?', (call_id,)).fetchone()
             if op == 'call.start':
-                if db.execute('SELECT COUNT(*) FROM web_calls').fetchone()[0]>=10000: return result
-                if binding or any(s['call']['phase'] not in ('idle','ended') for s in self.states.snapshot().values()):
-                    return result
+                if binding:
+                    return result  # Existing call identity must never release a reservation.
+                if (db.execute('SELECT COUNT(*) FROM web_calls').fetchone()[0]>=10000 or
+                    any(s['call']['phase'] not in ('idle','ended') for s in self.states.snapshot().values())):
+                    # Durable proof that this NEW web call never reached AudioManager/PLC.
+                    rejected = dict(result, status='NOT_STARTED', data=dict(
+                        call_id=call_id, railing_id=rail, epoch=ident))
+                    db.execute('INSERT INTO requests VALUES(?,?,?,?)',
+                               (ident,fingerprint,expiry,json.dumps(rejected)))
+                    LOG.warning('Web call rejected before execution rail=%s; local call unresolved or journal full', rail)
+                    return rejected
             elif not binding or binding[0] != rail:
                 return result
             db.execute('DELETE FROM requests WHERE expires<?', (time.time()-86400,))
@@ -96,8 +108,16 @@ class CallRemote:
             with self.lock:
                 self.current = (call_id,rail,session,ident,direction) if direction!='IDLE' else None
             result.update(status='APPLIED', data=dict(call_id=call_id,railing_id=rail,session_id=session,direction=direction,epoch=ident))
-        except (ValueError, RuntimeError, OSError, sqlite3.Error):
+        except (ValueError, RuntimeError, OSError, sqlite3.Error) as exc:
+            LOG.warning('Web call failed rail=%s operation=%s: %s', rail, op, exc)
             result['status'] = 'UNKNOWN'
+            if op == 'call.start':
+                with sqlite3.connect(self.path) as db:
+                    reserved = db.execute('SELECT 1 FROM web_calls WHERE id=?', (call_id,)).fetchone()
+                # AudioManager invokes reserved() before any START transmission.
+                if not reserved:
+                    result.update(status='NOT_STARTED', data=dict(
+                        call_id=call_id, railing_id=rail, epoch=ident))
             self.disconnect()
         with sqlite3.connect(self.path) as db:
             db.execute('UPDATE requests SET result=? WHERE id=?', (json.dumps(result),ident))

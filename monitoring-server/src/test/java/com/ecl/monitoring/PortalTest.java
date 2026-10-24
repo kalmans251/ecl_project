@@ -63,6 +63,30 @@ class PortalTest {
   }
   public void close(){ws.sendClose(1000,"done").join();}
  }
+ @Test void rejectedStartReleasesReservationButUnknownKeepsHangup()throws Exception{
+  var b=new Browser("admin");String rail=rail();
+  try(var device=new Device()){
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());
+   var start=json.readTree(device.next());
+   var proof=Map.of("call_id",start.path("call_id").asText(),"railing_id",1,"epoch",start.path("message_id").asText());
+   var reply=Map.of("version",1,"type","call_result","message_id",start.path("message_id").asText(),"status","NOT_STARTED","data",proof);
+   var wrong=new HashMap<String,Object>(proof);wrong.put("epoch",UUID.randomUUID().toString());
+   var invalid=new HashMap<String,Object>(reply);invalid.put("data",wrong);
+   assertThrows(RuntimeException.class,()->commands.callResult("gateway-01",json.valueToTree(invalid)));
+   assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
+   commands.callResult("gateway-01",json.valueToTree(reply));
+   assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());
+   var next=json.readTree(device.next());
+   var unknown=new HashMap<String,Object>();unknown.put("version",1);unknown.put("type","call_result");unknown.put("message_id",next.path("message_id").asText());unknown.put("status","UNKNOWN");unknown.put("data",null);
+   commands.callResult("gateway-01",json.valueToTree(unknown));
+   assertEquals("UNKNOWN",db.queryForObject("SELECT status FROM calls",String.class));
+   assertEquals(409,b.request("/api/portal/commands","POST",command(rail,"volume","20"),true).statusCode());
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.end",null),true).statusCode());
+   device.callAck(json.readTree(device.next()));
+   assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls",Integer.class));
+  }
+ }
  @Test void commandDedupQueueAndCallOwnership()throws Exception{
   String owner=newUser("owner","OPERATOR"),other=newUser("other","OPERATOR");var b=new Browser(owner);var o=new Browser(other);String rail=rail();
   try(var device=new Device()){

@@ -80,3 +80,19 @@ class MusicSyncTests(unittest.TestCase):
         asyncio.run(publisher._run(connect))
         self.assertEqual(sent[0]['type'], 'music_state')
         self.assertEqual(sent[1], dict(version=1, type='ack', message_id='request-1', status='FAILED'))
+
+    def test_web_call_without_web_voice_reports_not_started(self):
+        import asyncio, json
+        publisher=MusicPublisher('wss://monitor.example/ws/gateways/pi-1','secret')
+        sent=[]
+        class Socket:
+            async def recv(self):
+                publisher.stop.set()
+                return json.dumps(dict(type='command',operation='call.start',
+                    message_id='request',call_id='call',railing_id=1))
+            async def send(self,raw): sent.append(json.loads(raw))
+        import threading
+        alive=threading.Event();alive.set()
+        asyncio.run(publisher._connection(Socket(),alive))
+        self.assertEqual('NOT_STARTED',sent[0]['status'])
+        self.assertEqual(dict(call_id='call',railing_id=1,epoch='request'),sent[0]['data'])
