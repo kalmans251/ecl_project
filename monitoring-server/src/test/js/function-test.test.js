@@ -17,3 +17,21 @@ test('unknown owned call keeps hangup enabled',()=>{
  const a=app();a.run(`view.calls=[{RAIL_ID:'a',OWNED:true,STATUS:'UNKNOWN'}];renderCall();`);
  assert.equal(a.elements.callEnd.disabled,false);assert.equal(a.elements.pttOn.disabled,true);
 });
+test('microphone preparation excludes poll media sync and duplicate controls',async()=>{
+ const a=app();let release;const gate=new Promise(r=>release=r);let syncs=0,posts=0;
+ a.context.gate=gate;a.context.sync=()=>syncs++;a.context.post=()=>posts++;
+ a.run(`site='s';view.calls=[{RAIL_ID:'a',OWNED:true,STATUS:'ACTIVE',DIRECTION:'FIELD_TX'}];
+ webVoice={close(){},prepare:async()=>{},mic:()=>gate,sync};
+ api=async(p,m)=>{if(m==='POST'){post();return [{id:'cmd',status:'APPLIED'}];}return {...view,calls:[{RAIL_ID:'a',OWNED:true,STATUS:'ACTIVE',DIRECTION:'CONTROL_TX'}]};};`);
+ const pending=a.run(`callControl('ptt.on')`);await new Promise(r=>setImmediate(r));
+ await a.run('refresh()');assert.equal(syncs,0);assert.equal(a.run('writable()'),false);
+ await assert.rejects(a.run(`callControl('ptt.off')`),/기다려/);
+ await assert.rejects(a.run(`send('led','off')`));
+ release();await pending;assert.equal(posts,1);assert.equal(syncs,1);assert.equal(a.run('callChanging'),false);
+});
+test('failed microphone preparation releases transition and restores listening without PTT',async()=>{
+ const a=app();let syncs=0;a.context.sync=()=>syncs++;
+ a.run(`webVoice={close(){},prepare:async()=>{},mic:async()=>{throw Error('permission denied');},sync};refresh=async()=>{};send=async()=>{throw Error('must not send');};`);
+ await assert.rejects(a.run(`callControl('ptt.on')`),/permission denied/);
+ assert.equal(a.run('callChanging'),false);assert.equal(syncs,1);
+});

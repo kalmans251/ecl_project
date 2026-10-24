@@ -1,7 +1,7 @@
 'use strict';
 let webVoice;
 const $=id=>document.getElementById(id), pending=new Set(['QUEUED','SENT','RECEIVED']);
-let csrf, me, view=null, site='', selected=new Set(), busy=false, loading=false, epoch=0, page=null, received=-Infinity;
+let csrf, me, view=null, site='', selected=new Set(), busy=false, callChanging=false, loading=null, epoch=0, page=null, received=-Infinity;
 const sections=[
  ['장치 조회','query',[['p4','P4 조회'],['wroom','WROOM 조회'],['s3','S3 조회']]],
  ['전원','power',[['ac','AC 선택 + 켜기'],['battery','배터리 선택 + 켜기'],['on','켜기'],['off','끄기']]],
@@ -17,7 +17,7 @@ const sections=[
 ];
 function notice(s){$('notice').textContent=s;}
 function items(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
-function writable(){return !!view && view.role!=='VIEWER' && items().length>0 && items().every(r=>r.online) && !busy;}
+function writable(allowCall=false){return !!view && view.role!=='VIEWER' && items().length>0 && items().every(r=>r.online) && !busy && (!callChanging||allowCall);}
 function one(){const rows=items();if(rows.length!==1)throw Error('난간 하나만 선택하세요.');return rows[0];}
 async function api(path,method='GET',data){
  const headers={};if(method!=='GET'){headers[csrf.header]=csrf.token;headers['Content-Type']='application/json';}
@@ -36,8 +36,8 @@ function build(){
 }
 function resetPage(){page=null;$('track').replaceChildren();$('page').textContent='목록 미조회';}
 function render(){
- $('site').disabled=busy; $('rails').replaceChildren();
- for(const r of view?.rails||[]){const b=document.createElement('button');b.textContent=`${r.name} · ${r.gateway_id}/${r.number} · ${r.online?'Pi 연결':'오프라인'}`;b.setAttribute('aria-pressed',String(selected.has(r.id)));b.disabled=busy;b.onclick=()=>{if(selected.has(r.id))selected.delete(r.id);else selected.add(r.id);resetPage();render();};$('rails').append(b);}
+ $('site').disabled=busy||callChanging; $('rails').replaceChildren();
+ for(const r of view?.rails||[]){const b=document.createElement('button');b.textContent=`${r.name} · ${r.gateway_id}/${r.number} · ${r.online?'Pi 연결':'오프라인'}`;b.setAttribute('aria-pressed',String(selected.has(r.id)));b.disabled=busy||callChanging;b.onclick=()=>{if(selected.has(r.id))selected.delete(r.id);else selected.add(r.id);resetPage();render();};$('rails').append(b);}
  $('target').textContent=items().length?'선택: '+items().map(r=>r.name).join(', '):'난간을 선택하세요.';
  $('connection').textContent=view?`권한: ${view.role} · 상태 조회: ${new Date().toLocaleTimeString()}`:'상태 조회 실패 또는 현장 없음';
  $('raw').textContent=JSON.stringify(items().map(r=>({name:r.name,gateway_online:r.online,seen_at:r.seen_at,reported:r.reported,music_status:r.music_status})),null,2);
@@ -54,10 +54,15 @@ function renderMusic(){
 function renderResults(rows){
  $('results').replaceChildren();for(const c of rows){const tr=document.createElement('tr');for(const v of [new Date(c.created_at).toLocaleTimeString(),view?.rails.find(r=>r.id===c.rail_id)?.name||c.rail_id,c.operation+(c.value?' '+c.value:''),c.status,(c.detail||'')+'\n'+(c.result?JSON.stringify(c.result,null,2):'')]){const td=document.createElement('td');td.textContent=v;tr.append(td);}$('results').append(tr);}
 }
-async function refresh(){
- if(loading||!site)return;loading=true;const token=epoch,requested=site;
+function refresh(){
+ if(!site)return Promise.resolve();
+ if(loading)return loading;
+ loading=refreshState().finally(()=>{loading=null;});return loading;
+}
+async function refreshState(){
+ const token=epoch,requested=site;
  try{const next=await api(`/api/portal/sites/${encodeURIComponent(requested)}/state`);if(token!==epoch)return;view=next;received=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));render();if(!busy)renderResults(view.commands||[]);}
- catch(e){if(token===epoch){view=null;received=-Infinity;resetPage();render();notice('상태 조회 실패: '+e.message);}throw e;}finally{loading=false;}
+ catch(e){if(token===epoch){view=null;received=-Infinity;resetPage();render();notice('상태 조회 실패: '+e.message);}throw e;}
 }
 async function waitResults(rows,limit){
  const deadline=performance.now()+limit;let latest=rows;
@@ -66,8 +71,8 @@ async function waitResults(rows,limit){
  if(performance.now()>=deadline)throw Error('응답 대기 종료 · 적용 여부 불명. 상태 새로고침으로 결과를 확인하세요.');
  await new Promise(resolve=>setTimeout(resolve,500));}
 }
-async function send(operation,value=null){
- if(!writable())throw Error(busy?'이전 명령 응답을 기다리는 중입니다.':'난간 선택·연결·제어 권한을 확인하세요.');
+async function send(operation,value=null,allowCall=false){
+ if(!writable(allowCall))throw Error(busy?'이전 명령 응답을 기다리는 중입니다.':'난간 선택·연결·제어 권한을 확인하세요.');
  const targets=items().map(r=>r.id);busy=true;render();notice(`${operation} 전송 중…`);
  try{const rows=await api('/api/portal/commands','POST',{request_id:crypto.randomUUID(),rail_ids:targets,operation,value});
  notice(`${operation} 접수 · 장치 응답 대기`);const results=await waitResults(rows,operation==='music.list'?55000:operation.startsWith('call.')||operation.startsWith('ptt.')?65000:22000);
@@ -88,13 +93,22 @@ function renderCall(){
  $('callEnd').disabled=!single||!call?.OWNED;
  $('pttOn').disabled=!single||!call?.OWNED||call.STATUS!=='ACTIVE'||!view.voice_available;
  $('pttOff').disabled=!single||!call?.OWNED||call.STATUS!=='ACTIVE';
- if(webVoice && !busy)guarded(()=>webVoice.sync(call,view?.voice_available));
+ if(webVoice && !busy && !callChanging)guarded(()=>webVoice.sync(call,view?.voice_available));
 }
 async function callControl(op){
- one();webVoice.close();
- if(op!=='call.end')await webVoice.prepare();
- if(op==='ptt.on')await webVoice.mic();
- try{await send(op);}finally{await refresh();}
+ if(callChanging||busy)throw Error('이전 통화 전환을 기다려 주세요.');
+ one();callChanging=true;render();webVoice.close();
+ try{
+  if(op!=='call.end')await webVoice.prepare();
+  if(op==='ptt.on')await webVoice.mic();
+  await send(op,null,true);
+ }finally{
+  try{
+   // An older poll may still be in flight. Fetch again after it settles.
+   if(loading)await loading.catch(()=>{});
+   await refresh();
+  }finally{callChanging=false;render();}
+ }
 }
 async function changeSite(){epoch++;site=$('site').value;view=null;selected.clear();resetPage();render();await refresh();}
 async function init(){webVoice=new WebVoice(notice);build();render();csrf=await api('/api/auth/csrf');me=await api('/api/portal/me');$('account').textContent=`${me.user.NAME} (${me.user.USERNAME})`;
@@ -104,6 +118,6 @@ async function init(){webVoice=new WebVoice(notice);build();render();csrf=await 
  window.addEventListener('pagehide',()=>webVoice.close());
  $('list').onclick=()=>guarded(()=>list());$('prev').onclick=()=>guarded(()=>list(page.offset-8));$('next').onclick=()=>guarded(()=>list(page.offset+8));$('play').onclick=()=>guarded(play);$('seek').onclick=()=>guarded(seek);
  await refresh();notice(site?'난간을 선택한 뒤 테스트할 버튼을 누르세요.':'등록된 현장이 없습니다. 기존 모니터링의 관리 메뉴에서 현장·난간을 등록하세요.');
- setInterval(()=>{if($('auto').checked&&!busy)guarded(refresh);},2000);setInterval(renderMusic,1000);
+ setInterval(()=>{if($('auto').checked&&!busy&&!callChanging)guarded(refresh);},2000);setInterval(renderMusic,1000);
 }
 if(typeof module!=='undefined')module.exports={sections};else guarded(init);
