@@ -9,3 +9,11 @@ test('busy blocks another request and request keeps original rail',async()=>{con
 test('music play uses catalog identity and rejects empty selection',async()=>{const a=app(),sent=[];a.context.capture=x=>sent.push(x);a.run(`page={catalog_version:123,group:'20',tracks:[{index:2}]};$('track').value='2';api=async(p,m,d)=>{capture(d);return [{id:'1',rail_id:'a',status:'APPLIED'}];};refresh=async()=>{};`);await a.run('play()');assert.equal(sent[0].value,'123:20:2');assert.equal(sent[0].operation,'music.play');a.run(`$('track').value=''`);await assert.rejects(a.run('play()'),/선택/);});
 test('seek rejects stale state and sends playback ID with milliseconds',async()=>{const a=app(),sent=[];a.context.capture=x=>sent.push(x);a.run(`view.rails[0].music_status={available:true,fresh:true,fresh_ms:10000,age_ms:0,seekable:true,state:'playing',duration_ms:90000,playback_id:42};$('seconds').value='10';`);await assert.rejects(a.run('seek()'),/최신/);a.run(`received=performance.now();api=async(p,m,d)=>{capture(d);return [{id:'1',rail_id:'a',status:'APPLIED'}];};refresh=async()=>{};`);await a.run('seek()');assert.equal(sent[0].value,'42:10000');});
 test('failed state refresh disables controls and clears catalog',async()=>{const a=app();a.run(`site='s';page={tracks:[]};api=async()=>{throw Error('offline');};`);await assert.rejects(a.run('refresh()'),/offline/);assert.equal(a.run('writable()'),false);assert.equal(a.run('page'),null);});
+test('hangup bypasses broken browser audio and refreshes failed call state',async()=>{
+ const a=app();a.run(`webVoice={close(){},prepare(){throw Error('audio unavailable');}};send=async(op)=>{if(op!=='call.end')throw Error('wrong op');throw Error('unconfirmed');};refresh=async()=>{globalThis.refreshed=true;};`);
+ await assert.rejects(a.run(`callControl('call.end')`),/unconfirmed/);assert.equal(a.context.refreshed,true);
+});
+test('unknown owned call keeps hangup enabled',()=>{
+ const a=app();a.run(`view.calls=[{RAIL_ID:'a',OWNED:true,STATUS:'UNKNOWN'}];renderCall();`);
+ assert.equal(a.elements.callEnd.disabled,false);assert.equal(a.elements.pttOn.disabled,true);
+});

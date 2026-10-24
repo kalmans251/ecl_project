@@ -56,7 +56,7 @@ class WebCallTests(unittest.TestCase):
     def test_expired_or_disconnected_never_transmits(self):
         message=self.message('call.start');message['expires_at']='2000-01-01T00:00:00+00:00'
         self.assertEqual('EXPIRED',self.remote.handle(message)['status']);self.assertFalse(self.bus.sent)
-        self.assertEqual('UNKNOWN',self.remote.handle(self.message('call.start'),lambda:False)['status']);self.assertFalse(self.bus.sent)
+        self.assertEqual('NOT_STARTED',self.remote.handle(self.message('call.start'),lambda:False)['status']);self.assertFalse(self.bus.sent)
     def test_uncertain_start_is_never_replayed(self):
         self.bus.callback=lambda f:None
         message=self.message('call.start');self.assertEqual('UNKNOWN',self.remote.handle(message)['status'])
@@ -68,3 +68,17 @@ class WebCallTests(unittest.TestCase):
         relay=VoiceRelay(self.bus,fresh);remote=CallRemote(audio,relay,fresh,[1],self.remote.path)
         self.bus.callback=lambda f:audio.handle_frame(event(session=int.from_bytes(f.payload,'big'),kind=AudioEvent.CALL_ENDED))
         self.assertEqual('APPLIED',remote.handle(self.message('call.end'))['status'])
+    def test_preflight_rejection_is_durable_and_never_replayed(self):
+        self.states.reserve_call(1)
+        message=self.message('call.start')
+        result=self.remote.handle(message)
+        self.assertEqual('NOT_STARTED',result['status'])
+        self.assertEqual(self.cid,result['data']['call_id'])
+        self.assertFalse(self.bus.sent)
+        self.states.call_ended(1,session_id=self.states.snapshot(1)['call']['session_id'])
+        self.assertEqual(result,self.remote.handle(message))
+        self.assertFalse(self.bus.sent)
+
+    def test_existing_binding_rejection_cannot_release_call(self):
+        self.assertEqual('APPLIED',self.remote.handle(self.message('call.start'))['status'])
+        self.assertEqual('FAILED',self.remote.handle(self.message('call.start'))['status'])

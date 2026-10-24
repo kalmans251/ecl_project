@@ -72,7 +72,7 @@ async function send(operation,value=null){
  try{const rows=await api('/api/portal/commands','POST',{request_id:crypto.randomUUID(),rail_ids:targets,operation,value});
  notice(`${operation} 접수 · 장치 응답 대기`);const results=await waitResults(rows,operation==='music.list'?55000:operation.startsWith('call.')||operation.startsWith('ptt.')?65000:22000);
  const fail=results.filter(r=>!['APPLIED','COMPLETED'].includes(r.status));
- if(fail.length)throw Error(fail.map(r=>`${view?.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id}: ${r.status}`).join(' / '));
+ if(fail.length)throw Error(fail.map(r=>`${view?.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id}: ${r.status}${r.detail?' · '+r.detail:''}`).join(' / '));
  notice(results.map(r=>`${view?.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id}: ${r.status==='APPLIED'?'장치 적용 확인':r.detail||'응답 확인'}`).join(' / '));return results;
  }catch(e){resetPage();throw Error(e.message+' · 자동 재전송하지 않습니다.');}finally{busy=false;render();}
 }
@@ -84,16 +84,17 @@ function selectedCall(){return (view?.calls||[]).find(c=>items().some(r=>r.id===
 function renderCall(){
  const call=selectedCall(),single=writable()&&items().length===1;
  $('callState').textContent=call?`${call.STATUS} · ${call.DIRECTION} · ${call.OWNED?'내 통화':'다른 운영자 통화'}`:view?.voice_available?'통화 없음':'서버 Codec2 라이브러리 로드 실패';
- $('callStart').disabled=!single||!!call;
+ $('callStart').disabled=!single||!!call||!view.voice_available;
  $('callEnd').disabled=!single||!call?.OWNED;
  $('pttOn').disabled=!single||!call?.OWNED||call.STATUS!=='ACTIVE'||!view.voice_available;
  $('pttOff').disabled=!single||!call?.OWNED||call.STATUS!=='ACTIVE';
  if(webVoice && !busy)guarded(()=>webVoice.sync(call,view?.voice_available));
 }
 async function callControl(op){
- one();webVoice.close();await webVoice.prepare();
+ one();webVoice.close();
+ if(op!=='call.end')await webVoice.prepare();
  if(op==='ptt.on')await webVoice.mic();
- await send(op);await refresh();
+ try{await send(op);}finally{await refresh();}
 }
 async function changeSite(){epoch++;site=$('site').value;view=null;selected.clear();resetPage();render();await refresh();}
 async function init(){webVoice=new WebVoice(notice);build();render();csrf=await api('/api/auth/csrf');me=await api('/api/portal/me');$('account').textContent=`${me.user.NAME} (${me.user.USERNAME})`;
