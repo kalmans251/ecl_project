@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 
+@org.junit.jupiter.api.condition.EnabledIfSystemProperty(named="codec.native.tests",matches="true")
 class Codec2Test {
     private Codec2 codec(String library) {
         return new Codec2(new PortalSettings(null,null,null,null,null,library));

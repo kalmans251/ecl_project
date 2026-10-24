@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 /** In-process Codec2 2400. Native pointers never leave this synchronized owner. */
 @Component
+@org.springframework.context.annotation.Lazy
 public final class Codec2 implements AutoCloseable {
     interface Api extends Library {
         Pointer codec2_create(int mode);
