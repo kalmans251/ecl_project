@@ -1,6 +1,7 @@
 # Windows PowerShell 5.1 compatible. No administrator installation or persistent PATH changes.
 param([string]$ProjectDir = (Split-Path $PSScriptRoot -Parent), [string]$Skip = 'false')
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 Set-StrictMode -Version Latest
 # Maven may inherit PowerShell 7's module path while launching Windows PowerShell 5.1.
 # Load this host's own built-in modules rather than a different edition's modules.
