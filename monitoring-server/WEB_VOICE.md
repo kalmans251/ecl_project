@@ -151,3 +151,12 @@ pages (Ctrl+F5); older pages using bare PCM are not compatible. Verify that one
 server `VOICE bound` messages share a socket ID with changing epochs. End the
 call to close the socket. UNKNOWN, logout, permission loss, or transport failure
 still close the media connection; physical playback requires an on-device test.
+
+Operator PCM arrival jitter is tolerated with a three-packet token bucket,
+refilling one packet per 160 ms (6.25 packets/second). A 91 ms arrival gap alone
+no longer closes the socket. Excess packets beyond this allowance are dropped
+before encoding/forwarding, without an unbounded queue or a forced hangup;
+`VOICE excess PCM dropped` is logged at most once per five seconds. Direction
+rebind resets the allowance only when the confirmed epoch changes. Sustained
+excess or network stalls can still cause audible gaps; successful socket writes
+do not confirm speaker playback.

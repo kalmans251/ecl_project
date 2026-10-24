@@ -46,7 +46,7 @@ public class Voice extends AbstractWebSocketHandler {
                 if(peers.get(peer.callId())!=peer)return;
                 if(!epoch.equals(peer.epoch())){
                     codec.release(peer.callId());
-                    for(String key:List.of("field_sequence","last_pcm","sequence"))peer.session().getAttributes().remove(key);
+                    for(String key:List.of("field_sequence","voice_rate","rate_dropped","rate_log_at","sequence"))peer.session().getAttributes().remove(key);
                     peers.put(peer.callId(),new Peer(peer.session(),peer.username(),peer.callId(),epoch));
                 }
                 peer.session().sendMessage(new TextMessage(json.writeValueAsString(Map.of("type","ready","epoch",epoch,"direction",direction))));
@@ -68,7 +68,20 @@ public class Voice extends AbstractWebSocketHandler {
             var call=owned(peer.username(),peer.callId());if(!active(peer,call))return;if(message.getPayloadLength()!=2596)throw new IllegalArgumentException("Expected epoch + PCM");
             byte[] tag=new byte[36];message.getPayload().get(tag);if(!peer.epoch().equals(new String(tag,java.nio.charset.StandardCharsets.US_ASCII)))return;
             if(!call.get("DIRECTION").equals("CONTROL_TX"))throw new IllegalArgumentException("Not speaking");
-            long now=System.nanoTime();synchronized(session){var last=(Long)session.getAttributes().get("last_pcm");if(last!=null&&now-last<100_000_000L)throw new IllegalArgumentException("Voice rate exceeded: interval_ms="+((now-last)/1_000_000L));session.getAttributes().put("last_pcm",now);}
+            long now=System.nanoTime();
+            synchronized(session){
+                var limiter=(VoiceRateLimit)session.getAttributes().computeIfAbsent("voice_rate",key->new VoiceRateLimit());
+                if(!limiter.allow(now)){
+                    long dropped=((Number)session.getAttributes().getOrDefault("rate_dropped",0L)).longValue()+1;
+                    session.getAttributes().put("rate_dropped",dropped);
+                    var logged=(Long)session.getAttributes().get("rate_log_at");
+                    if(logged==null||now-logged>=5_000_000_000L){
+                        LOG.warn("VOICE excess PCM dropped call={} packets={}; connection retained",peer.callId(),dropped);
+                        session.getAttributes().put("rate_log_at",now);
+                    }
+                    return;
+                }
+            }
             byte[] pcm=new byte[2560];message.getPayload().get(pcm);
             long count=((Number)session.getAttributes().getOrDefault("pcm_count",0L)).longValue()+1;session.getAttributes().put("pcm_count",count);
             if(count==1||count%25==0)LOG.info("VOICE PCM received call={} packets={} bytes={} peak={}",peer.callId(),count,pcm.length,peak(pcm));
