@@ -23,7 +23,7 @@ mvn spring-boot:run
 Windows용 Maven 프로파일이 자동 활성화되어 최초 실행 시 약 40 MB의
 w64devkit 2.5.0을 공식 GitHub에서 내려받고 고정 SHA-256을 검증한 뒤 압축을 풉니다.
 관리자 권한, CMake/Ninja/MSYS2 수동 설치, Actions 아티팩트 수동 다운로드는 필요 없습니다.
-컴파일러는 `%LOCALAPPDATA%/ecl-monitoring-tools`에 보관하고 시스템 PATH는 변경하지 않습니다.
+컴파일러는 `%LOCALAPPDATA%/ecl-monitoring-tools`에 보관합니다. 컴파일 중에만 해당 도구 경로를 임시 PATH에 추가하여 `as.exe`/`ld.exe`를 찾고, 성공·실패 모두 기존 PATH로 복원합니다. 시스템 PATH는 변경하지 않습니다.
 펌웨어와 같은 Codec2 커밋을 받아 2400 모드 DLL을 빌드하고 Maven 리소스에 포함합니다.
 두 번째 실행부터 DLL 해시·빌드 스크립트가 일치하면 캐시를 사용합니다.
 `mvn clean` 이후에도 같은 명령으로 자동 재생성합니다. 다운로드/빌드 실패 시 서버 실행을 중단합니다.
