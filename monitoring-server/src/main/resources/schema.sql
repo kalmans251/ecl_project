@@ -88,3 +88,11 @@ ALTER TABLE commands ADD COLUMN IF NOT EXISTS result_data VARCHAR(8192);
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS voice_epoch VARCHAR(36);
 
 ALTER TABLE calls ADD COLUMN IF NOT EXISTS plc_session BIGINT;
+
+-- Camera devices have no PLC or administrator credentials. Secrets are SHA-256
+-- digests of 256-bit random tokens; provision separately for each purpose.
+CREATE TABLE IF NOT EXISTS cctv_devices (
+ camera_id VARCHAR(80) PRIMARY KEY REFERENCES cameras(id),
+ control_hash VARCHAR(64) NOT NULL, publish_hash VARCHAR(64) NOT NULL,
+ analysis_hash VARCHAR(64) NOT NULL, enabled BOOLEAN NOT NULL DEFAULT FALSE
+);

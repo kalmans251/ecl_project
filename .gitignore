@@ -7,3 +7,10 @@ esp32-s3-arduino/.pio/
 
 # Misc
 *.log
+
+# Local camera credentials / generated deployment settings
+cctv-pi/config.json
+analytics-server/config.json
+deployment/cctv/mediamtx.yml
+**/.venv/
+**/__pycache__/

@@ -9,6 +9,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfiguration {
     @Bean org.springframework.security.web.session.HttpSessionEventPublisher sessionEvents(){return new org.springframework.security.web.session.HttpSessionEventPublisher();}
     @Bean org.springframework.security.crypto.password.PasswordEncoder passwordEncoder(Accounts accounts) { return accounts.passwordEncoder(); }
+    @Bean @Order(0) SecurityFilterChain cameras(HttpSecurity http,Cctv cctv)throws Exception{
+        return http.securityMatcher("/ws/cameras/**","/api/cctv/**").csrf(c->c.disable())
+            .sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(a->a.anyRequest().permitAll())
+            .addFilterBefore(new CctvAuthentication(cctv),UsernamePasswordAuthenticationFilter.class).build();
+    }
     @Bean @Order(1) SecurityFilterChain devices(HttpSecurity http, Settings settings, Registry registry) throws Exception {
         return http.securityMatcher("/ws/gateways/**","/api/analytics/**","/api/gateways","/api/events/**")
             .csrf(c -> c.disable()).sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

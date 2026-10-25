@@ -1,0 +1,5 @@
+requests>=2.32,<3
+numpy<2
+opencv-python>=4.10,<5
+ultralytics>=8.3,<9
+lapx>=0.5

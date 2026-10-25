@@ -1,0 +1,30 @@
+# MediaMTX v1.21.2. Copy to mediamtx.yml; fill the camera passphrase.
+# Do not retain anonymous users or old catch-all paths from previous configs.
+logLevel: warn
+authMethod: http
+authHTTPAddress: http://127.0.0.1:8080/api/cctv/media-auth
+authHTTPExclude: []
+api: false
+metrics: false
+pprof: false
+playback: false
+rtsp: true
+rtspAddress: 127.0.0.1:8554
+rtspTransports: [tcp]
+rtmp: false
+hls: false
+moq: false
+webrtc: true
+webrtcAddress: 127.0.0.1:8889
+webrtcAllowOrigins: ["https://omtest.duckdns.org"]
+webrtcTrustedProxies: ["127.0.0.1/32"]
+webrtcLocalUDPAddress: :8189
+webrtcIPsFromInterfaces: false
+webrtcAdditionalHosts: [omtest.duckdns.org]
+srt: true
+srtAddress: :8890
+paths:
+  cctv01_raw:
+    source: publisher
+    overridePublisher: false
+    srtPublishPassphrase: REPLACE_WITH_RANDOM_SRT_PASSPHRASE

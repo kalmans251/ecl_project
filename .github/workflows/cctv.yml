@@ -1,0 +1,31 @@
+name: CCTV agents
+on:
+  push:
+    paths: ['cctv-pi/**', 'analytics-server/**', 'deployment/cctv/**', '.github/workflows/cctv.yml']
+  pull_request:
+    paths: ['cctv-pi/**', 'analytics-server/**', 'deployment/cctv/**', '.github/workflows/cctv.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover -s cctv-pi/tests -v
+      - run: python -m unittest discover -s analytics-server/tests -v
+      - run: python -m compileall -q cctv-pi analytics-server
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Download pinned MediaMTX and verify checksum
+        run: |
+          mkdir -p /tmp/cctv-mtx
+          cd /tmp/cctv-mtx
+          curl -fsSL -O https://github.com/bluenviron/mediamtx/releases/download/v1.21.2/mediamtx_v1.21.2_linux_amd64.tar.gz
+          curl -fsSL -O https://github.com/bluenviron/mediamtx/releases/download/v1.21.2/checksums.sha256
+          sha256sum --check --ignore-missing checksums.sha256
+          tar -xzf mediamtx_v1.21.2_linux_amd64.tar.gz
+      - name: Verify actual encrypted video transport
+        run: python deployment/cctv/test_media.py /tmp/cctv-mtx/mediamtx

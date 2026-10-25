@@ -1,0 +1,20 @@
+[Unit]
+Description=CCTV outbound control and SRT publisher
+Wants=network-online.target
+After=network-online.target
+[Service]
+User=cctv
+Group=cctv
+WorkingDirectory=/opt/ecl_project/cctv-pi
+ExecStart=/opt/ecl_project/cctv-pi/.venv/bin/python agent.py --config /etc/ecl-cctv/config.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+UMask=0077
+[Install]
+WantedBy=multi-user.target
