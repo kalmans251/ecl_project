@@ -23,5 +23,5 @@ public class CctvApi {
   if(n.size()!=3||!n.path("available").isBoolean()||!n.path("people").isInt()||n.path("people").asInt()<0||n.path("people").asInt()>1000||!Set.of("ready","disabled","unavailable","pending").contains(n.path("age").asText()))throw Accounts.bad("Invalid observation");
   if(!cctv.analysis(camera))throw Accounts.bad("Analysis disabled");cctv.observe(camera,Map.of("available",n.path("available").asBoolean(),"people",n.path("people").asInt(),"age",n.path("age").asText()));
  }
- @PostMapping("/api/cctv/media-auth") public Map<String,Object> media(@RequestBody JsonNode n){String token=n.path("token").asText();if(token.isEmpty())token=n.path("password").asText();return cctv.media(n.path("action").asText(),n.path("path").asText(),n.path("protocol").asText(),token);}
+ @PostMapping("/api/cctv/media-auth") public Map<String,Object> media(@RequestBody JsonNode n){String token=n.path("token").asText();if(token.isEmpty())token=n.path("password").asText();return cctv.media(n.path("action").asText(),n.path("path").asText(),n.path("protocol").asText(),token,n.path("id").asText());}
 }

@@ -16,6 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
  "monitoring.admin-token=admin-012345678901234567890123456789","monitoring.analytics-token=analytics-012345678901234567890123456789",
  "monitoring.gateways[0].id=gateway-01","monitoring.gateways[0].token=gateway-012345678901234567890123456789"})
 class CctvTest {
+ @org.springframework.test.context.bean.override.mockito.MockitoBean MediaSessions mediaSessions;
  @Value("${local.server.port}")int port;
  @Autowired Cctv cctv;@Autowired Registry registry;@Autowired Accounts accounts;@Autowired JdbcTemplate db;
  final JsonMapper json=JsonMapper.builder().build();final String control="a".repeat(43),publish="b".repeat(43),analysis="c".repeat(43);
@@ -47,6 +48,10 @@ class CctvTest {
    assertEquals(401,media(nativeClient,"publish","other_raw","srt",publish).statusCode());
    assertEquals(401,media(nativeClient,"read","cctv01_raw","webrtc",publish).statusCode());
    assertEquals(200,media(nativeClient,"read","cctv01_raw","webrtc",view.path("token").asText()).statusCode());
+   String mediaId=UUID.randomUUID().toString();cctv.mediaControlReady();
+   cctv.media("read","cctv01_raw","webrtc",view.path("token").asText(),mediaId);
+   assertTrue(cctv.mediaValid(mediaId));cctv.pruneMedia(Set.of());assertTrue(cctv.mediaKnown(mediaId),"A list/auth race must not forget a new reader");
+   cctv.mediaControlFailed();assertThrows(Exception.class,()->cctv.media("read","cctv01_raw","webrtc",view.path("token").asText(),UUID.randomUUID().toString()));
    var anonymous=request(nativeClient,"/api/portal/cctv/cctv01","GET",null,Map.of());assertEquals(401,anonymous.statusCode());
    String outsider=(String)accounts.create("outsider","outsider","integration-test-password",false).get("id");
    assertThrows(Exception.class,()->cctv.view("outsider","session","cctv01",null));
@@ -54,6 +59,7 @@ class CctvTest {
    // Confirmed CCTV mode keeps analysis streaming with no browser lease.
    db.update("UPDATE rails SET snapshot=?,seen_at=? WHERE id=?","{\"detection\":\"cctv\"}",System.currentTimeMillis(),rail);
    request(browser,"/api/portal/cctv/view/"+view.path("lease").asText(),"DELETE",null,headers);
+   assertFalse(cctv.mediaValid(mediaId),"Released lease must revoke a connected reader");
    assertTrue(cctv.analysis("cctv01"));assertTrue(cctv.wanted("cctv01"));
    assertEquals(401,media(nativeClient,"read","cctv01_raw","webrtc",view.path("token").asText()).statusCode());
    assertEquals(200,media(nativeClient,"read","cctv01_raw","rtsp",analysis).statusCode());
@@ -72,6 +78,6 @@ class CctvTest {
    }finally{gateway.sendClose(1000,"done").join();}
   }finally{device.sendClose(1000,"done").join();}
  }
- HttpResponse<String> media(HttpClient h,String action,String path,String protocol,String token)throws Exception{return request(h,"/api/cctv/media-auth","POST",Map.of("action",action,"path",path,"protocol",protocol,"password",token),Map.of());}
+ HttpResponse<String> media(HttpClient h,String action,String path,String protocol,String token)throws Exception{cctv.mediaControlReady();return request(h,"/api/cctv/media-auth","POST",Map.of("action",action,"path",path,"protocol",protocol,"password",token,"id",UUID.randomUUID().toString()),Map.of());}
  WebSocket socket(HttpClient h,String path,String token,BlockingQueue<String> messages){return h.newWebSocketBuilder().header("Authorization","Bearer "+token).buildAsync(URI.create("ws://127.0.0.1:"+port+path),new WebSocket.Listener(){StringBuilder b=new StringBuilder();public void onOpen(WebSocket s){s.request(1);}public CompletionStage<?> onText(WebSocket s,CharSequence t,boolean last){b.append(t);if(last){messages.add(b.toString());b.setLength(0);}s.request(1);return null;}}).join();}
 }

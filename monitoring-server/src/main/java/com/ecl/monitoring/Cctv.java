@@ -19,6 +19,8 @@ public class Cctv {
  private record Ticket(String lease,long expires){}
  private record Observation(Map<String,Object> state,long at){}
  private final Map<String,Lease> leases=new ConcurrentHashMap<>();
+ private volatile long mediaControlAt;
+ private final Map<String,String> mediaReaders=new ConcurrentHashMap<>();
  private final Map<String,Ticket> tickets=new ConcurrentHashMap<>();
  private final Map<String,Long> demandUntil=new ConcurrentHashMap<>();
  private final Map<String,Observation> observations=new ConcurrentHashMap<>();
@@ -69,15 +71,25 @@ public class Cctv {
  public void release(String user,String session,String lease){var l=leases.get(lease);if(l!=null&&l.user().equals(user)&&l.session().equals(session))leases.remove(lease,l);}
  @org.springframework.context.event.EventListener public void logout(org.springframework.security.web.session.HttpSessionDestroyedEvent e){leases.entrySet().removeIf(x->x.getValue().session().equals(e.getId()));}
  @org.springframework.scheduling.annotation.Scheduled(fixedDelay=10000) public void prune(){leases.entrySet().removeIf(e->!valid(e.getValue()));tickets.entrySet().removeIf(e->e.getValue().expires()<System.currentTimeMillis()||!leases.containsKey(e.getValue().lease()));}
- public Map<String,Object> media(String action,String path,String protocol,String token){
+ public void mediaControlReady(){mediaControlAt=System.currentTimeMillis();}
+ public void mediaControlFailed(){mediaControlAt=0;}
+ public boolean mediaControlHealthy(){return System.currentTimeMillis()-mediaControlAt<15000;}
+ public boolean mediaKnown(String id){return mediaReaders.containsKey(id);}
+ public boolean mediaValid(String id){var hash=mediaReaders.get(id);var t=hash==null?null:tickets.get(hash);return t!=null&&t.expires()>System.currentTimeMillis()&&valid(leases.get(t.lease()));}
+ public void forgetMedia(String id){mediaReaders.remove(id);}
+ public void pruneMedia(Set<String> ids){mediaReaders.entrySet().removeIf(e->!ids.contains(e.getKey())&&!tickets.containsKey(e.getValue()));}
+ public Map<String,Object> media(String action,String path,String protocol,String token,String id){
   if(path==null||!path.matches("[A-Za-z0-9_-]{1,80}_raw")||token==null||token.length()>128)throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
   String camera=path.substring(0,path.length()-4);
   if(action.equals("publish")&&protocol.equals("srt")&&wanted(camera)&&auth(camera,"publish",token))return Map.of();
   if(action.equals("read")&&protocol.equals("rtsp")&&analysis(camera)&&auth(camera,"analysis",token))return Map.of();
   var ticket=tickets.get(digest(token));var lease=ticket==null?null:leases.get(ticket.lease());
-  if(action.equals("read")&&protocol.equals("webrtc")&&ticket!=null&&ticket.expires()>System.currentTimeMillis()&&valid(lease)&&lease.camera().equals(camera))return Map.of("expireAt",Instant.ofEpochMilli(ticket.expires()).toString());
+  if(action.equals("read")&&protocol.equals("webrtc")&&mediaControlHealthy()&&ticket!=null&&ticket.expires()>System.currentTimeMillis()&&valid(lease)&&lease.camera().equals(camera)){
+   try{UUID.fromString(id);}catch(Exception e){throw Accounts.bad("Missing media session identity");}
+   mediaReaders.put(id,digest(token));return Map.of();
+  }
   throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
  }
  public void observe(String camera,Map<String,Object> state){observations.put(camera,new Observation(Map.copyOf(state),System.currentTimeMillis()));}
- public Map<String,Object> status(String camera){var o=observations.get(camera);return Map.of("camera_id",camera,"enabled",enabled(camera),"analysis",analysis(camera),"wanted",wanted(camera),"analysis_fresh",o!=null&&System.currentTimeMillis()-o.at()<5000,"analysis_state",o==null?Map.of():o.state());}
+ public Map<String,Object> status(String camera){var o=observations.get(camera);return Map.of("camera_id",camera,"enabled",enabled(camera),"analysis",analysis(camera),"wanted",wanted(camera),"analysis_fresh",o!=null&&System.currentTimeMillis()-o.at()<5000,"analysis_state",o==null?Map.of():o.state(),"media_control_ready",mediaControlHealthy());}
 }

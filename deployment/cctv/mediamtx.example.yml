@@ -3,8 +3,11 @@
 logLevel: warn
 authMethod: http
 authHTTPAddress: http://127.0.0.1:8080/api/cctv/media-auth
-authHTTPExclude: []
-api: false
+authHTTPExclude:
+  - action: api
+# Trusted server-local administration only; NEVER proxy or forward this port.
+api: true
+apiAddress: 127.0.0.1:9997
 metrics: false
 pprof: false
 playback: false

@@ -61,7 +61,7 @@ paths:
             raise AssertionError(mtx.stdout.read().decode())
         def publisher(passphrase, token):
             query = urlencode(dict(streamid='publish:cctv01_raw:camera:'+token, passphrase=passphrase, pbkeylen=32, pkt_size=1316))
-            p = subprocess.Popen(['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-re','-f','lavfi','-i','testsrc=size=160x120:rate=5','-t','15','-pix_fmt','yuv420p','-c:v','libx264','-threads','1','-preset','ultrafast','-tune','zerolatency','-f','mpegts','srt://127.0.0.1:18890?'+query], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            p = subprocess.Popen(['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-re','-f','lavfi','-i','testsrc=size=160x120:rate=5','-t','20','-pix_fmt','yuv420p','-c:v','libx264','-threads','1','-g','5','-preset','ultrafast','-tune','zerolatency','-f','mpegts','srt://127.0.0.1:18890?'+query], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             processes.append(p)
             return p
         # A missing encryption secret must fail even when the auth token is valid.
