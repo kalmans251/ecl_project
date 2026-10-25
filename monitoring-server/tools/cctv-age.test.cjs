@@ -7,7 +7,7 @@ test('age panel refreshes without reconnecting video and clears stale results',a
  const nodes={};const get=id=>nodes[id]??=( {value:id==='camera'?'cctv01':'',textContent:'',src:'existing-stream',addEventListener(){}} );
  let state={analysis:true,analysis_fresh:true,analysis_state:{age:'ready'},latest_detection:{age_group:'20',observed_at:'2026-10-25T00:00:00Z',event_seq:1,enter_status:'PLC_SENT',age_status:'PLC_SENT'}}, fail=false,tick;
  const source=fs.readFileSync(path.join(__dirname,'../src/main/resources/static/cctv-test.js'),'utf8');
- await vm.runInNewContext(source,{document:{getElementById:get,hidden:false},AbortSignal,Date,setInterval:f=>{tick=f;},fetch:async url=>({ok:!fail,status:503,json:async()=>url.includes('/csrf')?{header:'X-CSRF',token:'test'}:state})});
+ await vm.runInNewContext(source,{document:{getElementById:get,hidden:false},AbortSignal,Date,setInterval:f=>{tick=f;},fetch:async url=>({ok:!fail,status:503,json:async()=>url.includes('/csrf')?{header:'X-CSRF',token:'test'}:{camera:state}})});
  assert.equal(get('age-group').textContent,'20대');
  assert.equal(get('age-delivery').textContent,'난간 전달 처리 완료');
  assert.equal(get('view').src,'existing-stream');

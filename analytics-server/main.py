@@ -13,6 +13,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 from core import Entries
+from overlay import OverlayWorker, snapshot
 
 os.environ.setdefault('OPENCV_FFMPEG_CAPTURE_OPTIONS', 'rtsp_transport;tcp')
 os.environ.setdefault('OPENCV_FFMPEG_LOGLEVEL', '-8')
@@ -135,6 +136,7 @@ def run(c):
         raise ValueError('Model must detect person')
     api = ApiWorker(c)
     reader = Reader(c, api)
+    overlay = OverlayWorker(c, api)
     entries = Entries(c['camera_id'])
     ctx = mp.get_context('spawn')
     jobs, replies, stop_age = ctx.Queue(maxsize=1), ctx.Queue(maxsize=4), ctx.Event()
@@ -147,6 +149,7 @@ def run(c):
         age_proc.start()
     api.start()
     reader.start()
+    overlay.start()
     generation = -1
     last_seq = -1
     next_frame = 0
@@ -169,6 +172,7 @@ def run(c):
                 age_ready = busy = False
             snap = reader.latest
             if not api.active() or snap is None or now - snap[2] > 2:
+                overlay.latest = None
                 api.observation = {'available': False, 'people': 0, 'age': 'unavailable'}
                 entries.tracks.clear()
                 time.sleep(.05)
@@ -215,7 +219,9 @@ def run(c):
                         break
             for event in entries.age_events():
                 api.offer(event)
-            api.observation = {'available': True, 'people': len(rows), 'age': 'ready' if age_ready else 'disabled' if age_proc is None else 'unavailable'}
+            age_state = 'ready' if age_ready else 'disabled' if age_proc is None else 'unavailable'
+            overlay.latest = (captured, snapshot(rows, entries.tracks, w, h, f'{gen}:{seq}', age_state))
+            api.observation = {'available': True, 'people': len(rows), 'age': age_state}
     finally:
         api.stop.set()
         stop_age.set()
@@ -226,6 +232,7 @@ def run(c):
                 age_proc.join(2)
         reader.join(4)
         api.join(4)
+        overlay.join(2)
         for q in (jobs, replies):
             q.cancel_join_thread()
             q.close()

@@ -7,8 +7,8 @@ import tools.jackson.databind.JsonNode;
 
 @RestController
 public class CctvApi {
- private final Cctv cctv;private final CameraSocket sockets;private final Events events;
- public CctvApi(Cctv cctv,CameraSocket sockets,Events events){this.cctv=cctv;this.sockets=sockets;this.events=events;}
+ private final CctvOverlay overlay;private final Cctv cctv;private final CameraSocket sockets;private final Events events;
+ public CctvApi(Cctv cctv,CameraSocket sockets,Events events,CctvOverlay overlay){this.overlay=overlay;this.cctv=cctv;this.sockets=sockets;this.events=events;}
  public record Provision(String control_token,String publish_token,String analysis_token){}
  @PutMapping("/api/portal/admin/cctv/{camera}") public void provision(Principal p,@PathVariable String camera,@RequestBody Provision v){cctv.provision(p.getName(),camera,v.control_token(),v.publish_token(),v.analysis_token());sockets.refresh();}
  public record Enabled(boolean enabled){}
@@ -23,5 +23,7 @@ public class CctvApi {
   if(n.size()!=3||!n.path("available").isBoolean()||!n.path("people").isInt()||n.path("people").asInt()<0||n.path("people").asInt()>1000||!Set.of("ready","disabled","unavailable","pending").contains(n.path("age").asText()))throw Accounts.bad("Invalid observation");
   if(!cctv.analysis(camera))throw Accounts.bad("Analysis disabled");cctv.observe(camera,Map.of("available",n.path("available").asBoolean(),"people",n.path("people").asInt(),"age",n.path("age").asText()));
  }
+ @PostMapping("/api/cctv/analysis/{camera}/overlay") public void overlay(@PathVariable String camera,@RequestBody JsonNode n){if(!cctv.analysis(camera))throw Accounts.bad("Analysis disabled");overlay.accept(camera,n);}
+ @GetMapping("/api/portal/cctv/{camera}/overlay") public org.springframework.http.ResponseEntity<Map<String,Object>> overlay(Principal p,@PathVariable String camera){cctv.permit(p.getName(),camera,false);return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(cctv.analysis(camera)?overlay.latest(camera):Map.of("fresh",false,"people",List.of()));}
  @PostMapping("/api/cctv/media-auth") public Map<String,Object> media(@RequestBody JsonNode n){String token=n.path("token").asText();if(token.isEmpty())token=n.path("password").asText();return cctv.media(n.path("action").asText(),n.path("path").asText(),n.path("protocol").asText(),token,n.path("id").asText());}
 }

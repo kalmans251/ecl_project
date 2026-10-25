@@ -17,7 +17,7 @@
   try{
    const selected=camera(),r=await fetch('/api/portal/cctv/'+selected,{cache:'no-store',signal:AbortSignal.timeout(5000)});
    if(!r.ok)throw Error('상태 조회 실패 '+r.status);
-   const state=await r.json();if(camera()!==selected)return;
+   const response=await r.json(),state=response.camera;if(camera()!==selected)return;
    el('status').textContent=JSON.stringify(state,null,2);
    const age=state.analysis_state?.age;
    el('age-health').textContent=!state.analysis?'CCTV 분석 비활성':!state.analysis_fresh?'분석 상태 오래됨 · 최근 기록만 표시':age==='ready'?'연령 모델 준비 완료':age==='disabled'?'연령 분석 꺼짐':'연령 모델 사용 불가 / 준비 중';

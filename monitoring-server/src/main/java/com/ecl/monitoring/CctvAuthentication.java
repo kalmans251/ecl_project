@@ -16,7 +16,7 @@ public class CctvAuthentication extends OncePerRequestFilter {
   }else{
    String camera,purpose;
    if(path.matches("/ws/cameras/[A-Za-z0-9_-]{1,80}")&&q.getMethod().equals("GET")){camera=path.substring(12);purpose="control";}
-   else if(path.matches("/api/cctv/analysis/[A-Za-z0-9_-]{1,80}/(state|events|observation)")){camera=path.split("/")[4];purpose="analysis";}
+   else if(path.matches("/api/cctv/analysis/[A-Za-z0-9_-]{1,80}/(state|events|observation|overlay)")){camera=path.split("/")[4];purpose="analysis";}
    else{r.sendError(404);return;}
    String h=q.getHeader("Authorization");
    if(!cctv.auth(camera,purpose,h!=null&&h.startsWith("Bearer ")?h.substring(7):null)){r.sendError(401);return;}

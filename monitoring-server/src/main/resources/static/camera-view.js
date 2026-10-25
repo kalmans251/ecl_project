@@ -2,10 +2,12 @@
 (async()=>{
  const camera=new URLSearchParams(location.search).get('camera'),status=document.getElementById('status'),video=document.getElementById('video');
  if(!/^[A-Za-z0-9_-]{1,80}$/.test(camera||'')){status.textContent='잘못된 카메라 ID';return;}
+ const overlay=CameraOverlay.attach(camera,video,document.getElementById('overlay'),document.getElementById('overlay-status'),document.getElementById('show-overlay'));
+ document.getElementById('fullscreen').onclick=()=>document.getElementById('stage').requestFullscreen().catch(()=>{status.textContent='전체 화면을 사용할 수 없습니다';});
  let lease=null,pc=null,resource=null,mediaToken=null,closed=false,generation=0,csrf;
  const pause=ms=>new Promise(r=>setTimeout(r,ms));
  async function api(path,method,body){const r=await fetch(path,{method,headers:{'Content-Type':'application/json',[csrf.header]:csrf.token},body:body===undefined?undefined:JSON.stringify(body)});if(!r.ok){const error=Error('권한 또는 카메라 상태 확인 필요 ('+r.status+')');error.status=r.status;throw error;}return r.status===204||method==='DELETE'?null:r.json();}
- async function disconnect(){generation++;pc?.close();pc=null;video.srcObject=null;const old=resource,token=mediaToken;resource=null;if(old)fetch(old,{method:'DELETE',headers:{Authorization:'Bearer '+token},keepalive:true}).catch(()=>{});}
+ async function disconnect(){overlay.clear();generation++;pc?.close();pc=null;video.srcObject=null;const old=resource,token=mediaToken;resource=null;if(old)fetch(old,{method:'DELETE',headers:{Authorization:'Bearer '+token},keepalive:true}).catch(()=>{});}
  function sessionUrl(value){const u=new URL(value,location.origin);if(u.origin!==location.origin)throw Error('잘못된 미디어 주소');const prefix='/'+camera+'_raw/whep/';if(u.pathname.startsWith(prefix))u.pathname='/cctv-media'+u.pathname;if(!u.pathname.startsWith('/cctv-media'+prefix)||u.search||u.hash)throw Error('잘못된 미디어 세션');return u.href;}
  async function connect(access){
   await disconnect();const version=generation;const peer=pc=new RTCPeerConnection();mediaToken=access.token;
@@ -19,7 +21,7 @@
   if(version!==generation||closed){fetch(url,{method:'DELETE',headers:{Authorization:'Bearer '+access.token}}).catch(()=>{});return;}
   resource=url;await peer.setRemoteDescription({type:'answer',sdp:await r.text()});status.textContent='영상 연결됨';
  }
- const release=()=>{closed=true;disconnect();if(lease&&csrf)fetch('/api/portal/cctv/view/'+lease,{method:'DELETE',headers:{[csrf.header]:csrf.token},keepalive:true}).catch(()=>{});};
+ const release=()=>{closed=true;overlay.stop();disconnect();if(lease&&csrf)fetch('/api/portal/cctv/view/'+lease,{method:'DELETE',headers:{[csrf.header]:csrf.token},keepalive:true}).catch(()=>{});};
  addEventListener('pagehide',release);
  try{
   const r=await fetch('/api/auth/csrf');csrf=await r.json();let connectedAt=0;
