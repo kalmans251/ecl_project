@@ -91,6 +91,11 @@ public class Voice extends AbstractWebSocketHandler {
     public void receive(String gateway,JsonNode node) throws Exception {
         if(node.size()!=8 || !node.path("epoch").isString() || !node.path("sequence").isInt() || node.path("sequence").asInt()<0 || node.path("sequence").asInt()>65535 || !node.path("railing_id").isInt() || !node.path("direction").asText().equals("FIELD_TX"))throw Accounts.bad("Invalid voice envelope");
         Peer peer=peers.get(node.path("call_id").asText());if(peer==null)return;
+        // Reject a foreign producer before entering the target peer's error path.
+        // A bad gateway must never be able to close another gateway's operator socket.
+        var routes=db.queryForList("SELECT gateway_id FROM calls WHERE id=?",peer.callId());
+        if(routes.isEmpty())return;
+        if(!gateway.equals(routes.get(0).get("GATEWAY_ID")))throw Accounts.bad("Voice gateway does not own call");
         try{
             var call=owned(peer.username(),peer.callId());if(!active(peer,call))return;if(!node.path("epoch").asText().equals(peer.epoch()))return;if(!call.get("GATEWAY_ID").equals(gateway)||((Number)call.get("NUMBER")).intValue()!=node.path("railing_id").intValue()||!call.get("DIRECTION").equals("FIELD_TX"))throw new IllegalArgumentException();
             if(!node.path("epoch").asText().equals(call.get("VOICE_EPOCH")))return;
