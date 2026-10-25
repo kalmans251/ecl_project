@@ -91,5 +91,18 @@ public class Cctv {
   throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
  }
  public void observe(String camera,Map<String,Object> state){observations.put(camera,new Observation(Map.copyOf(state),System.currentTimeMillis()));}
- public Map<String,Object> status(String camera){var o=observations.get(camera);return Map.of("camera_id",camera,"enabled",enabled(camera),"analysis",analysis(camera),"wanted",wanted(camera),"analysis_fresh",o!=null&&System.currentTimeMillis()-o.at()<5000,"analysis_state",o==null?Map.of():o.state(),"media_control_ready",mediaControlHealthy());}
+ public Map<String,Object> latestDetection(String camera){
+  var mapped=registry.camera(camera);
+  var rows=db.queryForList("SELECT event_id,seq,observed_at,status FROM deliveries WHERE camera_id=? AND gateway_id=? AND railing_id=? AND event_type='enter' ORDER BY seq DESC LIMIT 1",camera,mapped.gatewayId(),mapped.railingId());
+  if(rows.isEmpty())return Map.of();
+  var enter=rows.get(0);
+  var ages=db.queryForList("SELECT age_group,status FROM deliveries WHERE camera_id=? AND event_id=? AND event_type='age' ORDER BY seq DESC LIMIT 1",camera,enter.get("EVENT_ID"));
+  var result=new LinkedHashMap<String,Object>();
+  result.put("event_seq",enter.get("SEQ"));result.put("observed_at",enter.get("OBSERVED_AT"));
+  result.put("enter_status",enter.get("STATUS"));
+  result.put("age_group",ages.isEmpty()?"pending":ages.get(0).get("AGE_GROUP"));
+  result.put("age_status",ages.isEmpty()?"NOT_RECEIVED":ages.get(0).get("STATUS"));
+  return result;
+ }
+ public Map<String,Object> status(String camera){var o=observations.get(camera);return Map.of("camera_id",camera,"enabled",enabled(camera),"analysis",analysis(camera),"wanted",wanted(camera),"analysis_fresh",o!=null&&System.currentTimeMillis()-o.at()<5000,"analysis_state",o==null?Map.of():o.state(),"media_control_ready",mediaControlHealthy(),"latest_detection",latestDetection(camera));}
 }
