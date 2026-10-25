@@ -69,7 +69,7 @@ paths:
         try:
             bad.wait(timeout=8)
         except subprocess.TimeoutExpired:
-            bad.kill();bad.wait()
+            bad.kill();bad.wait();raise AssertionError("Wrong encryption key was not rejected")
         assert bad.returncode != 0, 'Wrong encryption key accepted'
         denied = publisher(PASSPHRASE, 'wrong')
         denied.wait(timeout=8)

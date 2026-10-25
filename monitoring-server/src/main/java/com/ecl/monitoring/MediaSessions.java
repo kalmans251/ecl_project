@@ -13,20 +13,21 @@ import tools.jackson.databind.json.JsonMapper;
  * Network I/O runs outside the Spring scheduler used by PLC/voice control. */
 @Component
 public class MediaSessions {
- private final Cctv cctv;
+ private final Cctv cctv;private final String base;
  private final HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build();
  private final ExecutorService worker=Executors.newSingleThreadExecutor(r->{var t=new Thread(r,"cctv-media-reaper");t.setDaemon(true);return t;});
  private final AtomicBoolean busy=new AtomicBoolean();
  private final Map<String,Long> unknown=new ConcurrentHashMap<>();
  private final JsonMapper json=JsonMapper.builder().build();
- public MediaSessions(Cctv cctv){this.cctv=cctv;}
+ @org.springframework.beans.factory.annotation.Autowired public MediaSessions(Cctv cctv){this(cctv,"http://127.0.0.1:9997");}
+ MediaSessions(Cctv cctv,String base){this.cctv=cctv;this.base=base;}
  @org.springframework.scheduling.annotation.Scheduled(fixedDelay=5000) public void tick(){
   if(busy.compareAndSet(false,true))worker.submit(()->{try{sweep();}catch(Exception e){cctv.mediaControlFailed();}finally{busy.set(false);}});
  }
- private void sweep()throws Exception{
+ void sweep()throws Exception{
   Set<String> present=new HashSet<>();
   for(int page=0;page<20;page++){
-   var response=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:9997/v3/webrtcsessions/list?itemsPerPage=100&page="+page)).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.ofString());
+   var response=client.send(HttpRequest.newBuilder(URI.create(base+"/v3/webrtcsessions/list?itemsPerPage=100&page="+page)).timeout(Duration.ofSeconds(1)).GET().build(),HttpResponse.BodyHandlers.ofString());
    if(response.statusCode()!=200||response.body().length()>500000)throw new IllegalStateException("Media control unavailable");
    var body=json.readTree(response.body());if(!body.path("items").isArray())throw new IllegalStateException("Invalid media inventory");
    for(var item:body.path("items")){
@@ -36,7 +37,7 @@ public class MediaSessions {
     // A new session may appear just before its authentication callback arrives.
     long first=unknown.computeIfAbsent(id,k->System.currentTimeMillis());
     if(known||System.currentTimeMillis()-first>10000){
-     var kicked=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:9997/v3/webrtcsessions/kick/"+id)).timeout(Duration.ofSeconds(1)).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());
+     var kicked=client.send(HttpRequest.newBuilder(URI.create(base+"/v3/webrtcsessions/kick/"+id)).timeout(Duration.ofSeconds(1)).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());
      if(kicked.statusCode()!=200&&kicked.statusCode()!=404)throw new IllegalStateException("Media termination failed");
      cctv.forgetMedia(id);unknown.remove(id);
     }
