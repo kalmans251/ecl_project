@@ -34,7 +34,7 @@ class OverlayWorker(threading.Thread):
         with requests.Session() as http:
             http.trust_env = False
             http.headers['Authorization'] = 'Bearer ' + self.config['analysis_token']
-            while not self.api.stop.wait(.2):
+            while not self.api.stop.wait(.1):
                 item = self.latest
                 if not self.api.active() or item is None:
                     continue
