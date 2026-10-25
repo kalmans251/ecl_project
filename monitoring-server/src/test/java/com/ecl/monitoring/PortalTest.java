@@ -62,7 +62,7 @@ class PortalTest {
    ws.sendText(json.writeValueAsString(Map.of("version",1,"type","call_result","message_id",id,"status","APPLIED","data",data)),true).join();
    long until=System.nanoTime()+2_000_000_000L;while(System.nanoTime()<until){if("APPLIED".equals(db.queryForObject("SELECT status FROM commands WHERE id=?",String.class,id)))return;Thread.sleep(10);}fail("Call result not received");
   }
-  public void close(){ws.sendClose(1000,"done").join();}
+  public void close(){if(!ws.isOutputClosed())ws.sendClose(1000,"done").join();}
  }
  @Test void rejectedStartReleasesReservationButUnknownKeepsHangup()throws Exception{
   var b=new Browser("admin");String rail=rail();
@@ -220,7 +220,7 @@ class PortalTest {
    awaitVoice(command.path("call_id").asText(),command.path("message_id").asText());
   }
   void send(String epoch,byte[] bits){ws.sendBinary(java.nio.ByteBuffer.allocate(84).put(epoch.getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(bits).flip(),true).join();}
-  public void close(){ws.sendClose(1000,"done").join();}
+  public void close(){if(!ws.isOutputClosed())ws.sendClose(1000,"done").join();}
  }
  tools.jackson.databind.JsonNode callCommand(Browser b,Device d,String rail,String op)throws Exception{
   var response=b.request("/api/portal/commands","POST",command(rail,op,null),true);assertEquals(200,response.statusCode(),response.body());
