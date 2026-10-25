@@ -76,7 +76,7 @@ class CctvTest {
     assertEquals(200,request(nativeClient,"/api/cctv/analysis/cctv01/events","POST",ageEvent,auth).statusCode());
     var ageMessage=json.readTree(gatewayMessages.poll(3,TimeUnit.SECONDS));assertEquals("cctv.age",ageMessage.path("type").asText());
     var portal=json.readTree(request(browser,"/api/portal/cctv/cctv01","GET",null,Map.of()).body());
-    assertEquals("20",portal.path("latest_detection").path("age_group").asText());
+    assertEquals("20",portal.path("camera").path("latest_detection").path("age_group").asText());
     db.update("UPDATE deliveries SET status='PLC_SENT' WHERE camera_id=? AND event_id=? AND event_type='age'","cctv01",event.get("event_id"));
     assertEquals("PLC_SENT",cctv.latestDetection("cctv01").get("age_status"));
     var next=new HashMap<String,Object>(event);next.put("event_id",UUID.randomUUID().toString());next.put("observed_at",Instant.now().toString());
@@ -89,7 +89,20 @@ class CctvTest {
     String otherRail=registry.ensureRail("gateway-01",2);registry.camera("admin","age-other",otherRail,"");
     assertTrue(cctv.latestDetection("age-other").isEmpty());
     var foreign=new HashMap<String,Object>(event);foreign.put("camera_id","foreign");assertEquals(400,request(nativeClient,"/api/cctv/analysis/cctv01/events","POST",foreign,auth).statusCode());
-    cctv.enable("admin","cctv01",false);assertFalse(cctv.wanted("cctv01"));
+    var visual=Map.of("frame_id","1:42","age_ms",0,"people",List.of(Map.of("id","7","box",List.of(.1,.2,.4,.8),"age",28.0,"state","estimated")));
+    assertEquals(401,request(nativeClient,"/api/cctv/analysis/cctv01/overlay","POST",visual,Map.of("Authorization","Bearer "+control)).statusCode());
+    assertEquals(401,request(nativeClient,"/api/cctv/analysis/foreign/overlay","POST",visual,auth).statusCode());
+    assertEquals(200,request(nativeClient,"/api/cctv/analysis/cctv01/overlay","POST",visual,auth).statusCode());
+    var visualResponse=request(browser,"/api/portal/cctv/cctv01/overlay","GET",null,Map.of());
+    assertEquals(200,visualResponse.statusCode());assertTrue(visualResponse.headers().firstValue("Cache-Control").orElse("").contains("no-store"));
+    assertEquals(28,json.readTree(visualResponse.body()).path("people").get(0).path("age").asInt());
+    assertEquals(401,request(nativeClient,"/api/portal/cctv/cctv01/overlay","GET",null,Map.of()).statusCode());
+    var outsiderBrowser=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();
+    var outsiderCsrf=json.readTree(request(outsiderBrowser,"/api/auth/csrf","GET",null,Map.of()).body());
+    outsiderBrowser.send(HttpRequest.newBuilder(URI.create(url("/api/auth/login"))).header(outsiderCsrf.path("header").asText(),outsiderCsrf.path("token").asText()).header("Content-Type","application/x-www-form-urlencoded").POST(HttpRequest.BodyPublishers.ofString("username=outsider&password=integration-test-password")).build(),HttpResponse.BodyHandlers.ofString());
+    assertEquals(403,request(outsiderBrowser,"/api/portal/cctv/cctv01/overlay","GET",null,Map.of()).statusCode());
+    cctv.enable("admin","cctv01",false);
+    assertFalse(json.readTree(request(browser,"/api/portal/cctv/cctv01/overlay","GET",null,Map.of()).body()).path("fresh").asBoolean());assertFalse(cctv.wanted("cctv01"));
     assertEquals(400,request(nativeClient,"/api/cctv/analysis/cctv01/events","POST",event,auth).statusCode());
     assertEquals(401,media(nativeClient,"publish","cctv01_raw","srt",publish).statusCode());
    }finally{gateway.sendClose(1000,"done").join();}
