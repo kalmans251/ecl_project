@@ -1,33 +1,66 @@
-# MediaMTX v1.21.2. Copy to mediamtx.yml; fill the camera passphrase.
-# Do not retain anonymous users or old catch-all paths from previous configs.
+# Complete MediaMTX v1.21.2 example.
+# Copy outside Git as mediamtx.yml and replace the SRT passphrase.
+# Camera control/publish/analysis tokens are registered in Spring Boot, not here.
+
 logLevel: warn
+logDestinations: [stdout]
+readTimeout: 10s
+writeTimeout: 10s
+writeQueueSize: 512
+udpMaxPayloadSize: 1452
+
+# Camera/path/operation authorization by the local Spring Boot server.
 authMethod: http
 authHTTPAddress: http://127.0.0.1:8080/api/cctv/media-auth
 authHTTPExclude:
   - action: api
-# Trusted server-local administration only; NEVER proxy or forward this port.
+
+# Used by Spring Boot to disconnect revoked viewers.
+# Trusted local OS only: NEVER expose this API through Nginx or port forwarding.
 api: true
 apiAddress: 127.0.0.1:9997
+apiEncryption: false
 metrics: false
 pprof: false
 playback: false
+
+# Only the server-side analysis process reads RTSP.
 rtsp: true
 rtspAddress: 127.0.0.1:8554
 rtspTransports: [tcp]
+rtspEncryption: "no"
+rtspAuthMethods: [basic]
+
 rtmp: false
 hls: false
 moq: false
+
+# Nginx terminates HTTPS for WebRTC signaling.
 webrtc: true
 webrtcAddress: 127.0.0.1:8889
+webrtcEncryption: false
 webrtcAllowOrigins: ["https://omtest.duckdns.org"]
 webrtcTrustedProxies: ["127.0.0.1/32"]
 webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: ""
 webrtcIPsFromInterfaces: false
 webrtcAdditionalHosts: [omtest.duckdns.org]
+webrtcICEServers2: []
+
+# Encrypted video from CCTV Pi.
 srt: true
 srtAddress: :8890
+
+pathDefaults:
+  source: publisher
+  record: false
+  overridePublisher: false
+
+# Camera IDs must be unique across the server.
+# Add explicit paths per camera; do not add all_others or anonymous users.
 paths:
   cctv01_raw:
     source: publisher
     overridePublisher: false
-    srtPublishPassphrase: REPLACE_WITH_RANDOM_SRT_PASSPHRASE
+    # Generate locally; use the SAME value as Pi config.json srt_passphrase.
+    srtPublishPassphrase: "REPLACE_WITH_RANDOM_SRT_PASSPHRASE"
