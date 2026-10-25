@@ -42,7 +42,7 @@
       if(!stopped){data=next;received=performance.now();requestCost=received-start;}
      }catch(e){data=null;}finally{clearTimeout(timer);}
     }else data=null;
-    await new Promise(resolve=>setTimeout(resolve,200));
+    await new Promise(resolve=>setTimeout(resolve,100));
    }
   }
   render();poll();
