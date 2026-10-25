@@ -148,19 +148,36 @@ Remove-Variable bootstrapPassword
 
 $env:SERVER_ADDRESS = "127.0.0.1"
 $env:SERVER_FORWARD_HEADERS_STRATEGY = "framework"
-$env:COOKIE_SECURE = "true"
+$env:COOKIE_SECURE = "true" # 실제 운영은 HTTPS 전용 쿠키
 
 # 다음 난간 Pi 단계에서 입력할 값. 자신의 PC 화면에서만 확인한다.
 Write-Host "난간 Pi에 입력할 Gateway 토큰:"
 Write-Host $env:MONITOR_GATEWAY_TOKEN
 Set-Clipboard -Value $env:MONITOR_GATEWAY_TOKEN
 
-mvn verify
-if ($LASTEXITCODE -ne 0) {
+# 통합 테스트는 내부 HTTP 서버를 사용하므로 검증 중에만 해제한다.
+$verifyExit = 1
+$env:COOKIE_SECURE = "false"
+try {
+    mvn verify
+    $verifyExit = $LASTEXITCODE
+}
+finally {
+    # 테스트 실패/예외가 나도 운영 설정을 복구한다.
+    $env:COOKIE_SECURE = "true"
+}
+if ($verifyExit -ne 0) {
     throw "빌드/검증 실패. 위 오류를 해결한 다음 실행하세요."
 }
 mvn spring-boot:run
 ```
+
+`mvn verify`의 로그인 통합 테스트는 `http://127.0.0.1`을 사용한다.
+`COOKIE_SECURE=true`가 그대로 적용되면 세션 쿠키가 전달되지 않아 로그인 테스트가
+403으로 실패할 수 있다. 위 코드는 검증 중에만 false로 바꾸고 성공·실패 모두 true로
+복구한다. 실제 HTTPS 서버의 쿠키 보안을 끄거나 테스트를 생략할 필요는 없다.
+이미 이 오류가 발생했다면 토큰 생성이나 DB 초기화를 반복하지 말고,
+현재 monitoring-server 폴더에서 위 검증 블록부터 다시 실행한다.
 
 이 설정은 현재 PowerShell 프로세스에만 적용된다. 시스템 환경변수나 파일로 자동 저장하지 않는다.
 따라서 **이 창을 닫으면 토큰은 환경변수에서 사라진다**.
