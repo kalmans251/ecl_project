@@ -171,9 +171,10 @@ class MusicPublisher:
                         data=dict(call_id=message.get('call_id'),railing_id=message.get('railing_id'),
                                   epoch=message['message_id']))))
                     continue
-                handler = self.calls if message.get('operation') in CALLS else self.remote
+                handler = self.calls if message.get('type') == 'command' and message.get('operation') in CALLS else self.remote
                 supported = CALLS if handler is self.calls and self.calls else ({'music.list','music.play','music.seek'} | OPERATIONS)
-                if message.get('type')=='command' and message.get('operation') in supported and handler:
+                if ((message.get('type')=='command' and message.get('operation') in supported)
+                        or message.get('type') in ('cctv.enter','cctv.age')) and handler:
                     if self.command_task and not self.command_task.done():
                         await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='BUSY')))
                     else:
