@@ -5,7 +5,7 @@ VALUES = {
     'music.mode': ('sequential','shuffle','age'), 'sleep': ('on','off'),
     'detection': ('radar','cctv'), 'query': ('p4','wroom','s3'),
 }
-ACTIONS = frozenset('music.'+s for s in ('start','stop','pause','resume','next'))
+ACTIONS = frozenset('music.'+s for s in ('start','stop','pause','resume','next')) | {'detection.count','detection.reset'}
 OPERATIONS = frozenset(VALUES) | ACTIONS | {'volume','led.basic_pattern','led.music_pattern'}
 def parts(operation, value, rail):
     if operation in VALUES:
@@ -22,5 +22,6 @@ def parts(operation, value, rail):
     if operation.endswith('_pattern'):
         return ['led',r,'basic' if operation=='led.basic_pattern' else 'music',str(int(value)+1)]
     if operation=='music.mode': return ['music',r,'mode',value]
+    if operation in ('detection.count','detection.reset'): return ['detection',r,operation.split('.')[1]]
     if operation in ACTIONS: return ['music',r,operation.split('.')[1]]
     return [operation,r,value]

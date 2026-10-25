@@ -956,6 +956,15 @@ bool detection_manager_radar_new_person(
  * GET SUMMARY
  * ============================================================ */
 
+void detection_manager_reset_count(detection_summary_t *summary)
+{
+    lock_manager();
+    s_summary.total_detected_count = 0;
+    if (summary != NULL) *summary = s_summary;
+    unlock_manager();
+    ESP_LOGI(TAG, "Detection count reset -> 0");
+}
+
 void detection_manager_get_summary(
     detection_summary_t *summary
 )

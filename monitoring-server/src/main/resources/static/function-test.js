@@ -3,6 +3,7 @@ let webVoice;
 const $=id=>document.getElementById(id), pending=new Set(['QUEUED','SENT','RECEIVED']);
 let csrf, me, view=null, site='', selected=new Set(), busy=false, callChanging=false, loading=null, epoch=0, page=null, received=-Infinity;
 const sections=[
+ ['감지 카운트',null,[['detection.count','카운트 조회'],['detection.reset','카운트 초기화']]],
  ['장치 조회','query',[['p4','P4 조회'],['wroom','WROOM 조회'],['s3','S3 조회']]],
  ['전원','power',[['ac','AC 선택 + 켜기'],['battery','배터리 선택 + 켜기'],['on','켜기'],['off','끄기']]],
  ['프로젝터','projector',[['on','켜기'],['off','끄기']]],
@@ -36,6 +37,7 @@ function build(){
 }
 function resetPage(){page=null;$('track').replaceChildren();$('page').textContent='목록 미조회';}
 function render(){
+ DetectionCounts.ingest(view?.commands);$('detectionCount').textContent=items().map(r=>r.name+': '+DetectionCounts.describe(r.id)).join(' / ')||'난간을 선택하세요.';
  $('site').disabled=busy||callChanging; $('rails').replaceChildren();
  for(const r of view?.rails||[]){const b=document.createElement('button');b.textContent=`${r.name} · ${r.gateway_id}/${r.number} · ${r.online?'Pi 연결':'오프라인'}`;b.setAttribute('aria-pressed',String(selected.has(r.id)));b.disabled=busy||callChanging;b.onclick=()=>{if(selected.has(r.id))selected.delete(r.id);else selected.add(r.id);resetPage();render();};$('rails').append(b);}
  $('target').textContent=items().length?'선택: '+items().map(r=>r.name).join(', '):'난간을 선택하세요.';
@@ -52,6 +54,7 @@ function renderMusic(){
  $('seek').disabled=!(writable()&&r&&d.fresh&&d.seekable&&d.state==='playing'&&d.durationMs);
 }
 function renderResults(rows){
+ DetectionCounts.ingest(rows);$('detectionCount').textContent=items().map(r=>r.name+': '+DetectionCounts.describe(r.id)).join(' / ')||'난간을 선택하세요.';
  $('results').replaceChildren();for(const c of rows){const tr=document.createElement('tr');for(const v of [new Date(c.created_at).toLocaleTimeString(),view?.rails.find(r=>r.id===c.rail_id)?.name||c.rail_id,c.operation+(c.value?' '+c.value:''),c.status,(c.detail||'')+'\n'+(c.result?JSON.stringify(c.result,null,2):'')]){const td=document.createElement('td');td.textContent=v;tr.append(td);}$('results').append(tr);}
 }
 function refresh(){
@@ -73,6 +76,7 @@ async function waitResults(rows,limit){
 }
 async function send(operation,value=null,allowCall=false){
  if(!writable(allowCall))throw Error(busy?'이전 명령 응답을 기다리는 중입니다.':'난간 선택·연결·제어 권한을 확인하세요.');
+ if(operation==='detection.reset'&&!confirm(items().map(r=>r.name).join(', ')+'의 누적 감지 카운트를 0으로 초기화할까요? 연령대 통계는 유지됩니다.'))return [];
  const targets=items().map(r=>r.id);busy=true;render();notice(`${operation} 전송 중…`);
  try{const rows=await api('/api/portal/commands','POST',{request_id:crypto.randomUUID(),rail_ids:targets,operation,value});
  notice(`${operation} 접수 · 장치 응답 대기`);const results=await waitResults(rows,operation==='music.list'?55000:operation.startsWith('call.')||operation.startsWith('ptt.')?65000:22000);

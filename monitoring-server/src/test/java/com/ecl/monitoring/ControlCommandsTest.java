@@ -29,4 +29,14 @@ class ControlCommandsTest {
   assertThrows(RuntimeException.class,()->ControlCommands.validate("music.stop",null,1,"APPLIED",data("music.stop",null,true,List.of(step(2,2,33,0,"00")))));
   ControlCommands.validate("music.stop",null,1,"APPLIED",data("music.stop",null,true,List.of(step(3,2,33,0,"00"))));
  }
+ @Test void detectionCountReadAndResetRequireExactP4Schema(){
+  Commands.validate("detection.count",null);Commands.validate("detection.reset",null);
+  assertThrows(RuntimeException.class,()->Commands.validate("detection.reset","0"));
+  ControlCommands.validate("detection.count",null,1,"COMPLETED",data("detection.count",null,false,List.of(step(2,9,16,0,"0101ffffffff"))));
+  ControlCommands.validate("detection.reset",null,1,"APPLIED",data("detection.reset",null,true,List.of(step(2,9,54,0,"010000000000"))));
+  for(String bytes:List.of("00","010200000000","010100000001"))
+   assertThrows(RuntimeException.class,()->ControlCommands.validate("detection.reset",null,1,"APPLIED",data("detection.reset",null,true,List.of(step(2,9,54,0,bytes)))));
+  assertThrows(RuntimeException.class,()->ControlCommands.validate("detection.reset",null,1,"APPLIED",data("detection.reset",null,true,List.of(step(3,9,54,0,"010000000000")))));
+  assertThrows(RuntimeException.class,()->ControlCommands.validate("detection.count",null,1,"APPLIED",data("detection.count",null,true,List.of(step(2,9,16,0,"010000000000")))));
+ }
 }

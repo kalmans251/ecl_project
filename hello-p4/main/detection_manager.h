@@ -155,3 +155,6 @@ bool detection_manager_radar_new_person(
 void detection_manager_get_summary(
     detection_summary_t *summary
 );
+
+/* Reset only the cumulative detection count; preserve dedup, age and activity. */
+void detection_manager_reset_count(detection_summary_t *summary);
