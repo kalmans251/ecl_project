@@ -1,5 +1,8 @@
 # Windows 서버 CCTV 설정 적용 가이드
 
+**[DB 초기화부터 서버·난간 Pi·CCTV까지 순서대로 연결하기](../FRESH_START.md)** —
+완전 초기화와 평소 재시작을 구분한 통합 설명서입니다.
+
 이 문서는 Spring Boot, Nginx, MediaMTX가 **동일한 Windows PC**에서 실행되는
 omtest.duckdns.org 환경 기준이다. 먼저 CCTV 기능(PR #81)이 포함된 main을 업데이트한다.
 설정 파일을 GitHub에 올리는 것만으로 실행 중인 PC 설정이 바뀌지는 않는다.
