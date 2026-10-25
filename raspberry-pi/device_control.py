@@ -25,6 +25,7 @@ HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop cu
   volume <id> <0..100>           shared WROOM music/voice volume (outside calls)
   sleep <id> on|off              enable/disable existing sleep policy
   detection <id> radar|cctv      choose detection source (CCTV input needs server)
+  detection <id> count|reset    read/reset P4 cumulative detection count
   cctv <id> enter <seq>          inject a new-person event (CCTV mode)\n  cctv <id> age <seq> 10|20|30|40|keep\n                                inject matching age result; keep preserves group\n  query <id> p4|wroom|s3         request live SYSTEM status
 '''
 
@@ -124,7 +125,12 @@ class DeviceControls:
         elif name == 'sleep':
             add(Service.SLEEP, one({'on': Command.START, 'off': Command.STOP}))
         elif name == 'detection':
-            add(Service.DETECTION, Command.SET, bytes([one({'radar': 0, 'cctv': 1})]))
+            if args == ['count']:
+                add(Service.DETECTION, Command.STATUS_REQUEST)
+            elif args == ['reset']:
+                add(Service.DETECTION, Command.DETECTION_RESET)
+            else:
+                add(Service.DETECTION, Command.SET, bytes([one({'radar': 0, 'cctv': 1})]))
         elif name == 'cctv':
             if (not args or args[0] not in ('enter', 'age')
                     or len(args) != (2 if args[0] == 'enter' else 3)):
@@ -183,6 +189,8 @@ class DeviceControls:
                                       command=int(original.command), status=status, data=response.hex()))
                     if status == 3:
                         results.append('P4 policy confirmed; WROOM playback not confirmed')
+                    elif name == 'detection' and args in (['count'], ['reset']):
+                        results.append(f'P4 confirmed count={int.from_bytes(response[2:], "big")} source={"radar" if response[1]==0 else "cctv"}')
                     elif original.service == Service.SYSTEM:
                         results.append(f'{Node(source).name} response confirmed data={response.hex(" ")}')
                     else:
@@ -193,7 +201,7 @@ class DeviceControls:
                         self.result = None
         if structured:
             return dict(railing_id=rail, steps=steps,
-                        device_application_confirmed=all(s['status']==0 and s['service']!=Service.SYSTEM for s in steps))
+                        device_application_confirmed=all(s['status']==0 and s['service']!=Service.SYSTEM and not (s['service']==Service.DETECTION and s['command']==Command.STATUS_REQUEST) for s in steps))
         return f'Confirmed rail={rail}: {" ".join(parts)}; ' + '; '.join(results)
 
     def handle_frame(self, frame):
@@ -216,6 +224,12 @@ class DeviceControls:
                 return True
             if status == 0 and detail is not None and frame.payload[6] != detail:
                 return True
+            if status == 0 and frame.service == Service.DETECTION and op in (Command.STATUS_REQUEST, Command.DETECTION_RESET):
+                data = frame.payload[6:]
+                if len(data) != 6 or data[0] != 1 or data[1] not in (0, 1):
+                    return True
+                if op == Command.DETECTION_RESET and data[2:] != bytes(4):
+                    return True
             self.result = (status, frame.payload[6:], frame.src)
             self.condition.notify_all()
         return True

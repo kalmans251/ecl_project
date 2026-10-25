@@ -34,7 +34,7 @@ async function send(operation,value,ids){
   const rows=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:ids||items.map(r=>r.id),operation,value:value??null});
   toast(`${operation}: 요청 접수 · 장치 응답 대기`);
   if(operation==='emergency.ack'){await poll();return rows;}
-  const results=await waitControlResults(rows);await poll();
+  const results=await waitControlResults(rows);DetectionCounts.ingest(results);await poll();
   const label=r=>view.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id;
   const failed=results.filter(r=>!['APPLIED','COMPLETED'].includes(r.status));
   if(failed.length)throw Error(failed.map(r=>`${label(r)}: ${r.status}`).join(' / ')+' · 처리 내역 확인 필요, 자동 재전송 없음');
@@ -147,7 +147,7 @@ function renderLive(){
  renderMusicStatus();
  const r=rails()[0],fresh=r?.seen_at && Date.now()-r.seen_at<15000,s=fresh?r.reported:{};
  text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':s.battery_percent.toFixed(1)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
- text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?(fresh?'ONLINE · 상태 수신':'ONLINE · 상태 미수신'):'OFFLINE'):'난간 선택');text('radarDetectedCount',s.detection_count??'--');
+ text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?(fresh?'ONLINE · 상태 수신':'ONLINE · 상태 미수신'):'OFFLINE'):'난간 선택');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
  const logo=$('projectorLogoWrapper');logo.classList.toggle('spinning',s.projector===true);logo.classList.toggle('power-off',s.projector!==true);
  activeCall=view.calls.find(c=>rails().some(r=>r.id===c.RAIL_ID));const callText=activeCall?`${activeCall.STATUS} · ${activeCall.DIRECTION} · ${activeCall.OWNER_NAME}`:s.emergency?'🚨 비상 호출':fresh?'🟢 수신대기':'상태 미수신';text('sosBigText',callText);text('sosSubDesc',activeCall?(activeCall.OWNED?'내 통화 · 적용 확인 후 송수신':'다른 운영자의 통화'):view.voice_available?'통화 시작 후 음성 연결':'통화 제어 가능 · Codec2 라이브러리 로드 실패');
  $('btnPttTalk').disabled=!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available;$('btnPttTalk').classList.toggle('active',activeCall?.DIRECTION==='CONTROL_TX');
@@ -205,3 +205,5 @@ function loadContacts(){for(const [label,id]of [['주민센터','telGov'],['소�
 function fillSites(){$('siteSelect').replaceChildren();for(const s of me.sites){const o=document.createElement('option');o.value=s.ID;o.textContent=s.NAME+' · '+s.ROLE;$('siteSelect').append(o);}if(me.sites.some(s=>s.ID===site))$('siteSelect').value=site;else site=$('siteSelect').value;}
 async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!pttChanging)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
 init();
+
+function detectionCountAction(reset){guarded(async()=>{const r=requireSelection(true)[0];if(reset&&!confirm(r.name+'의 누적 감지 횟수만 0으로 초기화할까요? 연령대 통계는 유지됩니다.'))return;await send(reset?'detection.reset':'detection.count',null,[r.id]);});}

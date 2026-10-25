@@ -764,12 +764,13 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     
     <!-- 레이더/CCTV 통합 카드 -->
     <div class="card projector-merged-square-card2" style="grid-column: 4 / span 2; grid-row: 3 / span 3; ">
+        <p id="detectionCountSummary" style="font-size:12px;margin:4px 0;flex-shrink:0">누적 감지 카운트 미조회</p><div style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0"><button id="detectionCountRead" onclick="detectionCountAction(false)">카운트 조회</button><button id="detectionCountReset" onclick="detectionCountAction(true)">카운트 초기화</button></div>
         <div class="card-title" id="mediaDisplayTitle">출입인원 CHECK (레이더)</div>
         <div class="media-display-container">
             <!-- 레이더 화면 -->
             <div class="radar-container" id="viewRadarContainer">
                 <div class="radar-count-badge">
-                    <span class="radar-count-val" id="radarDetectedCount">0</span>
+                    <span class="radar-count-val" id="radarDetectedCount">--</span>
                 </div>
                 <div class="radar-canvas-wrap"><canvas id="ld2450RadarCanvas"></canvas></div>
             </div>
@@ -831,5 +832,5 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 <dialog id="portalDialog" class="portal-dialog"><button class="close" onclick="document.getElementById('portalDialog').close()">닫기</button><h2 id="dialogTitle"></h2><div id="dialogBody"></div></dialog>
 <script src="/music-status.js"></script>
 <script src="/web-voice.js"></script>
-<script src="/portal.js"></script>
+<script src="/detection-count.js"></script><script src="/portal.js"></script>
 </body></html>

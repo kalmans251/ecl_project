@@ -60,6 +60,7 @@ class Command(IntEnum):
     MUSIC_PLAY = 0x33
     MUSIC_TIMELINE = 0x34
     MUSIC_SEEK = 0x35
+    DETECTION_RESET = 0x36
 
 
 class EmergencySource(IntEnum):

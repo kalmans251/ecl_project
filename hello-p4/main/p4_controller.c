@@ -561,11 +561,14 @@ static void handle_led(
  * No automatic replay: NEXT/CCTV are not idempotent. */
 static void handle_general_apply(const protocol_frame_t *request)
 {
+    static bool reset_cached=false;
+    static uint8_t reset_rail,reset_token[4],reset_detail[6];
     if(request->length<5)return;
     protocol_frame_t f=*request;
     f.command=request->payload[4];f.length=request->length-5;
     memmove(f.payload,request->payload+5,f.length);
-    uint8_t response[11]={0};memcpy(response,request->payload,5);
+    uint8_t response[12]={0};memcpy(response,request->payload,5);
+    uint8_t response_length=7;
     response[5]=1;
     bool active=call_manager_is_active() || emergency_manager_is_active();
     s_apply_accepted=false;
@@ -608,7 +611,24 @@ static void handle_general_apply(const protocol_frame_t *request)
             }
             break;
         case SERVICE_DETECTION:
-            if(f.command==CMD_SET && f.length==1 && f.payload[0]<=1) {
+            if(f.length==0 && (f.command==CMD_STATUS_REQUEST || f.command==CMD_DETECTION_RESET)) {
+                if(f.command==CMD_DETECTION_RESET && reset_cached && reset_rail==request->railing_id && !memcmp(reset_token,request->payload,4)) {
+                    response[5]=0;memcpy(response+6,reset_detail,6);response_length=12;
+                    break; /* Repeated transaction must not erase later detections. */
+                }
+                detection_summary_t summary;
+                if(f.command==CMD_DETECTION_RESET)detection_manager_reset_count(&summary);
+                else detection_manager_get_summary(&summary);
+                uint32_t count=summary.total_detected_count;
+                response[5]=0;response[6]=1;response[7]=(uint8_t)summary.source;
+                response[8]=(uint8_t)(count>>24);response[9]=(uint8_t)(count>>16);
+                response[10]=(uint8_t)(count>>8);response[11]=(uint8_t)count;
+                response_length=12;
+                if(f.command==CMD_DETECTION_RESET) {
+                    reset_cached=true;reset_rail=request->railing_id;
+                    memcpy(reset_token,request->payload,4);memcpy(reset_detail,response+6,6);
+                }
+            } else if(f.command==CMD_SET && f.length==1 && f.payload[0]<=1) {
                 handle_detection(&f);response[5]=detection_manager_get_source()==f.payload[0]?0:2;
             } else if(f.command==CMD_DATA &&
                 ((f.length==5 && f.payload[0]==DETECT_EVENT_CCTV_NEW_PERSON) ||
@@ -637,7 +657,7 @@ static void handle_general_apply(const protocol_frame_t *request)
         default:break;
         }
     }
-    send_response(request,request->service,CMD_APPLY_RESULT,response,7);
+    send_response(request,request->service,CMD_APPLY_RESULT,response,response_length);
 }
 
 void p4_controller_task(

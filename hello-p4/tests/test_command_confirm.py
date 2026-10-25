@@ -16,13 +16,14 @@ class ConfirmTests(unittest.TestCase):
 static const protocol_frame_t *s_apply_request;
 static bool s_apply_accepted,active,emergency,queue_ok=true,manager_ok=true;
 static unsigned replies,led_calls,actions;
-static uint8_t result[11];
+static uint8_t result[12];
+static unsigned count=123, resets;
 static p4_system_state_t state;
 static bool call_manager_is_active(void){return active;}
 static bool emergency_manager_is_active(void){return emergency;}
 void system_state_get(p4_system_state_t *out){*out=state;}
 static void send_response(const protocol_frame_t *f,uint8_t service,uint8_t cmd,const uint8_t *p,uint8_t n){
- assert(f->service==service && cmd==CMD_APPLY_RESULT && n==7);memcpy(result,p,n);replies++;
+ assert(f->service==service && cmd==CMD_APPLY_RESULT && (n==7 || n==12));memcpy(result,p,n);replies++;
 }
 static void handle_led(const protocol_frame_t *f){(void)f;assert(s_apply_request);led_calls++;s_apply_accepted=queue_ok;}
 static void handle_power(const protocol_frame_t *f){actions++;if(f->command==CMD_SET)state.power_mode=f->payload[0];}
@@ -33,6 +34,8 @@ static bool projector_control_get(void){return state.projector_enabled;}
 static void handle_sleep(const protocol_frame_t *f){actions++;state.sleep_mode_enabled=f->command==CMD_START;}
 static void handle_detection(const protocol_frame_t *f){(void)f;actions++;s_apply_accepted=manager_ok;}
 detection_source_t detection_manager_get_source(void){return DETECTION_SOURCE_CCTV;}
+void detection_manager_get_summary(detection_summary_t *out){memset(out,0,sizeof(*out));out->source=DETECTION_SOURCE_CCTV;out->total_detected_count=count;}
+void detection_manager_reset_count(detection_summary_t *out){resets++;count=0;detection_manager_get_summary(out);}
 static void control_confirm_begin(const protocol_frame_t *f){(void)f;}
 static bool control_confirm_end(void){return false;}
 static bool music_manager_start(void){actions++;return manager_ok;}
@@ -64,6 +67,13 @@ int main(void){
  f=req(SERVICE_POWER,CMD_SET);f.length=6;f.payload[5]=POWER_MODE_AC;handle_general_apply(&f);assert(result[5]==0);
  f=req(SERVICE_POWER,CMD_START);handle_general_apply(&f);assert(result[5]==0);
  f=req(SERVICE_POWER,CMD_STOP);handle_general_apply(&f);assert(result[5]==2); /* output driver reports enabled */
+ f=req(SERVICE_DETECTION,CMD_STATUS_REQUEST);handle_general_apply(&f);
+ assert(result[5]==0 && result[6]==1 && result[7]==1 && result[11]==123);
+ f=req(SERVICE_DETECTION,CMD_DETECTION_RESET);handle_general_apply(&f);
+ assert(result[5]==0 && result[11]==0 && resets==1);
+ count=1;handle_general_apply(&f);assert(count==1 && resets==1 && result[11]==0);
+ f.payload[0]++;handle_general_apply(&f);assert(count==0 && resets==2);
+ count=9;f.payload[0]++;active=true;handle_general_apply(&f);assert(count==9 && result[5]==1);
  return 0;
 }
 '''

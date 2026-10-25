@@ -19,7 +19,7 @@ public class Commands {
         Map.entry("led",Set.of("on","off","basic","music")),Map.entry("weather",Set.of("clear","cloudy","rain","snow")),
         Map.entry("music.mode",Set.of("sequential","shuffle","age")),Map.entry("sleep",Set.of("on","off")),
         Map.entry("detection",Set.of("radar","cctv")),Map.entry("query",Set.of("p4","wroom","s3")));
-    private static final Set<String> ACTIONS=Set.of("music.start","music.stop","music.pause","music.resume","music.next","call.start","call.end","ptt.on","ptt.off","emergency.ack");
+    private static final Set<String> ACTIONS=Set.of("music.start","music.stop","music.pause","music.resume","music.next","call.start","call.end","ptt.on","ptt.off","emergency.ack","detection.count","detection.reset");
     public Commands(JdbcTemplate db, Accounts accounts, Registry registry, Gateways gateways) {
         this.db=db;this.accounts=accounts;this.registry=registry;this.gateways=gateways;
         this.transaction=new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.datasource.DataSourceTransactionManager(db.getDataSource()));
@@ -177,7 +177,7 @@ public class Commands {
         if(!Set.of("SENT","RECEIVED").contains(row.get("STATUS")))return;
         boolean expired=((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis();
         String detail=expired?"Late result; application unknown":status.equals("COMPLETED")?
-            (op.equals("query")?"Device response confirmed":"P4 policy confirmed; WROOM playback not confirmed"):"";
+            ((op.equals("query") || op.equals("detection.count"))?"Device response confirmed":"P4 policy confirmed; WROOM playback not confirmed"):"";
         db.update("UPDATE commands SET status=?,result_data=?,detail=? WHERE id=?",expired?"UNKNOWN":status,
             expired?null:json.writeValueAsString(node.get("data")),detail,row.get("ID"));
     }
