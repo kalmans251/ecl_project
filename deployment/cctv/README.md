@@ -1,5 +1,9 @@
 # CCTV 연결과 난간 연동 (MediaMTX v1.21.2)
 
+Windows에서 바로 적용하려면 **[전체 설정 복사·실행 가이드](WINDOWS_SETUP.md)**를 먼저 읽는다.
+전체 [nginx.conf](nginx.conf)와 [mediamtx.example.yml](mediamtx.example.yml)을 제공한다.
+운영 파일은 저장소 밖에 복사하고 실제 비밀은 운영 복사본에만 입력한다.
+
 ## 구성과 보안 경계
 
 CCTV → CCTV 전용 Pi(FFmpeg 복사 송출) → SRT/UDP 8890 → 서버 MediaMTX.
@@ -82,7 +86,9 @@ $r.GetBytes($b); $r.Dispose()
 .\mediamtx.exe .\mediamtx.yml
 ```
 
-`nginx-locations.conf` 조각을 기존 **443 server 블록**에 반영한다.
+현재 omtest.duckdns.org Windows 구성은 전체 `nginx.conf`를 백업 후 복사한다.
+별도의 사용자 설정을 유지해야 할 때만 `nginx-locations.conf` 조각을 기존 **443 server 블록**에 반영한다.
+전체 파일과 조각을 중복 적용하지 않는다.
 동일 location을 중복 추가하지 말고 이전 `/cctv/` 영상 프록시를 제거/교체한다.
 일반 `/` → Spring Boot, 기존 난간/음성 WebSocket 설정과 ACME 설정은 유지한다.
 사용자 지정 CSP가 있으면 WebRTC connect-src 'self', media-src 'self' blob:를 허용한다.
