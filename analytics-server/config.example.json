@@ -1,0 +1,14 @@
+{
+  "camera_id": "cctv01",
+  "server_url": "http://127.0.0.1:8080",
+  "analysis_token": "REPLACE_WITH_ANALYSIS_TOKEN",
+  "model": "yolo11n.pt",
+  "device": "cpu",
+  "roi": [0, 0, 1, 1],
+  "age": {
+    "enabled": false,
+    "repo": "MiVOLO",
+    "checkpoint": "models/mivolo_imdb.pth.tar",
+    "device": "cpu"
+  }
+}

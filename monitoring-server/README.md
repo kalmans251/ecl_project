@@ -187,3 +187,9 @@ APPLIED는 장치 적용, COMPLETED는 조회/정책 확인입니다. UNKNOWN은
 별도 Python 변환 프로세스 없이 Java/JNA에서 Codec2를 직접 호출합니다.
 Windows x64 및 Linux x64 네이티브 라이브러리 내장 배포 JAR, 소스 빌드·자기진단 방법은
 [WEB_VOICE.md](WEB_VOICE.md)를 확인하세요. 기존 Gateway 인증은 유지합니다.
+
+## CCTV 전용 Pi와 분석 서버
+
+새 장치별 인증·SRT 암호화·수요 기반 송출은 [CCTV 설치 안내](../deployment/cctv/README.md)를 따릅니다.
+로그인 후 `/cctv-test.html`에서 등록·사용 허용·상태·영상을 확인할 수 있습니다.
+기존 `/cctv/` 공개 프록시는 제거하고 안내의 Nginx 설정을 적용해야 합니다.
