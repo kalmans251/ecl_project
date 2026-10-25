@@ -48,16 +48,17 @@ class PortalTest {
   accounts.membership("admin",(String)accounts.user(operator).get("ID"),"site-01","NONE");assertEquals(403,op.request("/api/portal/sites/site-01/state","GET",null,false).statusCode());
  }
  class Device implements AutoCloseable {
-  final BlockingQueue<String> messages=new LinkedBlockingQueue<>();final WebSocket ws;
-  Device()throws Exception{ws=HttpClient.newHttpClient().newWebSocketBuilder().header("Authorization","Bearer gateway-012345678901234567890123456789").buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/gateways/gateway-01"),new WebSocket.Listener(){StringBuilder data=new StringBuilder();public void onOpen(WebSocket s){s.request(1);}public CompletionStage<?> onText(WebSocket s,CharSequence t,boolean last){data.append(t);if(last){messages.add(data.toString());data.setLength(0);}s.request(1);return null;}}).join();assertEquals("welcome",json.readTree(messages.poll(3,TimeUnit.SECONDS)).path("type").asText());}
+  final BlockingQueue<String> messages=new LinkedBlockingQueue<>();final WebSocket ws;final String gateway;
+  Device()throws Exception{this("gateway-01","gateway-012345678901234567890123456789");}
+  Device(String gateway,String token)throws Exception{this.gateway=gateway;ws=HttpClient.newHttpClient().newWebSocketBuilder().header("Authorization","Bearer "+token).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/gateways/"+gateway),new WebSocket.Listener(){StringBuilder data=new StringBuilder();public void onOpen(WebSocket s){s.request(1);}public CompletionStage<?> onText(WebSocket s,CharSequence t,boolean last){data.append(t);if(last){messages.add(data.toString());data.setLength(0);}s.request(1);return null;}}).join();assertEquals("welcome",json.readTree(messages.poll(3,TimeUnit.SECONDS)).path("type").asText());}
   String next(){try{return messages.poll(3,TimeUnit.SECONDS);}catch(Exception e){throw new RuntimeException(e);}}
   void ack(String id,String status)throws Exception{ws.sendText(json.writeValueAsString(Map.of("version",1,"type","ack","message_id",id,"status",status)),true).join();long until=System.nanoTime()+2_000_000_000L;while(System.nanoTime()<until){if(status.equals(db.queryForObject("SELECT status FROM commands WHERE id=?",String.class,id)))return;Thread.sleep(10);}fail("ACK not received");}
   void callAck(tools.jackson.databind.JsonNode message)throws Exception{
    String id=message.path("message_id").asText(),op=message.path("operation").asText();
    var data=Map.of("call_id",message.path("call_id").asText(),"railing_id",1,"session_id",123,"epoch",id,"direction",op.equals("call.end")?"IDLE":op.equals("ptt.on")?"CONTROL_TX":"FIELD_TX");
-   assertThrows(RuntimeException.class,()->commands.ack("gateway-01",id,"APPLIED"));
+   assertThrows(RuntimeException.class,()->commands.ack(gateway,id,"APPLIED"));
    var wrong=new HashMap<String,Object>(data);wrong.put("call_id",UUID.randomUUID().toString());
-   assertThrows(RuntimeException.class,()->commands.callResult("gateway-01",json.valueToTree(Map.of("version",1,"type","call_result","message_id",id,"status","APPLIED","data",wrong))));
+   assertThrows(RuntimeException.class,()->commands.callResult(gateway,json.valueToTree(Map.of("version",1,"type","call_result","message_id",id,"status","APPLIED","data",wrong))));
    ws.sendText(json.writeValueAsString(Map.of("version",1,"type","call_result","message_id",id,"status","APPLIED","data",data)),true).join();
    long until=System.nanoTime()+2_000_000_000L;while(System.nanoTime()<until){if("APPLIED".equals(db.queryForObject("SELECT status FROM commands WHERE id=?",String.class,id)))return;Thread.sleep(10);}fail("Call result not received");
   }
@@ -201,5 +202,78 @@ class PortalTest {
   long until=System.nanoTime()+3_000_000_000L;
   while(System.nanoTime()<until){var response=browser.request("/api/portal/commands/"+id,"GET",null,false);if(json.readTree(response.body()).path("status").asText().equals(expected))return;Thread.sleep(20);}
   fail("Music result not confirmed");
+ }
+ class Media implements AutoCloseable {
+  final BlockingQueue<byte[]> audio=new LinkedBlockingQueue<>();
+  final CompletableFuture<Integer> closed=new CompletableFuture<>();final WebSocket ws;
+  Media(Browser b,String call)throws Exception{
+   ws=b.http.newWebSocketBuilder().header("Origin","http://127.0.0.1:"+port).buildAsync(URI.create("ws://127.0.0.1:"+port+"/ws/operator/voice/"+call),new WebSocket.Listener(){
+    final java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();
+    public void onOpen(WebSocket w){w.request(1);}
+    public CompletionStage<?> onText(WebSocket w,CharSequence text,boolean last){w.request(1);return null;}
+    public CompletionStage<?> onBinary(WebSocket w,java.nio.ByteBuffer data,boolean last){byte[] part=new byte[data.remaining()];data.get(part);bytes.writeBytes(part);if(last){audio.add(bytes.toByteArray());bytes.reset();}w.request(1);return null;}
+    public CompletionStage<?> onClose(WebSocket w,int status,String reason){closed.complete(status);return null;}
+   }).join();
+  }
+  void bind(tools.jackson.databind.JsonNode command,String direction)throws Exception{
+   ws.sendText(json.writeValueAsString(Map.of("type","bind","codec","codec2-2400-v1","epoch",command.path("message_id").asText(),"direction",direction)),true).join();
+   awaitVoice(command.path("call_id").asText(),command.path("message_id").asText());
+  }
+  void send(String epoch,byte[] bits){ws.sendBinary(java.nio.ByteBuffer.allocate(84).put(epoch.getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(bits).flip(),true).join();}
+  public void close(){ws.sendClose(1000,"done").join();}
+ }
+ tools.jackson.databind.JsonNode callCommand(Browser b,Device d,String rail,String op)throws Exception{
+  var response=b.request("/api/portal/commands","POST",command(rail,op,null),true);assertEquals(200,response.statusCode(),response.body());
+  var outgoing=json.readTree(d.next());assertEquals(op,outgoing.path("operation").asText());d.callAck(outgoing);return outgoing;
+ }
+ Map<String,Object> fieldVoice(tools.jackson.databind.JsonNode c,byte[] bits,int seq){return Map.of("version",1,"type","voice","call_id",c.path("call_id").asText(),"railing_id",1,"direction","FIELD_TX","epoch",c.path("message_id").asText(),"sequence",seq,"codec2",Base64.getEncoder().encodeToString(bits));}
+ void assertAudio(Media m,byte[] expected)throws Exception{var packet=m.audio.poll(3,TimeUnit.SECONDS);assertNotNull(packet);assertEquals(84,packet.length);assertArrayEquals(expected,Arrays.copyOfRange(packet,36,84));}
+ void awaitCallStatus(String gateway,String status)throws Exception{
+  long until=System.nanoTime()+3_000_000_000L;while(System.nanoTime()<until){if(status.equals(db.queryForObject("SELECT status FROM calls WHERE gateway_id=?",String.class,gateway)))return;Thread.sleep(10);}fail("Expected call status "+status);
+ }
+ @Test void twoSitesKeepVoiceAndRecoveryIndependent()throws Exception{
+  String suffix=UUID.randomUUID().toString().substring(0,8),site="site-"+suffix,gateway="gateway-"+suffix,token="isolated-gateway-012345678901234567890";
+  registry.site("admin",site,"Second independent system");registry.gateway("admin",gateway,site,"Second gateway",token);
+  String aName=newUser("isolation-a","OPERATOR"),bName="isolation-b"+suffix;
+  String bId=(String)accounts.create(bName,bName,"integration-test-password",false).get("id");accounts.membership("admin",bId,site,"OPERATOR");
+  var a=new Browser(aName);var b=new Browser(bName);String railA=rail(),railB=registry.ensureRail(gateway,1);
+  byte[] bitsA=new byte[48],bitsB=new byte[48];Arrays.fill(bitsA,(byte)0x35);Arrays.fill(bitsB,(byte)0x6a);
+  try(var da=new Device();var dbDevice=new Device(gateway,token)){
+   assertEquals(403,a.request("/api/portal/sites/"+site+"/state","GET",null,false).statusCode());
+   assertEquals(403,b.request("/api/portal/sites/site-01/state","GET",null,false).statusCode());
+   assertEquals(403,a.request("/api/portal/commands","POST",command(railB,"call.start",null),true).statusCode());
+   var ca=callCommand(a,da,railA,"call.start");var cb=callCommand(b,dbDevice,railB,"call.start");
+   try(var ma=new Media(a,ca.path("call_id").asText());var mb=new Media(b,cb.path("call_id").asText());var foreign=new Media(a,cb.path("call_id").asText())){
+    assertEquals(1008,foreign.closed.get(3,TimeUnit.SECONDS));ma.bind(ca,"FIELD_TX");mb.bind(cb,"FIELD_TX");
+    da.ws.sendText(json.writeValueAsString(fieldVoice(ca,bitsA,0)),true).join();dbDevice.ws.sendText(json.writeValueAsString(fieldVoice(cb,bitsB,0)),true).join();
+    assertAudio(ma,bitsA);assertAudio(mb,bitsB);assertTrue(ma.audio.isEmpty());assertTrue(mb.audio.isEmpty());
+    // Both independent gateways may talk, even with the same local rail number.
+    var pa=callCommand(a,da,railA,"ptt.on");var pb=callCommand(b,dbDevice,railB,"ptt.on");ma.bind(pa,"CONTROL_TX");mb.bind(pb,"CONTROL_TX");
+    ma.send(pa.path("message_id").asText(),bitsA);mb.send(pb.path("message_id").asText(),bitsB);
+    var va=json.readTree(da.next());var vb=json.readTree(dbDevice.next());
+    assertEquals(ca.path("call_id").asText(),va.path("call_id").asText());assertArrayEquals(bitsA,Base64.getDecoder().decode(va.path("codec2").asText()));
+    assertEquals(cb.path("call_id").asText(),vb.path("call_id").asText());assertArrayEquals(bitsB,Base64.getDecoder().decode(vb.path("codec2").asText()));
+    cb=callCommand(b,dbDevice,railB,"ptt.off");mb.bind(cb,"FIELD_TX");
+    // Gateway A sends B's valid epoch/call ID: reject A, preserve B's media.
+    da.ws.sendText(json.writeValueAsString(fieldVoice(cb,bitsA,1)),true).join();awaitCallStatus("gateway-01","UNKNOWN");
+    assertFalse(mb.closed.isDone());assertEquals("ACTIVE",this.db.queryForObject("SELECT status FROM calls WHERE gateway_id=?",String.class,gateway));
+    dbDevice.ws.sendText(json.writeValueAsString(fieldVoice(cb,bitsB,1)),true).join();assertAudio(mb,bitsB);
+    // A reconnect is uncertain until a correlated physical END, not automatically idle.
+    try(var recovered=new Device()){
+     assertEquals(409,a.request("/api/portal/commands","POST",command(railA,"query","p4"),true).statusCode());
+     callCommand(a,recovered,railA,"call.end");
+     assertEquals(0,this.db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
+     assertFalse(mb.closed.isDone());
+     // Losing B's browser stops only B's renewal after the existing grace interval.
+     mb.close();mb.closed.get(3,TimeUnit.SECONDS);
+     long closedUntil=System.nanoTime()+3_000_000_000L;
+     while(((Map<?,?>)org.springframework.test.util.ReflectionTestUtils.getField(voice,"peers")).containsKey(cb.path("call_id").asText()) && System.nanoTime()<closedUntil)Thread.sleep(10);
+     assertFalse(((Map<?,?>)org.springframework.test.util.ReflectionTestUtils.getField(voice,"peers")).containsKey(cb.path("call_id").asText()));
+     this.db.update("UPDATE calls SET touched_at=? WHERE gateway_id=?",System.currentTimeMillis()-16000,gateway);voice.clean();
+     awaitCallStatus(gateway,"UNKNOWN");assertEquals("voice.pause",json.readTree(dbDevice.next()).path("type").asText());
+     callCommand(b,dbDevice,railB,"call.end");
+    }
+   }
+  }finally{this.db.update("DELETE FROM calls WHERE gateway_id IN (?,?)","gateway-01",gateway);}
  }
 }

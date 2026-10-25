@@ -59,3 +59,22 @@ PTT epoch 변경 시 codec 상태를 초기화하고 오래된 변환 결과를 
 
 실제 장비에서 양방향 10분 통화, PTT 반복, 탭 전환, 연결 끊김·재연결을 검증하세요.
 30명 동시 통화 성능이나 P4 전환 지연 개선을 보장하는 변경은 아닙니다.
+
+## Independent sites and disconnect recovery
+
+Each site must have its own gateway ID/token and user memberships. Local rail numbers
+may overlap (for example, both gateways may have rail 1); routing uses gateway and
+call identity, not the local rail number alone. A foreign gateway's voice envelope
+is rejected on the sending connection without closing the target operator socket.
+
+A current gateway disconnect makes only its calls UNKNOWN. A delayed close callback
+from an old gateway connection cannot invalidate its replacement. Browser media loss
+uses the existing 15-second grace period and pauses that call's renewal; physical
+termination must still be confirmed before releasing its reservation.
+
+`PortalTest.twoSitesKeepVoiceAndRecoveryIndependent` uses two authenticated users,
+two sites, and two simulated gateway WebSockets. It checks simultaneous calls and
+both audio directions, cross-site access denial, foreign voice rejection, reconnect
+and confirmed hangup, and browser disconnect recovery. `GatewayDisconnectTest`
+covers closed-session callbacks and obsolete callbacks after replacement.
+These tests do not measure 30-call capacity or real PLC audio quality.

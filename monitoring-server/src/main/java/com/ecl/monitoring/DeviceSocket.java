@@ -16,8 +16,10 @@ public class DeviceSocket extends TextWebSocketHandler {
     @Override public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         session.setTextMessageSizeLimit(4096);
         session.setBinaryMessageSizeLimit(4096);
-        commands.disconnected(id(session));
-        gateways.connect(id(session),session);
+        synchronized(commands){
+            commands.disconnected(id(session));
+            gateways.connect(id(session),session);
+        }
         gateways.send(id(session),json.writeValueAsString(Map.of("version",1,"type","welcome","gateway_id",id(session))));
     }
     @Override protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
@@ -49,11 +51,15 @@ public class DeviceSocket extends TextWebSocketHandler {
         gateways.pong(id(session),session.getId());
     }
     @Override public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        if(gateways.isCurrent(id(session),session.getId()))commands.disconnected(id(session));
-        gateways.disconnect(id(session),session.getId());
+        synchronized(commands){
+            if(gateways.ownsConnection(id(session),session.getId()))commands.disconnected(id(session));
+            gateways.disconnect(id(session),session.getId());
+        }
     }
     @Override public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
-        if(gateways.isCurrent(id(session),session.getId()))commands.disconnected(id(session));
-        gateways.disconnect(id(session),session.getId()); session.close(CloseStatus.SERVER_ERROR);
+        synchronized(commands){
+            if(gateways.ownsConnection(id(session),session.getId()))commands.disconnected(id(session));
+            gateways.disconnect(id(session),session.getId());
+        } session.close(CloseStatus.SERVER_ERROR);
     }
 }
