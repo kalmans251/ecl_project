@@ -1,5 +1,8 @@
 # CCTV 연결과 난간 연동 (MediaMTX v1.21.2)
 
+**[DB 초기화부터 서버·난간 Pi·CCTV까지 순서대로 연결하기](../FRESH_START.md)** —
+완전 초기화와 평소 재시작을 구분한 통합 설명서입니다.
+
 Windows에서 바로 적용하려면 **[전체 설정 복사·실행 가이드](WINDOWS_SETUP.md)**를 먼저 읽는다.
 전체 [nginx.conf](nginx.conf)와 [mediamtx.example.yml](mediamtx.example.yml)을 제공한다.
 운영 파일은 저장소 밖에 복사하고 실제 비밀은 운영 복사본에만 입력한다.

@@ -1,5 +1,8 @@
 # Monitoring server — 모니터링 화면과 현장별 제어 서버
 
+**[DB 초기화부터 서버·난간 Pi·CCTV까지 순서대로 연결하기](../deployment/FRESH_START.md)** —
+완전 초기화와 평소 재시작을 구분한 통합 설명서입니다.
+
 Spring Boot 4.1.1 / Java 17 / Maven 3.9+. 기존 모니터링 화면을 새 계정·현장 권한·장치 명령 구조에 연결했습니다.
 
 화면 이식 범위와 지원 상태는 [UI_MIGRATION.md](UI_MIGRATION.md), 새 Pi 어댑터 규격은 [DEVICE_PROTOCOL.md](DEVICE_PROTOCOL.md)를 확인하세요.
