@@ -60,8 +60,8 @@ public class Commands {
         for(var rail:rails) {
             String gateway=(String)rail.get("GATEWAY_ID");
             if(!gateways.online(gateway)) throw new ResponseStatusException(HttpStatus.CONFLICT,"Gateway offline");
-            if(db.queryForObject("SELECT COUNT(*) FROM commands WHERE gateway_id=? AND status IN ('QUEUED','SENT','RECEIVED')",Integer.class,gateway)>=100)
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Gateway queue full");
+            if(db.queryForObject("SELECT COUNT(*) FROM commands WHERE gateway_id=? AND status IN ('QUEUED','SENT','RECEIVED')",Integer.class,gateway)>0)
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"Gateway is processing another command; wait for its result before retrying");
             if(!call && !db.queryForList("SELECT id FROM calls WHERE gateway_id=?",gateway).isEmpty())
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"Gateway is in a call; only call controls are available");
         }

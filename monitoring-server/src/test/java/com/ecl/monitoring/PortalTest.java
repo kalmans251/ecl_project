@@ -120,6 +120,56 @@ class PortalTest {
    var query=json.readTree(device.next());device.ack(query.path("message_id").asText(),"FAILED");
   }
  }
+ @Test void concurrentOperatorsCannotQueueConflictingGatewayCommands()throws Exception{
+  String rail=rail(),rail2=registry.ensureRail("gateway-01",2);
+  var a=new Browser(newUser("busy-a","OPERATOR"));var b=new Browser(newUser("busy-b","OPERATOR"));
+  var requestA=command(rail,"volume","20");var requestB=command(rail,"volume","30");
+  try(var device=new Device()){
+   var pool=Executors.newFixedThreadPool(2);var ready=new CountDownLatch(2);var go=new CountDownLatch(1);
+   try{
+    var fa=pool.submit(()->{ready.countDown();go.await();return a.request("/api/portal/commands","POST",requestA,true);});
+    var fb=pool.submit(()->{ready.countDown();go.await();return b.request("/api/portal/commands","POST",requestB,true);});
+    assertTrue(ready.await(3,TimeUnit.SECONDS));go.countDown();
+    var ra=fa.get(5,TimeUnit.SECONDS);var rb=fb.get(5,TimeUnit.SECONDS);
+    assertEquals(Set.of(200,409),Set.of(ra.statusCode(),rb.statusCode()));
+    var first=json.readTree(device.next());String id=first.path("message_id").asText();
+    Browser winner=ra.statusCode()==200?a:b;var same=ra.statusCode()==200?requestA:requestB;
+    // A network retry with the same request ID returns its existing result, not a second command.
+    assertEquals(id,json.readTree(winner.request("/api/portal/commands","POST",same,true).body()).get(0).path("id").asText());
+    assertEquals(409,a.request("/api/portal/commands","POST",command(rail2,"query","p4"),true).statusCode());
+    assertEquals(409,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());
+    assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
+    assertNull(device.messages.poll(100,TimeUnit.MILLISECONDS));
+    device.ack(id,"FAILED");
+    // One deliberate multi-rail batch remains supported, and keeps the gateway busy until all results arrive.
+    var batch=command(rail,"query","p4");batch.put("rail_ids",List.of(rail,rail2));
+    assertEquals(200,a.request("/api/portal/commands","POST",batch,true).statusCode());
+    var one=json.readTree(device.next());assertNull(device.messages.poll(100,TimeUnit.MILLISECONDS));
+    assertEquals(409,b.request("/api/portal/commands","POST",command(rail,"volume","40"),true).statusCode());
+    device.ack(one.path("message_id").asText(),"FAILED");
+    var two=json.readTree(device.next());assertNotEquals(one.path("railing_id").asInt(),two.path("railing_id").asInt());
+    device.ack(two.path("message_id").asText(),"FAILED");
+    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"query","p4"),true).statusCode());
+    device.ack(json.readTree(device.next()).path("message_id").asText(),"FAILED");
+   }finally{go.countDown();pool.shutdownNow();}
+  }
+ }
+ @Test void busyGatewayDoesNotBlockAnotherGatewayOrPartiallyAcceptBatch()throws Exception{
+  String suffix=UUID.randomUUID().toString().substring(0,8),gateway="busy-"+suffix,token="busy-gateway-012345678901234567890";
+  registry.gateway("admin",gateway,"site-01","Independent gateway",token);
+  String railA=rail(),railB=registry.ensureRail(gateway,1);var browser=new Browser("admin");
+  try(var a=new Device();var b=new Device(gateway,token)){
+   assertEquals(200,browser.request("/api/portal/commands","POST",command(railA,"query","p4"),true).statusCode());
+   var first=json.readTree(a.next());
+   var batch=command(railB,"volume","20");batch.put("rail_ids",List.of(railB,railA));
+   assertEquals(409,browser.request("/api/portal/commands","POST",batch,true).statusCode());
+   assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM commands WHERE batch_id=?",Integer.class,batch.get("request_id")));
+   assertNull(b.messages.poll(100,TimeUnit.MILLISECONDS));
+   assertEquals(200,browser.request("/api/portal/commands","POST",command(railB,"query","p4"),true).statusCode());
+   b.ack(json.readTree(b.next()).path("message_id").asText(),"FAILED");
+   a.ack(first.path("message_id").asText(),"FAILED");
+  }
+ }
  @Test void commandDedupQueueAndCallOwnership()throws Exception{
   String owner=newUser("owner","OPERATOR"),other=newUser("other","OPERATOR");var b=new Browser(owner);var o=new Browser(other);String rail=rail();
   try(var device=new Device()){
