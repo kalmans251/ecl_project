@@ -22,9 +22,13 @@ function statusCheck(r){
  return {fresh:!stateFetchFailed&&r.online&&!!r.seen_at&&Date.now()-r.seen_at<15000&&advanced,
  waiting:!advanced&&performance.now()-baseline.at<15000};
 }
+let emergencyAudio;
+function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>text('emergencyAudioState',message));}
+function enableEmergencyAudio(){return guarded(()=>alarmAudio().enable());}
+function muteEmergencyAudio(){alarmAudio().mute();}
 function rails(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
 function requireSelection(single=false){const items=rails();if(!items.length || (single&&items.length!==1))throw Error(single?'난간 하나를 선택하세요.':'난간을 선택하세요.');if(view.role==='VIEWER')throw Error('조회 계정은 제어할 수 없습니다.');return items;}
-let controlBusy=false,pttChanging=false;
+let controlBusy=false,pttChanging=false,emergencyAccepting=false,emergencyModalOpen=false;
 async function waitControlResults(rows){
  const deadline=performance.now()+65000;
  let latest=rows;
@@ -36,6 +40,7 @@ async function waitControlResults(rows){
  throw Error('확인 대기 시간 초과 · 적용 여부 불명. 처리 내역을 확인하세요. 자동 재전송하지 않습니다.');
 }
 async function send(operation,value,ids){
+ if(emergencyAccepting && operation!=='call.accept')throw Error('비상통화 수락 처리 중입니다.');
  const items=requireSelection(operation.startsWith('call.')||operation.startsWith('ptt.'));
  const general=!operation.startsWith('call.')&&!operation.startsWith('ptt.')&&operation!=='emergency.ack';
  if(general&&controlBusy)throw Error('이전 제어의 장치 응답을 기다리고 있습니다.');
@@ -53,8 +58,8 @@ async function send(operation,value,ids){
  }finally{if(general)controlBusy=false;}
 }
 async function guarded(action){try{await action();}catch(error){toast(error.message);}}
-function choose(id){if(activeCall && !selected.has(id)){toast('통화 종료 후 난간을 변경하세요.');return;}selected=selected.has(id)?new Set():new Set([id]);dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
-function selectAllDevices(){if(activeCall)return toast('통화 종료 후 선택을 변경하세요.');selected=new Set(view.rails.map(r=>r.id));dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
+function choose(id){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall && !selected.has(id)){toast('통화 종료 후 난간을 변경하세요.');return;}selected=selected.has(id)?new Set():new Set([id]);dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
+function selectAllDevices(){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall)return toast('통화 종료 후 선택을 변경하세요.');selected=new Set(view.rails.map(r=>r.id));dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
 function renderSelection(){
  const grid=$('idBadgeGrid');grid.replaceChildren();for(const r of view.rails){const b=document.createElement('button');b.type='button';b.className=(selected.has(r.id)?'selected ':'')+(r.online?'':'offline');b.textContent=`${r.name} · ${r.gateway_id}/${r.number}`;b.title=r.online?'게이트웨이 연결됨':'게이트웨이 오프라인';b.onclick=()=>choose(r.id);grid.append(b);}
  text('selectedDeviceTag',rails().length?rails().map(r=>r.name).join(', '):'난간 선택');$('inputTotalDevices').value=view.rails.length;
@@ -154,6 +159,7 @@ function renderMusicStatus(){
  if(d.durationMs)showSeekTarget();else text('musicSeekTarget','--:--');
 }
 function renderLive(){
+ if(typeof EmergencyAudio!=='undefined')alarmAudio().sync(view?.rails||[],view?.calls||[]);
  renderMusicStatus();
  const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=fresh?r.reported:{};
  text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':s.battery_percent.toFixed(1)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
@@ -166,11 +172,11 @@ function renderLive(){
  $('btnPttTalk').disabled=!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available;$('btnPttTalk').classList.toggle('active',activeCall?.DIRECTION==='CONTROL_TX');
  if(!activeCall?.OWNED || !['ACTIVE','SWITCHING','ENDING'].includes(activeCall.STATUS))closeVoice();
  else if(activeCall.STATUS!=='ACTIVE')portalVoice?.pause();
- for(const item of view.rails){if(item.reported.emergency && (item.reported.emergency_at||item.seen_at) && !lastEmergency.has(item.id)){lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
+ for(const item of view.rails){if(item.reported.emergency && (item.reported.emergency_at||item.seen_at) && !lastEmergency.has(item.id) && !emergencyModalOpen && !emergencyAccepting){emergencyModalOpen=true;lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
  radarView.select(rails().length===1 && $('viewRadarContainer').style.display!=='none' ? r.id : null);
 }
 async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length&&!statusBaselines.size){selected.add(view.rails[0].id);awaitStatus(selected);}renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();await renewStatusDemand();}catch(e){if(requestedSite!==site)return;stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
-async function changeSite(){if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');site=$('siteSelect').value;selected.clear();statusBaselines.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
+async function changeSite(){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');if(emergencyAudio)emergencyAudio.sync([],[]);site=$('siteSelect').value;selected.clear();statusBaselines.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
 async function logout(){await guarded(async()=>{if(view?.calls.some(c=>c.OWNED))throw Error('통화를 종료한 뒤 로그아웃하세요.');closeVoice();await api('/api/auth/logout','POST');location.href='/login.html';});}
 function dialog(title){text('dialogTitle',title);$('dialogBody').replaceChildren();$('portalDialog').showModal();return $('dialogBody');}
 function table(parent,headers,rows){const t=document.createElement('table');let tr=document.createElement('tr');for(const h of headers){const th=document.createElement('th');th.textContent=h;tr.append(th);}t.append(tr);for(const row of rows){tr=document.createElement('tr');for(const val of row){const td=document.createElement('td');td.textContent=val??'--';tr.append(td);}t.append(tr);}parent.append(t);}
@@ -178,8 +184,20 @@ function showResults(){const body=dialog('요청 처리 내역');for(const node 
 function toggleStatsMenu(event){event.stopPropagation();$('statsMenuDropdown').classList.toggle('show');$('statsMenuDropdown').style.display=$('statsMenuDropdown').classList.contains('show')?'block':'none';}
 function openStatsDetail(label){guarded(async()=>{$('statsMenuDropdown').style.display='none';const s=await api(`/api/portal/sites/${site}/statistics?period=${({일일:'daily',주간:'weekly',월간:'monthly',연간:'yearly'})[label]}`);const body=dialog(label+' 통계');const p=document.createElement('p');p.textContent=`충전량 ${s.watt_hours.toFixed(2)} Wh · 유효 난간 측정 시간 ${s.coverage_rail_seconds}초 · 비상 발생 ${s.emergency_starts}회 · 표본 ${s.samples}개. 실제 수신 데이터만 집계하며 보존 기간은 ${s.retained_days}일입니다.`;body.append(p);table(body,['측정 시간','난간','배터리 (%)'],s.points.map(p=>[new Date(p.time).toLocaleString('ko-KR'),view.rails.find(r=>r.id===p.rail)?.name||p.rail,p.battery]));});}
 async function sendEmergencySms(label,input){await guarded(async()=>{const r=requireSelection(true)[0];const phone=$(input).value;if(!confirm(`${label}의 저장된 연락처로 ${r.name} 비상 확인 문자를 발송할까요?`))return;await api(`/api/portal/sites/${site}/contacts/${encodeURIComponent(label)}`,'PUT',{phone});const result=await api(`/api/portal/sites/${site}/sms`,'POST',{request_id:newId(),label,rail_id:r.id});toast(`문자 요청 ${result.status} · 수신자 도착 여부는 별도 확인이 필요합니다.`);});}
-function dismissEmergencyModal(){$('emergencyModal').style.display='none';$('emergencyModal').classList.remove('show');}
-function acceptEmergencyCallFromModal(){return guarded(async()=>{if(modalRail){selected=new Set([modalRail]);dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}await ensureAudio();await voiceClient().prepare();await send('call.accept');await openVoice();dismissEmergencyModal();});}
+function dismissEmergencyModal(){emergencyModalOpen=false;$('emergencyModal').style.display='none';$('emergencyModal').classList.remove('show');}
+function acceptEmergencyCallFromModal(){return guarded(async()=>{
+ if(emergencyAccepting||controlBusy||pttChanging||musicBusy)throw Error('이전 작업이 끝난 뒤 비상통화를 수락하세요.');
+ if(view?.calls?.some(c=>c.OWNED))throw Error('진행 중인 내 통화를 종료한 뒤 수락하세요.');
+ const target=modalRail,targetSite=site;
+ const check=()=>{const r=view?.rails.find(r=>r.id===target);if(site!==targetSite||!r||!r.reported?.emergency)throw Error('해당 비상 호출이 해제되었거나 현재 현장에서 확인되지 않습니다.');if(view.role==='VIEWER')throw Error('조회 계정은 통화를 수락할 수 없습니다.');};
+ check();emergencyAccepting=true;
+ try{
+  await ensureAudio();await voiceClient().prepare();check();
+  selected=new Set([target]);dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();
+  await send('call.accept',undefined,[target]);await openVoice();
+  if(modalRail===target)dismissEmergencyModal();
+ }finally{emergencyAccepting=false;}
+});}
 function triggerMp3Alarm(){if(!audioContext)audioContext=new AudioContext();audioContext.resume();const o=audioContext.createOscillator(),g=audioContext.createGain();o.frequency.value=660;g.gain.value=.05;o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.3);}
 function drawRadar(targets){
  const c=$('ld2450RadarCanvas'),ctx=c.getContext('2d'),dpr=window.devicePixelRatio||1,w=c.clientWidth||400,h=c.clientHeight||250;
