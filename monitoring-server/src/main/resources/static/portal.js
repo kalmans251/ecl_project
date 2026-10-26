@@ -124,12 +124,17 @@ function syncReportedControls(s){
  if(!dirty.has('detection')&&s.detection)switchDisplayView(s.detection,false);
  if(!dirty.has('projector'))document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',typeof s.projector==='boolean'&&b.getAttribute('onclick').includes(String(s.projector))));
 }
-function renderProjector(s){
+function renderProjector(s,fresh=true){
  const known=typeof s.projector==='boolean',on=known&&s.projector;
- const logo=$('projectorLogoWrapper');logo.classList.toggle('spinning',on);logo.classList.toggle('power-off',!on);
- const label=known?(on?'ON · 릴레이 켜짐':'OFF · 릴레이 꺼짐'):'상태 미확인';
+ const logo=$('projectorLogoWrapper');
+ // A delayed observation is not an OFF event. Use only this rail's reported value.
+ logo.classList.toggle('spinning',on);
+ logo.classList.toggle('power-off',known&&!on);
+ logo.classList.toggle('power-unknown',!known);
+ const label=known?`${on?'ON · 릴레이 켜짐':'OFF · 릴레이 꺼짐'}${fresh?'':' · 마지막 확인값 / 최신 상태 미확인'}`:'상태 미확인';
  text('projectorStateText',label);logo.title=label;
 }
+
 function mark(operation,value){dirty.set(operation,value);toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
 function switchCategoryTabUI(name,code,edit=true){currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>b.classList.toggle('active',i===code));['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');if(edit){if(code===1)mark('weather',['clear','rain','snow'][Number(document.querySelector('input[name="ledGroup1"]:checked')?.value||0)]);else mark('led',name);}}
@@ -231,7 +236,7 @@ function renderLive(){
  const age=r?.seen_at?Math.max(0,Math.floor((Date.now()-r.seen_at)/1000)):null;
  text('deviceStateSummary',!r?'난간 하나를 선택하세요':check.waiting?'상태 확인 중 · 새 응답 대기':!fresh?(age===null?'상태 미수신':`상태 지연 · 마지막 수신 ${age}초 전 (통화·비상 중 일반 조회 보류)`):
    `전원 ${s.power??'미확인'} / ${s.power_on===undefined?'미확인':s.power_on?'ON':'OFF'} · LED ${s.led??'미확인'} / ${s.led_enabled===undefined?'미확인':s.led_enabled?'ON':'OFF'} · 슬립 ${s.sleep===undefined?'미확인':s.sleep?'사용':'해제'}${s.sleep_active?' (잠든 상태)':''} · 감지 ${s.detection??'미확인'} · 음악 모드 ${s.music_mode??'미확인'} · 누적 ${s.detection_count??'--'} · ${age}초 전`);
- syncReportedControls(s);renderProjector(s);
+ syncReportedControls(s);renderProjector(r?.reported||{},fresh);
  activeCall=view.calls.find(c=>rails().some(r=>r.id===c.RAIL_ID));const callText=activeCall?`${activeCall.STATUS} · ${activeCall.DIRECTION} · ${activeCall.OWNER_NAME}`:r?.reported?.emergency?'🚨 비상 호출':fresh?'🟢 수신대기':'상태 미수신';text('sosBigText',callText);text('sosSubDesc',activeCall?(activeCall.OWNED?'내 통화 · 적용 확인 후 송수신':'다른 운영자의 통화'):view.voice_available?'통화 시작 후 음성 연결':'통화 제어 가능 · Codec2 라이브러리 로드 실패');
  $('btnPttTalk').disabled=!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available;$('btnPttTalk').classList.toggle('active',activeCall?.DIRECTION==='CONTROL_TX');
  if(!activeCall?.OWNED || !['ACTIVE','SWITCHING','ENDING'].includes(activeCall.STATUS))closeVoice();
