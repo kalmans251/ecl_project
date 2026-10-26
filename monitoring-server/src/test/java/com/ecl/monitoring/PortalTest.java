@@ -72,11 +72,15 @@ class PortalTest {
    assertEquals(409,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());
    device.callAck(accept);
    var end=new HashMap<String,Object>(Map.of("version",1,"type","call_ended","call_id",accept.path("call_id").asText(),"railing_id",1,"session_id",999));
-   commands.callEnded("gateway-01",json.valueToTree(end));
+   assertFalse(commands.callEnded("gateway-01",json.valueToTree(end)));
    assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
    end.put("session_id",123);commands.callEnded("another-gateway",json.valueToTree(end));
    assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
-   commands.callEnded("gateway-01",json.valueToTree(end));commands.callEnded("gateway-01",json.valueToTree(end));
+   device.ws.sendText(json.writeValueAsString(end),true).join();
+   var receipt=json.readTree(device.next());assertEquals("call_end_ack",receipt.path("type").asText());
+   assertEquals(accept.path("call_id").asText(),receipt.path("call_id").asText());
+   assertEquals(123,receipt.path("session_id").asInt());
+   assertTrue(commands.callEnded("gateway-01",json.valueToTree(end)));
    assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.accept",null),true).statusCode());
    var next=json.readTree(device.next());

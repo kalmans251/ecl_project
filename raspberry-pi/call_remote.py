@@ -20,8 +20,8 @@ OPERATIONS = frozenset(('call.start', 'call.accept', 'call.end', 'ptt.on', 'ptt.
 class CallRemote:
     def __init__(self, audio, relay, states, rails, journal, emergency=None):
         self.emergency = emergency
-        self._ended_notice = None
-        self._ended_last = 0
+        self._ended_last = float("-inf")
+        self._end_cursor = 0
         self.audio, self.relay, self.states = audio, relay, states
         self.rails, self.path = frozenset(rails), journal
         self.lock = threading.RLock()
@@ -30,6 +30,7 @@ class CallRemote:
         self.sequence = None
         with sqlite3.connect(self.path) as db:
             db.execute('CREATE TABLE IF NOT EXISTS web_calls (id TEXT PRIMARY KEY, rail INTEGER, session INTEGER, epoch TEXT, ended INTEGER DEFAULT 0)')
+            db.execute('CREATE TABLE IF NOT EXISTS web_call_ends (id TEXT PRIMARY KEY, rail INTEGER NOT NULL, session INTEGER NOT NULL)')
 
     def handle(self, message, connected=lambda: True):
         ident = message.get('message_id')
@@ -141,6 +142,11 @@ class CallRemote:
                         direction = 'CONTROL_TX' if op == 'ptt.on' else 'FIELD_TX'
                         self.audio.set_direction(rail, AudioDirection[direction], guard=guard)
                 guard()
+                if direction != 'IDLE':
+                    local=self.states.snapshot(rail)['call']
+                    if (local['phase']!='active' or local['session_id']!=session or
+                        local['direction']!=int(AudioDirection[direction])):
+                        raise RuntimeError('Call ended or changed before web confirmation')
             with sqlite3.connect(self.path) as db:
                 db.execute('UPDATE web_calls SET epoch=?,ended=? WHERE id=?', (ident,int(direction=='IDLE'),call_id))
             with self.lock:
@@ -190,21 +196,47 @@ class CallRemote:
             try: self.outbound.put_nowait((time.monotonic(),current,message))
             except queue.Full: pass
 
+    def confirm_end_receipt(self, message):
+        """Server receipt acknowledges this exact proof, never changes PLC state."""
+        if (set(message) != {'version','type','call_id','railing_id','session_id'} or
+            type(message.get('version')) is not int or message['version'] != 1 or
+            message.get('type') != 'call_end_ack' or
+            not isinstance(message.get('call_id'),str) or
+            type(message.get('railing_id')) is not int or message['railing_id'] not in self.rails or
+            type(message.get('session_id')) is not int or not 1 <= message['session_id'] <= 0xffffffff):
+            return False
+        with self.lock, sqlite3.connect(self.path) as db:
+            db.execute('DELETE FROM web_call_ends WHERE id=? AND rail=? AND session=?',
+                       (message['call_id'],message['railing_id'],message['session_id']))
+        return True
+
     def drain(self):
         result=[]
         with self.lock:
-            if self.current:
-                cid,rail,session,epoch,direction=self.current
-                state=self.states.snapshot(rail)['call']
-                if state['phase']=='ended' and state['session_id']==session:
-                    self._ended_notice=(time.monotonic()+30,dict(version=1,type='call_ended',
-                        call_id=cid,railing_id=rail,session_id=session))
-                    self.current=None
-                    self._clear()
-                    with sqlite3.connect(self.path) as db:
+            now=time.monotonic()
+            if now-self._ended_last>=1:
+                self._ended_last=now
+                # A PTT request or disconnect clears current. The durable ownership
+                # mapping still identifies a later physical END in local state.
+                states=self.states.snapshot()
+                with sqlite3.connect(self.path) as db:
+                    for cid,rail,session in db.execute('SELECT id,rail,session FROM web_calls WHERE ended=0').fetchall():
+                        state=states.get(str(rail),states.get(rail,{})).get('call',{})
+                        if state.get('phase')!='ended' or state.get('session_id')!=session:
+                            continue
+                        db.execute('INSERT OR IGNORE INTO web_call_ends VALUES(?,?,?)',(cid,rail,session))
                         db.execute('UPDATE web_calls SET ended=1 WHERE id=? AND session=?',(cid,session))
-            if self._ended_notice and time.monotonic()<self._ended_notice[0] and time.monotonic()-self._ended_last>=1:
-                result.append(self._ended_notice[1]);self._ended_last=time.monotonic()
+                        if self.current and self.current[:3]==(cid,rail,session):
+                            self.current=None;self._clear()
+                    rows=db.execute('SELECT id,rail,session FROM web_call_ends ORDER BY id').fetchall()
+                # Bound control messages independently from audio traffic; rotate
+                # so an unacknowledged old proof does not starve newer endings.
+                if rows:
+                    start=self._end_cursor % len(rows)
+                    batch=(rows[start:]+rows[:start])[:4]
+                    self._end_cursor=(start+len(batch)) % len(rows)
+                    result.extend(dict(version=1,type='call_ended',call_id=cid,
+                                       railing_id=rail,session_id=session) for cid,rail,session in batch)
             while True:
                 try: at,current,message=self.outbound.get_nowait()
                 except queue.Empty: break

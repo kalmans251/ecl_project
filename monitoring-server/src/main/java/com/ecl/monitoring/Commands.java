@@ -185,19 +185,22 @@ public class Commands {
         db.update("UPDATE calls SET status='UNKNOWN',voice_epoch=NULL WHERE gateway_id=?",gateway);
     }
     @org.springframework.transaction.annotation.Transactional
-    public synchronized void callEnded(String gateway,tools.jackson.databind.JsonNode node) {
+    public synchronized boolean callEnded(String gateway,tools.jackson.databind.JsonNode node) {
         if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").intValue()!=1 ||
            !node.path("type").asText().equals("call_ended") || !node.path("call_id").isString() ||
            !node.path("railing_id").isInt() || !node.path("session_id").isIntegralNumber() ||
            node.path("session_id").asLong()<1 || node.path("session_id").asLong()>0xffffffffL)
             throw Accounts.bad("Invalid physical call end");
         var rows=db.queryForList("SELECT * FROM calls WHERE gateway_id=? AND id=?",gateway,node.path("call_id").asText());
-        if(rows.isEmpty())return; // duplicate END cannot affect a new call
+        if(rows.isEmpty())return true; // duplicate END cannot affect a new call
         var call=rows.get(0);var rail=registry.rail((String)call.get("RAIL_ID"));
         if(((Number)rail.get("NUMBER")).intValue()!=node.path("railing_id").asInt() ||
-           call.get("PLC_SESSION")==null || ((Number)call.get("PLC_SESSION")).longValue()!=node.path("session_id").asLong())return;
+           call.get("PLC_SESSION")==null || ((Number)call.get("PLC_SESSION")).longValue()!=node.path("session_id").asLong())return false;
+        transaction.executeWithoutResult(tx -> {
         db.update("UPDATE commands SET status='UNKNOWN',detail='Physical call ended during request' WHERE gateway_id=? AND rail_id=? AND status IN ('QUEUED','SENT','RECEIVED') AND (operation LIKE 'call.%' OR operation LIKE 'ptt.%')",gateway,call.get("RAIL_ID"));
         db.update("DELETE FROM calls WHERE gateway_id=? AND id=?",gateway,call.get("ID"));
+        });
+        return true;
     }
     public synchronized void callResult(String gateway,tools.jackson.databind.JsonNode node) {
         if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1 ||
