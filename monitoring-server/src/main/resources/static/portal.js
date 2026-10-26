@@ -14,6 +14,14 @@ async function api(path,method='GET',data){
  if(!response.ok){let reason;try{reason=(await response.json()).message;}catch(_){}throw Error(reason||({403:'이 현장에 대한 제어 권한이 없습니다.',409:'장치 연결 또는 통화 점유 상태를 확인하세요.',503:'외부 서비스가 설정되지 않았습니다.'}[response.status]||`요청 실패 (${response.status})`));}
  return response.status===204 || response.headers.get('content-length')==='0'?null:response.text().then(t=>t?JSON.parse(t):null);
 }
+const statusBaselines=new Map();
+function awaitStatus(ids){for(const id of ids){const r=view?.rails.find(r=>r.id===id);statusBaselines.set(id,{seen:r?.seen_at??0,at:performance.now()});}}
+function statusCheck(r){
+ if(!r)return {fresh:false,waiting:false};
+ const baseline=statusBaselines.get(r.id),advanced=!baseline||(r.seen_at??0)>baseline.seen;
+ return {fresh:!stateFetchFailed&&r.online&&!!r.seen_at&&Date.now()-r.seen_at<15000&&advanced,
+ waiting:!advanced&&performance.now()-baseline.at<15000};
+}
 function rails(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
 function requireSelection(single=false){const items=rails();if(!items.length || (single&&items.length!==1))throw Error(single?'난간 하나를 선택하세요.':'난간을 선택하세요.');if(view.role==='VIEWER')throw Error('조회 계정은 제어할 수 없습니다.');return items;}
 let controlBusy=false,pttChanging=false;
@@ -36,7 +44,7 @@ async function send(operation,value,ids){
   const rows=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:ids||items.map(r=>r.id),operation,value:value??null});
   toast(`${operation}: 요청 접수 · 장치 응답 대기`);
   if(operation==='emergency.ack'){await poll();return rows;}
-  const results=await waitControlResults(rows);DetectionCounts.ingest(results);await poll();
+  const results=await waitControlResults(rows);DetectionCounts.ingest(results);awaitStatus(results.filter(r=>['APPLIED','COMPLETED'].includes(r.status)).map(r=>r.rail_id));await poll();
   const label=r=>view.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id;
   const failed=results.filter(r=>!['APPLIED','COMPLETED'].includes(r.status));
   if(failed.length)throw Error(failed.map(r=>`${label(r)}: ${r.status}`).join(' / ')+' · 처리 내역 확인 필요, 자동 재전송 없음');
@@ -45,8 +53,8 @@ async function send(operation,value,ids){
  }finally{if(general)controlBusy=false;}
 }
 async function guarded(action){try{await action();}catch(error){toast(error.message);}}
-function choose(id){if(activeCall && !selected.has(id)){toast('통화 종료 후 난간을 변경하세요.');return;}selected=selected.has(id)?new Set():new Set([id]);dirty.clear();renderSelection();}
-function selectAllDevices(){if(activeCall)return toast('통화 종료 후 선택을 변경하세요.');selected=new Set(view.rails.map(r=>r.id));dirty.clear();renderSelection();}
+function choose(id){if(activeCall && !selected.has(id)){toast('통화 종료 후 난간을 변경하세요.');return;}selected=selected.has(id)?new Set():new Set([id]);dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
+function selectAllDevices(){if(activeCall)return toast('통화 종료 후 선택을 변경하세요.');selected=new Set(view.rails.map(r=>r.id));dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
 function renderSelection(){
  const grid=$('idBadgeGrid');grid.replaceChildren();for(const r of view.rails){const b=document.createElement('button');b.type='button';b.className=(selected.has(r.id)?'selected ':'')+(r.online?'':'offline');b.textContent=`${r.name} · ${r.gateway_id}/${r.number}`;b.title=r.online?'게이트웨이 연결됨':'게이트웨이 오프라인';b.onclick=()=>choose(r.id);grid.append(b);}
  text('selectedDeviceTag',rails().length?rails().map(r=>r.name).join(', '):'난간 선택');$('inputTotalDevices').value=view.rails.length;
@@ -147,11 +155,11 @@ function renderMusicStatus(){
 }
 function renderLive(){
  renderMusicStatus();
- const r=rails()[0],fresh=!stateFetchFailed && r?.seen_at && Date.now()-r.seen_at<15000,s=fresh?r.reported:{};
+ const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=fresh?r.reported:{};
  text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':s.battery_percent.toFixed(1)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
- text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?(fresh?'ONLINE · 상태 수신':'ONLINE · 상태 미수신'):'OFFLINE'):'난간 선택');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
+ text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?`Pi 연결됨 · 난간 ${fresh?'응답 확인':check.waiting?'상태 확인 중':'최신 응답 미확인'}`:'Pi 연결 끊김 · 난간 상태 미확인'):'난간 하나를 선택하세요');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
  const age=r?.seen_at?Math.max(0,Math.floor((Date.now()-r.seen_at)/1000)):null;
- text('deviceStateSummary',!fresh?(age===null?'상태 미수신':`상태 지연 · 마지막 수신 ${age}초 전 (통화·비상 중 일반 조회 보류)`):
+ text('deviceStateSummary',!r?'난간 하나를 선택하세요':check.waiting?'상태 확인 중 · 새 응답 대기':!fresh?(age===null?'상태 미수신':`상태 지연 · 마지막 수신 ${age}초 전 (통화·비상 중 일반 조회 보류)`):
    `전원 ${s.power??'미확인'} / ${s.power_on===undefined?'미확인':s.power_on?'ON':'OFF'} · LED ${s.led??'미확인'} / ${s.led_enabled===undefined?'미확인':s.led_enabled?'ON':'OFF'} · 슬립 ${s.sleep===undefined?'미확인':s.sleep?'사용':'해제'}${s.sleep_active?' (잠든 상태)':''} · 감지 ${s.detection??'미확인'} · 음악 모드 ${s.music_mode??'미확인'} · 누적 ${s.detection_count??'--'} · ${age}초 전`);
  const logo=$('projectorLogoWrapper');logo.classList.toggle('spinning',s.projector===true);logo.classList.toggle('power-off',s.projector!==true);
  activeCall=view.calls.find(c=>rails().some(r=>r.id===c.RAIL_ID));const callText=activeCall?`${activeCall.STATUS} · ${activeCall.DIRECTION} · ${activeCall.OWNER_NAME}`:r?.reported?.emergency?'🚨 비상 호출':fresh?'🟢 수신대기':'상태 미수신';text('sosBigText',callText);text('sosSubDesc',activeCall?(activeCall.OWNED?'내 통화 · 적용 확인 후 송수신':'다른 운영자의 통화'):view.voice_available?'통화 시작 후 음성 연결':'통화 제어 가능 · Codec2 라이브러리 로드 실패');
@@ -161,8 +169,8 @@ function renderLive(){
  for(const item of view.rails){if(item.reported.emergency && (item.reported.emergency_at||item.seen_at) && !lastEmergency.has(item.id)){lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
  radarView.select(rails().length===1 && $('viewRadarContainer').style.display!=='none' ? r.id : null);
 }
-async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length)selected.add(view.rails[0].id);renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();await renewStatusDemand();}catch(e){stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
-async function changeSite(){if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');site=$('siteSelect').value;selected.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
+async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length&&!statusBaselines.size){selected.add(view.rails[0].id);awaitStatus(selected);}renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();await renewStatusDemand();}catch(e){if(requestedSite!==site)return;stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
+async function changeSite(){if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');site=$('siteSelect').value;selected.clear();statusBaselines.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
 async function logout(){await guarded(async()=>{if(view?.calls.some(c=>c.OWNED))throw Error('통화를 종료한 뒤 로그아웃하세요.');closeVoice();await api('/api/auth/logout','POST');location.href='/login.html';});}
 function dialog(title){text('dialogTitle',title);$('dialogBody').replaceChildren();$('portalDialog').showModal();return $('dialogBody');}
 function table(parent,headers,rows){const t=document.createElement('table');let tr=document.createElement('tr');for(const h of headers){const th=document.createElement('th');th.textContent=h;tr.append(th);}t.append(tr);for(const row of rows){tr=document.createElement('tr');for(const val of row){const td=document.createElement('td');td.textContent=val??'--';tr.append(td);}t.append(tr);}parent.append(t);}
@@ -171,7 +179,7 @@ function toggleStatsMenu(event){event.stopPropagation();$('statsMenuDropdown').c
 function openStatsDetail(label){guarded(async()=>{$('statsMenuDropdown').style.display='none';const s=await api(`/api/portal/sites/${site}/statistics?period=${({일일:'daily',주간:'weekly',월간:'monthly',연간:'yearly'})[label]}`);const body=dialog(label+' 통계');const p=document.createElement('p');p.textContent=`충전량 ${s.watt_hours.toFixed(2)} Wh · 유효 난간 측정 시간 ${s.coverage_rail_seconds}초 · 비상 발생 ${s.emergency_starts}회 · 표본 ${s.samples}개. 실제 수신 데이터만 집계하며 보존 기간은 ${s.retained_days}일입니다.`;body.append(p);table(body,['측정 시간','난간','배터리 (%)'],s.points.map(p=>[new Date(p.time).toLocaleString('ko-KR'),view.rails.find(r=>r.id===p.rail)?.name||p.rail,p.battery]));});}
 async function sendEmergencySms(label,input){await guarded(async()=>{const r=requireSelection(true)[0];const phone=$(input).value;if(!confirm(`${label}의 저장된 연락처로 ${r.name} 비상 확인 문자를 발송할까요?`))return;await api(`/api/portal/sites/${site}/contacts/${encodeURIComponent(label)}`,'PUT',{phone});const result=await api(`/api/portal/sites/${site}/sms`,'POST',{request_id:newId(),label,rail_id:r.id});toast(`문자 요청 ${result.status} · 수신자 도착 여부는 별도 확인이 필요합니다.`);});}
 function dismissEmergencyModal(){$('emergencyModal').style.display='none';$('emergencyModal').classList.remove('show');}
-function acceptEmergencyCallFromModal(){return guarded(async()=>{if(modalRail){selected=new Set([modalRail]);dirty.clear();renderSelection();}await ensureAudio();await voiceClient().prepare();await send('call.accept');await openVoice();dismissEmergencyModal();});}
+function acceptEmergencyCallFromModal(){return guarded(async()=>{if(modalRail){selected=new Set([modalRail]);dirty.clear();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}await ensureAudio();await voiceClient().prepare();await send('call.accept');await openVoice();dismissEmergencyModal();});}
 function triggerMp3Alarm(){if(!audioContext)audioContext=new AudioContext();audioContext.resume();const o=audioContext.createOscillator(),g=audioContext.createGain();o.frequency.value=660;g.gain.value=.05;o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.3);}
 function drawRadar(targets){
  const c=$('ld2450RadarCanvas'),ctx=c.getContext('2d'),dpr=window.devicePixelRatio||1,w=c.clientWidth||400,h=c.clientHeight||250;

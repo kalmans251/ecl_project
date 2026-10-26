@@ -59,3 +59,9 @@ class StatusTests(unittest.TestCase):
   self.sync.demand(dict(version=1,rails=[1]));self.sync.wanted[1]=0
   self.assertFalse(self.sync.sample(1));self.assertEqual([],self.bus.sent)
   self.sync.demand(dict(version=1,rails=[1]));self.assertTrue(self.sync.sample(1))
+
+ def test_refresh_only_prioritizes_current_viewers(self):
+  self.sync.due={1:999,2:999};self.sync.refresh(2);self.assertEqual(999,self.sync.due[2])
+  self.sync.refresh(1);self.assertEqual(0,self.sync.due[1])
+  self.sync.disconnect();self.sync.due[1]=999
+  self.sync.demand(dict(version=1,rails=[1]));self.assertEqual(0,self.sync.due[1])
