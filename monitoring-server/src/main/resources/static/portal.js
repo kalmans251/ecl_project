@@ -104,8 +104,31 @@ function selectAllDevices(){if(emergencyAccepting)return toast('비상통화 수
 function renderSelection(){
  const grid=$('idBadgeGrid');grid.replaceChildren();for(const r of view.rails){const b=document.createElement('button');b.type='button';b.className=(selected.has(r.id)?'selected ':'')+(r.online?'':'offline');b.textContent=`${r.name} · ${r.gateway_id}/${r.number}`;b.title=r.online?'게이트웨이 연결됨':'게이트웨이 오프라인';b.onclick=()=>choose(r.id);grid.append(b);}
  text('selectedDeviceTag',rails().length?rails().map(r=>r.name).join(', '):'난간 선택');$('inputTotalDevices').value=view.rails.length;
- if(rails().length===1){const r=rails()[0],s=r.reported;$('inputLat').value=r.latitude??'';$('inputLng').value=r.longitude??'';$('inputAddress').value=r.address??'';if(s.volume!==undefined){$('piVolume').value=s.volume;updateVolUI(s.volume,false);}if(s.power)document.querySelector(`input[name="pwrSupplyMode"][value="${s.power==='ac'?2:1}"]`).checked=true;if(s.sleep!==undefined)toggleSleepStateUI(s.sleep,false);if(s.led)switchCategoryTabUI(s.led,{basic:0,weather:1,music:2}[s.led],false);if(s.music_mode)$('piPlayMode').value={sequential:0,shuffle:1,age:2}[s.music_mode];if(s.detection)switchDisplayView(s.detection,false);}
+ if(rails().length===1){const r=rails()[0];$('inputLat').value=r.latitude??'';$('inputLng').value=r.longitude??'';$('inputAddress').value=r.address??'';}
  renderLive();renderMap();
+}
+// Keep unsent edits separate from confirmed device observations.
+function syncReportedControls(s){
+ if(!dirty.has('volume')&&s.volume!==undefined){$('piVolume').value=s.volume;updateVolUI(s.volume,false);}
+ if(!dirty.has('power'))document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.checked=i.value===({ac:'2',battery:'1'}[s.power]));
+ if(!dirty.has('sleep')){
+  if(typeof s.sleep==='boolean')toggleSleepStateUI(s.sleep,false);
+  else { $('btnModeWakeup').className='pwr-state-btn';$('btnModeSleep').className='pwr-state-btn'; }
+ }
+ if(!dirty.has('led')&&!dirty.has('weather')){
+  if(['basic','weather','music'].includes(s.led))switchCategoryTabUI(s.led,{basic:0,weather:1,music:2}[s.led],false);
+  else document.querySelectorAll('.category-tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('input[name="ledGroup1"]').forEach(i=>i.checked=i.value===({clear:'0',rain:'1',snow:'2'}[s.weather]));
+ }
+ if(!dirty.has('music.mode'))$('piPlayMode').value=({sequential:0,shuffle:1,age:2}[s.music_mode])??'';
+ if(!dirty.has('detection')&&s.detection)switchDisplayView(s.detection,false);
+ if(!dirty.has('projector'))document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',typeof s.projector==='boolean'&&b.getAttribute('onclick').includes(String(s.projector))));
+}
+function renderProjector(s){
+ const known=typeof s.projector==='boolean',on=known&&s.projector;
+ const logo=$('projectorLogoWrapper');logo.classList.toggle('spinning',on);logo.classList.toggle('power-off',!on);
+ const label=known?(on?'ON · 릴레이 켜짐':'OFF · 릴레이 꺼짐'):'상태 미확인';
+ text('projectorStateText',label);logo.title=label;
 }
 function mark(operation,value){dirty.set(operation,value);toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
@@ -208,7 +231,7 @@ function renderLive(){
  const age=r?.seen_at?Math.max(0,Math.floor((Date.now()-r.seen_at)/1000)):null;
  text('deviceStateSummary',!r?'난간 하나를 선택하세요':check.waiting?'상태 확인 중 · 새 응답 대기':!fresh?(age===null?'상태 미수신':`상태 지연 · 마지막 수신 ${age}초 전 (통화·비상 중 일반 조회 보류)`):
    `전원 ${s.power??'미확인'} / ${s.power_on===undefined?'미확인':s.power_on?'ON':'OFF'} · LED ${s.led??'미확인'} / ${s.led_enabled===undefined?'미확인':s.led_enabled?'ON':'OFF'} · 슬립 ${s.sleep===undefined?'미확인':s.sleep?'사용':'해제'}${s.sleep_active?' (잠든 상태)':''} · 감지 ${s.detection??'미확인'} · 음악 모드 ${s.music_mode??'미확인'} · 누적 ${s.detection_count??'--'} · ${age}초 전`);
- const logo=$('projectorLogoWrapper');logo.classList.toggle('spinning',s.projector===true);logo.classList.toggle('power-off',s.projector!==true);
+ syncReportedControls(s);renderProjector(s);
  activeCall=view.calls.find(c=>rails().some(r=>r.id===c.RAIL_ID));const callText=activeCall?`${activeCall.STATUS} · ${activeCall.DIRECTION} · ${activeCall.OWNER_NAME}`:r?.reported?.emergency?'🚨 비상 호출':fresh?'🟢 수신대기':'상태 미수신';text('sosBigText',callText);text('sosSubDesc',activeCall?(activeCall.OWNED?'내 통화 · 적용 확인 후 송수신':'다른 운영자의 통화'):view.voice_available?'통화 시작 후 음성 연결':'통화 제어 가능 · Codec2 라이브러리 로드 실패');
  $('btnPttTalk').disabled=!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available;$('btnPttTalk').classList.toggle('active',activeCall?.DIRECTION==='CONTROL_TX');
  if(!activeCall?.OWNED || !['ACTIVE','SWITCHING','ENDING'].includes(activeCall.STATUS))closeVoice();
