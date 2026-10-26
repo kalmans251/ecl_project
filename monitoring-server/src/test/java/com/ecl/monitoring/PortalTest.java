@@ -168,6 +168,19 @@ class PortalTest {
   assertDoesNotThrow(()->voice.receive("gateway-01",json.valueToTree(v)));
   v.put("extra",true);assertThrows(Exception.class,()->voice.receive("gateway-01",json.valueToTree(v)));
  }
+ @Test void alarmUpdateDoesNotMakeOldGeneralStatusFresh(){
+  String id=rail();long now=System.currentTimeMillis();
+  telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.ofEpochMilli(now).toString(),"state",Map.of("sleep",true,"sleep_active",true))));
+  var alarm=Map.of("version",1,"type","emergency_state","railing_id",1,"observed_at",Instant.ofEpochMilli(now+1).toString(),"state",Map.of("active",true));
+  telemetry.emergency("gateway-01",json.valueToTree(alarm));
+  assertEquals(now,db.queryForObject("SELECT seen_at FROM rails WHERE id=?",Long.class,id));
+  var stored=json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id));
+  assertTrue(stored.path("emergency").asBoolean());assertTrue(stored.path("sleep_active").asBoolean());
+  telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.ofEpochMilli(now+2).toString(),"state",Map.of("sleep",false))));
+  stored=json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id));
+  assertTrue(stored.path("emergency").asBoolean());assertFalse(stored.path("sleep").asBoolean());
+  assertThrows(Exception.class,()->telemetry.emergency("wrong-gateway",json.valueToTree(alarm)));
+ }
  @Test void telemetryIsBoundAndDoesNotInventState(){
   String id=rail();var data=Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.now().toString(),"state",Map.of("volume",13,"left_watt",1.5,"right_watt",2.5,"battery_percent",70,"emergency",false,"radar",List.of(Map.of("x",.3,"y",2.0))));
   telemetry.accept("gateway-01",json.valueToTree(data));assertTrue(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id).contains("13"));

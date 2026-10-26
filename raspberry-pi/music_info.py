@@ -6,16 +6,17 @@ from protocol import Command, Frame, Node, Service
 GROUPS = {'default': 0, '10': 1, '20': 2, '30': 3, '40': 4}
 
 
-def request(controls, rail, operation, payload=b'', *, background=False, timeout=None, guard=None):
+def request(controls, rail, operation, payload=b'', *, background=False, timeout=None, guard=None, service=Service.MUSIC, expected=Node.WROOM, control_lock=None):
     # Release bus ownership between tracks so event polling can run.
     with ExitStack() as stack:
         if background:
-            for lock in (controls.lock, controls.bus.transaction()):
+            for lock in (controls.lock, *((control_lock,) if control_lock else ()), controls.bus.transaction()):
                 if not lock.acquire(blocking=False):
                     raise RuntimeError('PLC busy; background music query skipped')
                 stack.callback(lock.release)
         else:
             stack.enter_context(controls.lock)
+            if control_lock: stack.enter_context(control_lock)
             stack.enter_context(getattr(controls.bus, 'transaction', nullcontext)())
         if guard:
             guard()
@@ -23,10 +24,10 @@ def request(controls, rail, operation, payload=b'', *, background=False, timeout
         controls.request_id = (controls.request_id + 1) & 0xffffffff
         token = controls.request_id.to_bytes(4, 'big')
         with controls.condition:
-            controls.pending = (rail, token, operation, Service.MUSIC, Node.WROOM, None)
+            controls.pending = (rail, token, operation, service, expected, None)
             controls.result = None
         try:
-            controls.bus.send_frame(Frame(rail, Node.PI, Node.P4, Service.MUSIC,
+            controls.bus.send_frame(Frame(rail, Node.PI, Node.P4, service,
                 Command.APPLY, token + bytes([operation]) + payload))
             deadline = time.monotonic() + (controls.ack_timeout if timeout is None else timeout)
             with controls.condition:
@@ -36,7 +37,7 @@ def request(controls, rail, operation, payload=b'', *, background=False, timeout
                         raise TimeoutError('Music request timed out; device state unknown; no automatic retry')
                     controls.condition.wait(remaining)
                 status, data, source = controls.result
-            if status != 0 or source != Node.WROOM:
+            if status != 0 or source != expected:
                 raise RuntimeError('Music request rejected/failed; check catalog, music session and pause/sleep policy')
             return data
         finally:

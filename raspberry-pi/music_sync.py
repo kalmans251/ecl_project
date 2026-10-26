@@ -70,6 +70,7 @@ class MusicSync:
 
     def close(self):
         self.stop.set()
+        if hasattr(self,'connected'): self.connected.clear()
         if self.thread:
             self.thread.join(2)
 
@@ -81,6 +82,7 @@ class MusicPublisher:
         if not token:
             raise ValueError('Set MONITOR_GATEWAY_TOKEN')
         self.url, self.token = url, token
+        self.connected = threading.Event()
         self.radar = None
         self.remote = remote
         self.calls = calls
@@ -114,10 +116,12 @@ class MusicPublisher:
                                    ping_interval=20, ping_timeout=20) as ws:
                     LOG.info('Music monitoring connection established')
                     alive = threading.Event(); alive.set()
+                    self.connected.set()
                     try:
                         await self._connection(ws, alive)
                     finally:
                         alive.clear()
+                        self.connected.clear()
                         if self.radar: self.radar.disconnect()
                         if self.calls: self.calls.disconnect()
                         if self.command_task:
@@ -201,5 +205,6 @@ class MusicPublisher:
 
     def close(self):
         self.stop.set()
+        if hasattr(self,'connected'): self.connected.clear()
         if self.thread:
             self.thread.join(10)
