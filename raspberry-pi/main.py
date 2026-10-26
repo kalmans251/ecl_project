@@ -182,6 +182,7 @@ def main() -> int:
     controls = DeviceControls(bus, railings, voice)
     local_audio = None
     radar_sync = None
+    status_sync = None
 
     def on_frame(frame: Frame) -> None:
         if frame.railing_id == 0:
@@ -214,6 +215,7 @@ def main() -> int:
             return
 
         if emergency.handle_frame(frame):
+            if status_sync: status_sync.emergency(frame.railing_id)
             voice.state_changed()
             return
 
@@ -293,10 +295,15 @@ def main() -> int:
                 publisher.radar = radar_sync
                 publisher.start()
                 radar_sync.start()
+                from status_sync import StatusSync
+                status_sync = StatusSync(controls, audio, args.event_railings, publisher)
+                publisher.status = status_sync
+                status_sync.start()
             music_sync = MusicSync(controls, args.event_railings, args.music_poll_interval,
                                    publisher.publish if publisher else None)
             music_sync.start()
     except Exception:
+        if status_sync: status_sync.close()
         if radar_sync: radar_sync.close()
         if publisher: publisher.close()
         if local_audio: local_audio.close()
@@ -510,6 +517,7 @@ def main() -> int:
 
     finally:
         if music_sync: music_sync.close()
+        if status_sync: status_sync.close()
         if radar_sync: radar_sync.close()
         if publisher: publisher.close()
         event_poller.close()

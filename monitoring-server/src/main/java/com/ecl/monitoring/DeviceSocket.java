@@ -36,6 +36,7 @@ public class DeviceSocket extends TextWebSocketHandler {
                 if (count>30) throw new IllegalArgumentException("Too many acknowledgments");
             }
             var node=json.readTree(message.getPayload());
+            if(node.path("type").asText().equals("emergency_state")){telemetry.emergency(id(session),node);return;}
             if(node.path("type").asText().equals("radar_state")){radar.accept(id(session),session.getId(),node);return;}
             if(node.path("type").asText().equals("call_ended")){
                 if(commands.callEnded(id(session),node))gateways.send(id(session),json.writeValueAsString(Map.of(

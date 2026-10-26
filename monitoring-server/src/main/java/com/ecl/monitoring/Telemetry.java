@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class Telemetry {
     private final JdbcTemplate db; private final Registry registry; private final JsonMapper json=JsonMapper.builder().build();
     private static final Set<String> NUMERIC=Set.of("left_watt","right_watt","battery_percent","volume","wind","pm10");
-    private static final Set<String> FLAGS=Set.of("emergency","projector","led_enabled","sleep","power_on");
+    private static final Set<String> FLAGS=Set.of("emergency","projector","led_enabled","sleep","sleep_active","power_on");
     private static final Map<String,Set<String>> ENUMS=Map.of("power",Set.of("ac","battery"),"led",Set.of("basic","music","weather"),"weather",Set.of("clear","cloudy","rain","snow"),"music",Set.of("playing","paused","stopped"),"music_mode",Set.of("sequential","shuffle","age"),"detection",Set.of("radar","cctv"));
     public Telemetry(JdbcTemplate db,Registry registry){this.db=db;this.registry=registry;}
     public synchronized void accept(String gateway,JsonNode node) {
@@ -32,8 +32,28 @@ public class Telemetry {
             } else if(key.equals("detection_count")){if(!value.isIntegralNumber()||value.asLong()<0)throw Accounts.bad("Invalid count");}
             else throw Accounts.bad("Unknown state field");
         }
-        db.update("UPDATE rails SET snapshot=?,seen_at=? WHERE id=?",json.writeValueAsString(state),observed,id);
+        var merged=(tools.jackson.databind.node.ObjectNode)state.deepCopy();
+        var prior=json.readTree(rail.get("SNAPSHOT")==null?"{}":(String)rail.get("SNAPSHOT"));
+        if(prior.has("emergency_at")) {
+            merged.set("emergency",prior.get("emergency"));merged.set("emergency_at",prior.get("emergency_at"));
+        }
+        db.update("UPDATE rails SET snapshot=?,seen_at=? WHERE id=?",json.writeValueAsString(merged),observed,id);
         db.update("INSERT INTO telemetry_samples(id,rail_id,observed_at,left_watt,right_watt,battery_percent,emergency) VALUES(?,?,?,?,?,?,?)",UUID.randomUUID().toString(),id,observed,number(state,"left_watt"),number(state,"right_watt"),number(state,"battery_percent"),state.has("emergency")?state.get("emergency").booleanValue():null);
+    }
+    public synchronized void emergency(String gateway,JsonNode node) {
+        if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1 ||
+           !node.path("type").asText().equals("emergency_state") || !node.path("railing_id").isInt() ||
+           !node.path("state").isObject() || node.path("state").size()!=1 || !node.path("state").path("active").isBoolean())
+            throw Accounts.bad("Invalid emergency state");
+        long at;try{at=Instant.parse(node.path("observed_at").asText()).toEpochMilli();}catch(Exception e){throw Accounts.bad("Invalid timestamp");}
+        long now=System.currentTimeMillis();if(at>now+2000 || at<now-60000)throw Accounts.bad("Stale emergency state");
+        var rail=registry.deviceRail(gateway,node.path("railing_id").asInt());
+        var state=(tools.jackson.databind.node.ObjectNode)json.readTree(rail.get("SNAPSHOT")==null?"{}":(String)rail.get("SNAPSHOT"));
+        if(state.path("emergency_at").asLong(0)>=at)return;
+        state.put("emergency",node.path("state").path("active").asBoolean());state.put("emergency_at",at);
+        // Do not refresh the general state timestamp with an alarm-only event.
+        db.update("UPDATE rails SET snapshot=? WHERE id=?",json.writeValueAsString(state),rail.get("ID"));
+        db.update("INSERT INTO telemetry_samples(id,rail_id,observed_at,emergency) VALUES(?,?,?,?)",UUID.randomUUID().toString(),rail.get("ID"),at,node.path("state").path("active").asBoolean());
     }
     private Double number(JsonNode node,String key){return node.has(key)?node.get(key).asDouble():null;}
     @org.springframework.scheduling.annotation.Scheduled(fixedDelay=3600000) public void prune(){db.update("DELETE FROM telemetry_samples WHERE observed_at<?",System.currentTimeMillis()-90L*86400000);}

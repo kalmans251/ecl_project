@@ -1,4 +1,7 @@
 'use strict';
+const statusViewId=crypto.randomUUID();
+async function renewStatusDemand(){if(!site)return;await api('/api/portal/status-demand','POST',{view:statusViewId,rails:document.hidden?[]:[...selected]});}
+document.addEventListener('visibilitychange',()=>renewStatusDemand().catch(()=>{}));
 let webVoice;
 const $=id=>document.getElementById(id), pending=new Set(['QUEUED','SENT','RECEIVED']);
 let csrf, me, view=null, site='', selected=new Set(), busy=false, callChanging=false, loading=null, epoch=0, page=null, received=-Infinity;
@@ -64,7 +67,7 @@ function refresh(){
 }
 async function refreshState(){
  const token=epoch,requested=site;
- try{const next=await api(`/api/portal/sites/${encodeURIComponent(requested)}/state`);if(token!==epoch)return;view=next;received=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));render();if(!busy)renderResults(view.commands||[]);}
+ try{const next=await api(`/api/portal/sites/${encodeURIComponent(requested)}/state`);if(token!==epoch)return;view=next;received=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));render();if(!busy)renderResults(view.commands||[]);await renewStatusDemand();}
  catch(e){if(token===epoch){view=null;received=-Infinity;resetPage();render();notice('상태 조회 실패: '+e.message);}throw e;}
 }
 async function waitResults(rows,limit){
