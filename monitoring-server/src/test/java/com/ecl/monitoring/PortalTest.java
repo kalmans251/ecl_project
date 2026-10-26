@@ -209,6 +209,26 @@ class PortalTest {
   assertTrue(Incidents.list(db,"another-site",true).isEmpty());
   var browser=new Browser("admin");assertEquals(200,browser.request("/api/portal/sites/site-01/incidents?history=true","GET",null,false).statusCode());
  }
+ @Test void incidentRecoveryRequiresMatchingUnknownCallAndPhysicalConfirmation()throws Exception{
+  String rail=rail();var b=new Browser("admin");long at=System.currentTimeMillis();Incidents.event(db,rail,at,true);
+  String incident=db.queryForObject("SELECT id FROM emergency_incidents WHERE rail_id=? AND started_at=?",String.class,rail,at);
+  String path="/api/portal/incidents/"+incident+"/recover";
+  try(var device=new Device()){
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.accept",null),true).statusCode());
+   var start=json.readTree(device.next());device.callAck(start);
+   assertEquals(409,b.request(path,"POST",Map.of("request_id",UUID.randomUUID()),true).statusCode());
+   db.update("UPDATE calls SET status='UNKNOWN' WHERE id=?",start.path("call_id").asText());
+   var viewer=new Browser(newUser("recoveryviewer","VIEWER"));assertEquals(403,viewer.request(path,"POST",Map.of("request_id",UUID.randomUUID()),true).statusCode());
+   assertEquals(200,b.request(path,"POST",Map.of("request_id",UUID.randomUUID()),true).statusCode());
+   var end=json.readTree(device.next());assertEquals("call.end",end.path("operation").asText());assertEquals(start.path("call_id").asText(),end.path("call_id").asText());
+   assertNull(db.queryForObject("SELECT ended_at FROM emergency_incident_calls WHERE call_id=?",Long.class,start.path("call_id").asText()));
+   assertEquals(409,b.request(path,"POST",Map.of("request_id",UUID.randomUUID()),true).statusCode());
+   device.callAck(end);
+   assertNotNull(db.queryForObject("SELECT ended_at FROM emergency_incident_calls WHERE call_id=?",Long.class,start.path("call_id").asText()));
+   assertNull(db.queryForObject("SELECT cleared_at FROM emergency_incidents WHERE id=?",Long.class,incident));
+   assertEquals(409,b.request(path,"POST",Map.of("request_id",UUID.randomUUID()),true).statusCode());
+  }
+ }
  @Test void telemetryIsBoundAndDoesNotInventState(){
   String id=rail();var data=Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.now().toString(),"state",Map.of("volume",13,"left_watt",1.5,"right_watt",2.5,"battery_percent",70,"emergency",false,"radar",List.of(Map.of("x",.3,"y",2.0))));
   telemetry.accept("gateway-01",json.valueToTree(data));assertTrue(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id).contains("13"));

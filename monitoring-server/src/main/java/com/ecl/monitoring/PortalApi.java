@@ -30,6 +30,12 @@ public class PortalApi {
     public List<Map<String,Object>> incidents(Principal p,@PathVariable String site,@RequestParam(defaultValue="false") boolean history){
         accounts.permit(p.getName(),site,false);return Incidents.list(db,site,history);
     }
+    public record Recovery(UUID request_id){}
+    @PostMapping("/api/portal/incidents/{id}/recover")
+    public List<Map<String,Object>> recoverIncident(Principal p,@PathVariable String id,@RequestBody Recovery input){
+        if(input==null||input.request_id()==null)throw Accounts.bad("Request ID required");
+        return commands.recoverIncident(p.getName(),id,input.request_id());
+    }
     @GetMapping("/api/portal/commands/{id}") public Map<String,Object> commandResult(Principal p,@PathVariable String id){return commands.find(p.getName(),id);}
     @PostMapping("/api/portal/commands") public List<Map<String,Object>> command(Principal p,@RequestBody Commands.Input input){return commands.submit(p.getName(),input);}
     public record Location(Double latitude,Double longitude,String address){}
