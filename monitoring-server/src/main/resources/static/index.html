@@ -603,14 +603,17 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
         <div class="battery-board-title">■ 태양광 에너지 모니터링</div>
         <div class="battery-grid">
             <div class="sub-block">
-                <div class="sub-block-title">실시간 충전량 (W)</div><div style="height:20px;"></div>
-                <div class="sub-block-data">- 좌측: <span style="font-size:20px;" id="chargeWattsLeft">0.0</span>W&nbsp;<br>- 우측: <span style="font-size:20px;" id="chargeWattsRight">0.0</span>W&nbsp;</div>
+                <div class="sub-block-title">태양광 입력 전력 (W)</div><div style="height:20px;"></div>
+                <div class="sub-block-data">- 좌측: <span style="font-size:20px;" id="chargeWattsLeft">--</span>W&nbsp;<br>- 우측: <span style="font-size:20px;" id="chargeWattsRight">--</span>W&nbsp;</div>
+                <div>입력 전류: 좌 <span id="solarCurrentLeft">--</span> A / 우 <span id="solarCurrentRight">--</span> A</div>
                 <div style="height:20px;"></div>
             </div>
             <div class="sub-block">
-                <div class="sub-block-title">배터리 잔량 (%)</div><div style="height:13px;"></div>
+                <div class="sub-block-title">배터리 추정 잔량 (%)</div><div style="height:13px;"></div>
                 <div class="sub-block-data">
-                    <span id="batPercentTotal" class="bat-single-percent">0%</span>
+                    <div>배터리 전압: <span id="batteryVoltage">미확인</span></div>
+                    <small>전압 기준 추정 · 충전/부하에 따라 오차 있음</small>
+                    <span id="batPercentTotal" class="bat-single-percent">미확인</span>
                     <div class="progress-bar-bg"><div class="progress-bar-fill" id="barTotal" style="width: 0%;"></div></div>
                 </div><div style="height:13px;"></div>
             </div>

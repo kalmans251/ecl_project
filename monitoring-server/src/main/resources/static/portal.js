@@ -227,11 +227,16 @@ function renderMusicStatus(){
  if(!musicSeekEditing)$('musicSeek').value=Math.min(Number($('musicSeek').max),Math.floor((d.positionMs||0)/1000));
  if(d.durationMs)showSeekTarget();else text('musicSeekTarget','--:--');
 }
+function renderEnergy(s){
+ text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':(s.battery_estimated?'약 ':'')+s.battery_percent.toFixed(0)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
+ text('batteryVoltage',s.battery_voltage===undefined?'미확인':s.battery_voltage.toFixed(2)+' V');
+ text('solarCurrentLeft',s.left_current===undefined?'--':s.left_current.toFixed(2));text('solarCurrentRight',s.right_current===undefined?'--':s.right_current.toFixed(2));
+}
 function renderLive(){
  if(typeof EmergencyAudio!=='undefined')alarmAudio().sync(view?.rails||[],view?.calls||[]);
  renderMusicStatus();
  const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=fresh?r.reported:{};
- text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':s.battery_percent.toFixed(1)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
+ renderEnergy(s);
  text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?`Pi 연결됨 · 난간 ${fresh?'응답 확인':check.waiting?'상태 확인 중':'최신 응답 미확인'}`:'Pi 연결 끊김 · 난간 상태 미확인'):'난간 하나를 선택하세요');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
  const age=r?.seen_at?Math.max(0,Math.floor((Date.now()-r.seen_at)/1000)):null;
  const reported=r?.reported||{};
