@@ -1,6 +1,62 @@
-<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>CCTV</title>
-<style>body{margin:0;background:#fff;color:#222;font:14px sans-serif}#stage{position:relative;background:#111}video{display:block;width:100%;height:75vh;object-fit:contain}canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}#stage:fullscreen video{height:100vh}p,label,button{margin:8px}button{background:white;border:1px solid #ccc;padding:8px}</style>
-<div id="stage"><video id="video" autoplay muted playsinline controls controlslist="nofullscreen" disablepictureinpicture></video><canvas id="overlay" aria-label="사람 인식 박스 및 추정 나이"></canvas></div>
-<label><input id="show-overlay" type="checkbox" checked>사람·추정 나이 표시</label><button id="fullscreen">전체 화면</button>
-<p id="overlay-status">분석 결과 대기</p><p id="status">카메라 연결 중</p>
-<script src="/camera-overlay.js"></script><script src="/camera-view.js"></script></html>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CCTV</title>
+<style>
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: #080d16; color: #dce6ef;
+  font: 13px system-ui, sans-serif;
+}
+#stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #000; }
+#video { display: block; width: 100%; height: 100%; object-fit: contain; }
+#overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+#stage:fullscreen { width: 100vw; height: 100vh; background: #000; }
+.camera-controls { min-width: 0; padding: 6px 10px; border-top: 1px solid #263747; }
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+label { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+input { margin: 0; accent-color: #39d79b; }
+button { flex: none; color: inherit; background: #172535; border: 1px solid #395367; border-radius: 5px; padding: 5px 10px; cursor: pointer; font: inherit; }
+button:hover { background: #23394d; }
+button:focus-visible, input:focus-visible { outline: 2px solid #6edcff; outline-offset: 2px; }
+.camera-status { display: flex; gap: 10px; min-width: 0; margin-top: 4px; font-size: 11px; color: #a7b7c7; }
+.camera-status p { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status { flex: 0 1 35%; }
+#overlay-status { flex: 1; }
+@media (max-height: 260px) {
+  .camera-controls { padding: 3px 8px; }
+  button { padding: 2px 8px; }
+  .camera-status { margin-top: 2px; }
+}
+@media (max-width: 320px) {
+  body { font-size: 11px; }
+  .camera-controls { padding-inline: 6px; }
+  .toolbar { gap: 4px; }
+  button { padding-inline: 6px; }
+}
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="video" autoplay muted playsinline controls controlslist="nofullscreen" disablepictureinpicture></video>
+  <canvas id="overlay" aria-label="사람 인식 박스 및 추정 나이"></canvas>
+</div>
+<div class="camera-controls">
+  <div class="toolbar">
+    <label><input id="show-overlay" type="checkbox" checked>사람·추정 나이 표시</label>
+    <button id="fullscreen" type="button">전체 화면</button>
+  </div>
+  <div class="camera-status">
+    <p id="status" role="status">카메라 연결 중</p>
+    <p id="overlay-status">분석 결과 대기</p>
+  </div>
+</div>
+<script src="/camera-overlay.js"></script>
+<script src="/camera-view.js"></script>
+</body>
+</html>
