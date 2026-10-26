@@ -56,7 +56,7 @@ public class Voice extends AbstractWebSocketHandler {
     }
     private boolean active(Peer peer,Map<String,Object> call){return call.get("STATUS").equals("ACTIVE")&&peer.epoch()!=null&&peer.epoch().equals(call.get("VOICE_EPOCH"))&&peers.get(peer.callId())==peer;}
     private byte[] packet(String epoch,byte[] pcm){return java.nio.ByteBuffer.allocate(36+pcm.length).put(epoch.getBytes(java.nio.charset.StandardCharsets.US_ASCII)).put(pcm).array();}
-    @Override public void handleTransportError(WebSocketSession session,Throwable error){LOG.warn("VOICE transport failed socket={} error={}",session.getId(),error.toString());}
+    @Override public void handleTransportError(WebSocketSession session,Throwable error){LOG.warn("VOICE transport failed socket={} error={}",session.getId(),error.toString());try{session.close(CloseStatus.SERVER_ERROR);}catch(Exception ignored){}finally{afterConnectionClosed(session,CloseStatus.SERVER_ERROR);}}
     private int port(URI uri){return uri.getPort()!=-1?uri.getPort():Set.of("https","wss").contains(uri.getScheme())?443:80;}
     @Override protected void handleBinaryMessage(WebSocketSession session,BinaryMessage message) throws Exception {
         var peer=peer(session);if(peer==null){session.close();return;}
@@ -124,5 +124,9 @@ public class Voice extends AbstractWebSocketHandler {
     @org.springframework.context.event.EventListener public void loggedOut(org.springframework.security.web.session.HttpSessionDestroyedEvent event){
         for(var peer:peers.values())if(event.getId().equals(peer.session().getAttributes().get(org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor.HTTP_SESSION_ID_ATTR_NAME)))try{peer.session().close(CloseStatus.POLICY_VIOLATION);}catch(Exception ignored){}
     }
-    @Override public void afterConnectionClosed(WebSocketSession session,CloseStatus status){LOG.info("VOICE closed socket={} code={} reason={} pcm_packets={}",session.getId(),status.getCode(),status.getReason(),session.getAttributes().getOrDefault("pcm_count",0L));peers.entrySet().removeIf(e->{if(!e.getValue().session().getId().equals(session.getId()))return false;return true;});}
+    @Override public void afterConnectionClosed(WebSocketSession session,CloseStatus status){LOG.info("VOICE closed socket={} code={} reason={} pcm_packets={}",session.getId(),status.getCode(),status.getReason(),session.getAttributes().getOrDefault("pcm_count",0L));peers.entrySet().removeIf(e->{if(!e.getValue().session().getId().equals(session.getId()))return false;
+            // Start the reconnect grace at the loss of the currently bound socket.
+            // A replaced socket must not extend the new owner's lease.
+            db.update("UPDATE calls SET touched_at=? WHERE id=? AND status='ACTIVE' AND voice_epoch=?",System.currentTimeMillis(),e.getKey(),e.getValue().epoch());
+            return true;});}
 }
