@@ -1,0 +1,22 @@
+menu "Railing energy measurements"
+config RAIL_ENERGY_ENABLED
+    bool "Read INA219 sensors on board I2C pins"
+    default y
+config RAIL_BATTERY_CHANNEL
+    int "Battery terminal voltage channel (0=unconfigured, 1=0x40, 2=0x41)"
+    range 0 2
+    default 1
+    help
+        This installation uses channel 1 (left solar charge line) for battery
+        terminal voltage. Both channels use R100 (100 milliohm) shunts.
+        Select only the sensor whose VIN- measures the battery terminal.
+        Unconfigured means battery voltage and estimated SOC remain unknown.
+config RAIL_LEFT_SHUNT_MOHM
+    int "0x40 shunt resistance in milliohms (0=unknown)"
+    range 0 1000
+    default 100
+config RAIL_RIGHT_SHUNT_MOHM
+    int "0x41 shunt resistance in milliohms (0=unknown)"
+    range 0 1000
+    default 100
+endmenu

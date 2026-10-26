@@ -19,6 +19,7 @@
 #include "p4_controller.h"
 
 #include "system_state.h"
+#include "energy_monitor.h"
 #include "led_task.h"
 
 #include "power_control.h"
@@ -66,6 +67,7 @@ void app_main(void)
     router_init();
 
     system_state_init();
+    energy_monitor_init();
 
     detection_manager_init();
 

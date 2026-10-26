@@ -13,18 +13,20 @@ class ConfirmTests(unittest.TestCase):
 #include "protocol.h"
 #include "system_state.h"
 #include "status_snapshot.h"
+#include "energy_monitor.h"
+void energy_monitor_encode(uint8_t out[ENERGY_WIRE_SIZE]){memset(out,0,ENERGY_WIRE_SIZE);out[0]=16;out[1]=0x33;out[2]=0x90;}
 #include "detection_manager.h"
 static const protocol_frame_t *s_apply_request;
 static bool s_apply_accepted,active,emergency,queue_ok=true,manager_ok=true;
 static unsigned replies,led_calls,actions;
-static uint8_t result[6+STATUS_SNAPSHOT_SIZE];
+static uint8_t result[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE];
 static unsigned count=123, resets;
 static p4_system_state_t state;
 static bool call_manager_is_active(void){return active;}
 static bool emergency_manager_is_active(void){return emergency;}
 void system_state_get(p4_system_state_t *out){*out=state;}
 static void send_response(const protocol_frame_t *f,uint8_t service,uint8_t cmd,const uint8_t *p,uint8_t n){
- assert(f->service==service && cmd==CMD_APPLY_RESULT && (n==7 || n==12 || n==6+STATUS_SNAPSHOT_SIZE));memcpy(result,p,n);replies++;
+ assert(f->service==service && cmd==CMD_APPLY_RESULT && (n==7 || n==12 || n==6+STATUS_SNAPSHOT_SIZE || n==6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE));memcpy(result,p,n);replies++;
 }
 static void handle_led(const protocol_frame_t *f){(void)f;assert(s_apply_request);led_calls++;s_apply_accepted=queue_ok;}
 static void handle_power(const protocol_frame_t *f){actions++;if(f->command==CMD_SET)state.power_mode=f->payload[0];}
@@ -80,7 +82,8 @@ int main(void){
  handle_general_apply(&f);assert(result[5]==0 && result[6]==1 && result[10]==LED_MODE_WEATHER);
  assert(result[14]==1 && result[15]==DETECTION_SOURCE_CCTV && result[16]==MUSIC_PLAY_MODE_SHUFFLE);
  assert(result[17]==0x12 && result[20]==0x78);
- f.payload[5]=2;handle_general_apply(&f);assert(result[5]==1);
+ f.payload[5]=2;handle_general_apply(&f);assert(result[5]==0 && result[6]==2 && result[22]==16 && result[23]==0x33 && result[24]==0x90);
+ f.payload[5]=3;handle_general_apply(&f);assert(result[5]==1);
  count=9;f.payload[0]++;active=true;handle_general_apply(&f);assert(count==9 && result[5]==1);
  return 0;
 }

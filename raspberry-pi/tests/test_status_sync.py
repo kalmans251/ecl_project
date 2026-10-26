@@ -24,7 +24,7 @@ class StatusTests(unittest.TestCase):
   self.sync.demand(dict(version=1,rails=[1]))
   def send(f):
    self.bus.sent.append(f)
-   self.assertEqual((Service.SYSTEM,Command.APPLY,b'\x01'),(f.service,f.command,f.payload[5:]))
+   self.assertEqual((Service.SYSTEM,Command.APPLY,b'\x02'),(f.service,f.command,f.payload[5:]))
    for rail,token in [(2,f.payload[:4]),(1,bytes(4))]:
     self.controls.handle_frame(Frame(rail,Node.P4,Node.PI,Service.SYSTEM,Command.APPLY_RESULT,token+f.payload[4:5]+b'\x00'+DATA))
     self.assertIsNone(self.controls.result)
@@ -34,6 +34,18 @@ class StatusTests(unittest.TestCase):
   self.assertTrue(self.sync.sample(1));s=self.messages[0]['state']
   self.assertEqual('weather',s['led']);self.assertTrue(s['sleep_active']);self.assertEqual(7,s['detection_count'])
   self.assertNotIn('volume',s);self.assertNotIn('battery_percent',s)
+ def test_old_p4_fallback_is_cached_and_reprobed_after_disconnect(self):
+  versions=[]
+  def send(f):
+   versions.append(f.payload[-1])
+   status=b'\x01' if f.payload[-1]==2 else b'\x00'
+   data=b'\x00' if status==b'\x01' else DATA
+   self.controls.handle_frame(Frame(1,Node.P4,Node.PI,Service.SYSTEM,Command.APPLY_RESULT,f.payload[:5]+status+data))
+  self.bus.send_frame=send
+  self.assertTrue(self.sync.sample(1));self.assertTrue(self.sync.sample(1))
+  self.assertEqual([2,1,1],versions)
+  self.sync.disconnect();self.sync.demand(dict(version=1,rails=[1]))
+  self.assertTrue(self.sync.sample(1));self.assertEqual([2,1],versions[-2:])
  def test_no_network_or_busy_control_or_call_does_not_poll(self):
   self.connected.clear();self.assertFalse(self.sync.sample(1));self.connected.set()
   with self.audio._control_lock:self.assertFalse(self.sync.sample(1))
@@ -65,3 +77,20 @@ class StatusTests(unittest.TestCase):
   self.sync.refresh(1);self.assertEqual(0,self.sync.due[1])
   self.sync.disconnect();self.sync.due[1]=999
   self.sync.demand(dict(version=1,rails=[1]));self.assertEqual(0,self.sync.due[1])
+
+class EnergyTests(unittest.TestCase):
+ def sample(self,flags=31,mv=13200):
+  return bytes([2])+DATA[1:]+bytes([flags])+mv.to_bytes(2,'big')+(13200).to_bytes(2,'big')+(13000).to_bytes(2,'big')+(500).to_bytes(4,'big',signed=True)+(-100).to_bytes(4,'big',signed=True)
+ def test_scaled_signed_energy_and_estimate(self):
+  s=decode(self.sample());self.assertEqual(70,s['battery_percent']);self.assertTrue(s['battery_estimated'])
+  self.assertEqual(13.2,s['battery_voltage']);self.assertEqual(6.6,s['left_watt']);self.assertEqual(-1.3,s['right_watt'])
+ def test_missing_sensor_is_not_zero(self):
+  s=decode(self.sample(0));self.assertNotIn('battery_percent',s);self.assertNotIn('left_watt',s)
+  s=decode(self.sample(1));self.assertEqual(13.2,s['left_voltage']);self.assertNotIn('left_current',s)
+ def test_reject_invalid_energy(self):
+  for d in (self.sample()[:-1],self.sample(32),self.sample(4),self.sample(mv=20000)):
+   with self.assertRaises(ValueError):decode(d)
+ def test_curve_bounds_and_monotonic(self):
+  from status_sync import estimate_percent
+  values=[estimate_percent(v/100) for v in range(800,1601)]
+  self.assertEqual(values,sorted(values));self.assertEqual(0,values[0]);self.assertEqual(100,values[-1])

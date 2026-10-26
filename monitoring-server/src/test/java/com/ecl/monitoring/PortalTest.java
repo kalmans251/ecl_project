@@ -279,6 +279,15 @@ class PortalTest {
    assertEquals(409,b.request(path,"POST",Map.of("request_id",UUID.randomUUID()),true).statusCode());
   }
  }
+ @Test void energyTelemetryPersistsSignedInputsAndClearsMissingReadings(){
+  String id=registry.ensureRail("gateway-01",2);long now=System.currentTimeMillis();
+  telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",2,"observed_at",Instant.ofEpochMilli(now+10).toString(),"state",Map.of("battery_voltage",13.2,"battery_percent",70,"battery_estimated",true,"left_voltage",13.2,"left_current",-0.1,"left_watt",-1.32))));
+  var state=json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id));
+  assertEquals(13.2,state.path("battery_voltage").asDouble());assertTrue(state.path("battery_estimated").asBoolean());assertEquals(-1.32,state.path("left_watt").asDouble());
+  assertThrows(Exception.class,()->telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",2,"observed_at",Instant.ofEpochMilli(now+11).toString(),"state",Map.of("battery_voltage",30)))));
+  telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",2,"observed_at",Instant.ofEpochMilli(now+12).toString(),"state",Map.of("projector",false))));
+  state=json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id));assertFalse(state.has("battery_voltage"));assertFalse(state.has("battery_percent"));
+ }
  @Test void telemetryIsBoundAndDoesNotInventState(){
   String id=rail();var data=Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.now().toString(),"state",Map.of("volume",13,"left_watt",1.5,"right_watt",2.5,"battery_percent",70,"emergency",false,"radar",List.of(Map.of("x",.3,"y",2.0))));
   telemetry.accept("gateway-01",json.valueToTree(data));assertTrue(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id).contains("13"));
