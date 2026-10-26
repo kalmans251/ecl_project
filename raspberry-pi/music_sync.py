@@ -159,6 +159,9 @@ class MusicPublisher:
             while not self.stop.is_set():
                 raw = await ws.recv()
                 message = json.loads(raw)
+                if message.get('type') == 'call_end_ack' and self.calls:
+                    self.calls.confirm_end_receipt(message)
+                    continue
                 if message.get('type') == 'radar.demand' and self.radar:
                     self.radar.demand(message)
                     continue

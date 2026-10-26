@@ -184,6 +184,44 @@ class EmergencyWebCallTests(WebCallTests):
         result=self.remote.handle(self.message('call.start'));sid=result['data']['session_id']
         self.assertEqual([],self.remote.drain())
         self.states.call_ended(1,session_id=sid)
+        self.remote._ended_last=float('-inf')
         notice=self.remote.drain()[0]
         self.assertEqual('call_ended',notice['type']);self.assertEqual(sid,notice['session_id'])
         self.assertEqual(self.cid,notice['call_id']);self.assertIsNone(self.remote.current)
+
+    def test_end_after_disconnect_is_detected_without_current_audio_binding(self):
+        result=self.remote.handle(self.message('call.start'));sid=result['data']['session_id']
+        self.remote.disconnect();self.assertIsNone(self.remote.current)
+        self.states.call_ended(1,session_id=sid)
+        notice=self.remote.drain()[0]
+        self.assertEqual(sid,notice['session_id'])
+        self.assertEqual('call_ended',notice['type'])
+
+    def test_end_proof_survives_restart_until_exact_server_receipt(self):
+        result=self.remote.handle(self.message('call.start'));sid=result['data']['session_id']
+        self.states.call_ended(1,session_id=sid);notice=self.remote.drain()[0]
+        # Restart with no local call state: only the persisted physical proof is replayed.
+        fresh=RailingManager();audio=AudioManager(self.bus,fresh)
+        restored=CallRemote(audio,VoiceRelay(self.bus,fresh),fresh,[1],self.remote.path)
+        self.assertEqual(notice,restored.drain()[0])
+        restored.confirm_end_receipt(dict(notice,type='call_end_ack',session_id=sid^1))
+        restored._ended_last=float('-inf');self.assertEqual(notice,restored.drain()[0])
+        restored.confirm_end_receipt(dict(notice,type='call_end_ack'))
+        restored._ended_last=float('-inf');self.assertEqual([],restored.drain())
+        self.assertEqual({},fresh.snapshot(1))
+
+    def test_unknown_call_never_creates_end_proof(self):
+        self.remote.handle(self.message('call.start'));self.remote.disconnect()
+        self.assertEqual([],self.remote.drain())
+
+    def test_end_between_plc_start_and_web_result_is_not_reported_active(self):
+        original=self.audio.start_call
+        def started_then_ended(*args,**kwargs):
+            result=original(*args,**kwargs)
+            sid=self.states.snapshot(1)['call']['session_id']
+            self.states.call_ended(1,session_id=sid)
+            return result
+        self.audio.start_call=started_then_ended
+        self.assertEqual('UNKNOWN',self.remote.handle(self.message('call.start'))['status'])
+        self.assertIsNone(self.remote.current)
+        self.assertEqual('call_ended',self.remote.drain()[0]['type'])
