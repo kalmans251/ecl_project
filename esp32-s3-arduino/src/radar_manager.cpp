@@ -128,7 +128,7 @@ static radar_state_t
 
 static bool
     s_detail_enabled =
-        false;
+        true; // Local P4 cache only; never unsolicited PLC coordinates.
 
 
 static uint8_t
@@ -641,11 +641,11 @@ static void send_radar_detail(
         NODE_S3;
 
     /*
-     * P4에서는 로컬 wake 판단을 하지 않고
-     * 상세 좌표는 Pi가 받는다.
+     * P4 caches the selected sensor. Pi requests snapshots on the PLC bus.
+     * This is independent of new-person counting and wake policy.
      */
     frame.dst =
-        NODE_PI;
+        NODE_P4;
 
     frame.service =
         SERVICE_RADAR;

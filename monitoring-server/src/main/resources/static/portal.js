@@ -103,7 +103,7 @@ async function playSelectedMusic(){
  finally {musicBusy=false;renderMusicCatalog();}
 }
 function toggleDeviceState(type,value){if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');mark('projector',value?'on':'off');document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(String(value))));}
-function switchDisplayView(mode,edit=true){$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);}
+function switchDisplayView(mode,edit=true){$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);radarView.select(mode==='radar'&&rails().length===1?rails()[0].id:null);}
 async function applyAllUpdates(){await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(dirty.get(op)===value)dirty.delete(op);}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
 function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
@@ -154,7 +154,7 @@ function renderLive(){
  if(!activeCall?.OWNED || !['ACTIVE','SWITCHING','ENDING'].includes(activeCall.STATUS))closeVoice();
  else if(activeCall.STATUS!=='ACTIVE')portalVoice?.pause();
  for(const item of view.rails){if(item.reported.emergency && item.seen_at && Date.now()-item.seen_at<15000 && !lastEmergency.has(item.id)){lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
- drawRadar(s.radar||[]);
+ radarView.select(rails().length===1 && $('viewRadarContainer').style.display!=='none' ? r.id : null);
 }
 async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length)selected.add(view.rails[0].id);renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();}catch(e){toast(e.message);text('systemCommState','서버 연결 실패');musicReceivedAt=-Infinity;renderMusicStatus();closeVoice();}finally{polling=false;}}
 async function changeSite(){if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');site=$('siteSelect').value;selected.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
@@ -168,7 +168,16 @@ async function sendEmergencySms(label,input){await guarded(async()=>{const r=req
 function dismissEmergencyModal(){$('emergencyModal').style.display='none';$('emergencyModal').classList.remove('show');}
 function acceptEmergencyCallFromModal(){guarded(async()=>{if(modalRail){selected=new Set([modalRail]);dirty.clear();renderSelection();}await send('emergency.ack');await send('call.start');dismissEmergencyModal();});}
 function triggerMp3Alarm(){if(!audioContext)audioContext=new AudioContext();audioContext.resume();const o=audioContext.createOscillator(),g=audioContext.createGain();o.frequency.value=660;g.gain.value=.05;o.connect(g).connect(audioContext.destination);o.start();o.stop(audioContext.currentTime+.3);}
-function drawRadar(targets){const c=$('ld2450RadarCanvas'),ctx=c.getContext('2d'),dpr=window.devicePixelRatio||1,w=c.clientWidth||400,h=c.clientHeight||250;c.width=w*dpr;c.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);const ox=w/2,oy=12,R=h-25;ctx.strokeStyle='#284558';for(let i=1;i<=6;i++){ctx.beginPath();ctx.arc(ox,oy,R*i/6,Math.PI/6,5*Math.PI/6);ctx.stroke();ctx.fillStyle='#73929e';ctx.font='11px system-ui';ctx.fillText(i+'m',ox+5,oy+R*i/6);}for(const t of targets){ctx.fillStyle='#00f2fe';ctx.shadowColor='#00f2fe';ctx.shadowBlur=12;ctx.beginPath();ctx.arc(ox+t.x*w/6,oy+t.y*R/6,6,0,Math.PI*2);ctx.fill();}ctx.shadowBlur=0;}
+function drawRadar(targets){
+ const c=$('ld2450RadarCanvas'),ctx=c.getContext('2d'),dpr=window.devicePixelRatio||1,w=c.clientWidth||400,h=c.clientHeight||250;
+ c.width=w*dpr;c.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
+ const ox=w/2,oy=12,scale=Math.min((w-30)/12,(h-30)/6);
+ ctx.strokeStyle='#284558';ctx.fillStyle='#73929e';ctx.font='11px system-ui';
+ for(let i=1;i<=6;i++){ctx.beginPath();ctx.arc(ox,oy,scale*i,0,Math.PI);ctx.stroke();ctx.fillText(i+'m',ox+5,oy+scale*i);}
+ for(const t of targets){if(!Number.isFinite(t.x)||!Number.isFinite(t.y))continue;ctx.fillStyle='#00f2fe';ctx.beginPath();ctx.arc(ox+t.x*scale,oy+t.y*scale,6,0,Math.PI*2);ctx.fill();}
+}
+const radarView=new RadarView(drawRadar,message=>text('radarLiveStatus',message));
+
 async function ensureAudio(){if(!audioContext)audioContext=new AudioContext();await audioContext.resume();}
 let portalVoice;
 function voiceClient(){return portalVoice??=new WebVoice(toast);}

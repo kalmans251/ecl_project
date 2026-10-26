@@ -10,8 +10,9 @@ public class DeviceSocket extends TextWebSocketHandler {
     private final Events events;
     private final Commands commands; private final Telemetry telemetry;private final Voice voice;
     private final MusicTelemetry music;
+    private final RadarSocket radar;
     private final JsonMapper json=JsonMapper.builder().build();
-    public DeviceSocket(Gateways gateways, Events events, Commands commands, Telemetry telemetry,Voice voice,MusicTelemetry music) { this.gateways=gateways; this.events=events; this.commands=commands;this.telemetry=telemetry;this.voice=voice;this.music=music; }
+    public DeviceSocket(Gateways gateways, Events events, Commands commands, Telemetry telemetry,Voice voice,MusicTelemetry music,RadarSocket radar) { this.gateways=gateways; this.events=events; this.commands=commands;this.telemetry=telemetry;this.voice=voice;this.music=music;this.radar=radar; }
     private String id(WebSocketSession session) { return session.getUri().getPath().substring("/ws/gateways/".length()); }
     @Override public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         session.setTextMessageSizeLimit(4096);
@@ -35,6 +36,7 @@ public class DeviceSocket extends TextWebSocketHandler {
                 if (count>30) throw new IllegalArgumentException("Too many acknowledgments");
             }
             var node=json.readTree(message.getPayload());
+            if(node.path("type").asText().equals("radar_state")){radar.accept(id(session),session.getId(),node);return;}
             if(node.path("type").asText().equals("call_result")){commands.callResult(id(session),node);return;}
             if(node.path("type").asText().equals("control_result")){commands.controlResult(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("music_result")){commands.musicResult(id(session),node);return;}
