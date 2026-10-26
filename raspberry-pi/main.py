@@ -181,6 +181,7 @@ def main() -> int:
         return 1
     controls = DeviceControls(bus, railings, voice)
     local_audio = None
+    radar_sync = None
 
     def on_frame(frame: Frame) -> None:
         if frame.railing_id == 0:
@@ -204,6 +205,9 @@ def main() -> int:
         )
 
         if event_poller.handle_frame(frame):
+            return
+
+        if radar_sync and radar_sync.handle_frame(frame):
             return
 
         if controls.handle_frame(frame):
@@ -284,11 +288,16 @@ def main() -> int:
                     calls = CallRemote(audio, voice, railings, args.event_railings, remote.path)
                     voice.set_field_handler(calls.field)
                 publisher = MusicPublisher(args.monitor_url, os.environ['MONITOR_GATEWAY_TOKEN'], remote, calls)
+                from radar_sync import RadarSync
+                radar_sync = RadarSync(bus, controls, audio, railings, args.event_railings, publisher.publish)
+                publisher.radar = radar_sync
                 publisher.start()
+                radar_sync.start()
             music_sync = MusicSync(controls, args.event_railings, args.music_poll_interval,
                                    publisher.publish if publisher else None)
             music_sync.start()
     except Exception:
+        if radar_sync: radar_sync.close()
         if publisher: publisher.close()
         if local_audio: local_audio.close()
         voice.close(); bus.close()
@@ -501,6 +510,7 @@ def main() -> int:
 
     finally:
         if music_sync: music_sync.close()
+        if radar_sync: radar_sync.close()
         if publisher: publisher.close()
         event_poller.close()
         audio.close()

@@ -5,10 +5,12 @@ const vm=require('node:vm');
 const path=require('node:path');
 function app(){
  const elements={};
- const context=vm.createContext({console,setTimeout,clearTimeout,performance,crypto:require('node:crypto').webcrypto,
+ const context=vm.createContext({console,setTimeout,clearTimeout,setInterval:()=>1,performance,crypto:require('node:crypto').webcrypto,
   Option:class {constructor(text,value){this.text=text;this.value=value;}},
   window:{addEventListener(){}},document:{addEventListener(){},getElementById(id){return elements[id]??=( {value:'',disabled:false,children:[],replaceChildren(){this.children=[];this.value='';},append(item){this.children.push(item);}});}}});
- const source=fs.readFileSync(path.join(__dirname,'../../main/resources/static/portal.js'),'utf8').replace(/\ninit\(\);\s*$/,'');
+ const source=fs.readFileSync(path.join(__dirname,'../../main/resources/static/portal.js'),'utf8').replace(/^init\(\);$/m,'');
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../../main/resources/static/radar-view.js'),'utf8'),context);
+ vm.runInContext(fs.readFileSync(path.join(__dirname,'../../main/resources/static/detection-count.js'),'utf8'),context);
  vm.runInContext(source,context);
  const run=code=>vm.runInContext(code,context);
  run(`view={role:'OPERATOR',rails:[{id:'rail-a',name:'A',online:true},{id:'rail-b',name:'B',online:true}]};selected=new Set(['rail-a']);renderMusicCatalog();`);

@@ -15,7 +15,7 @@ class GatewayDisconnectTest {
  }
  @Test void alreadyClosedCurrentSocketMarksUnknownButOldSocketCannotInvalidateReplacement()throws Exception{
   var gateways=new Gateways();var commands=mock(Commands.class);
-  var handler=new DeviceSocket(gateways,null,commands,null,null,null);
+  var handler=new DeviceSocket(gateways,null,commands,null,null,null,null);
   var old=session("old");var replacement=session("new");gateways.connect("gateway-a",old);
   when(old.isOpen()).thenReturn(false);
   handler.afterConnectionClosed(old,CloseStatus.NORMAL);

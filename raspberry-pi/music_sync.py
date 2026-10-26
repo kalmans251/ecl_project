@@ -81,6 +81,7 @@ class MusicPublisher:
         if not token:
             raise ValueError('Set MONITOR_GATEWAY_TOKEN')
         self.url, self.token = url, token
+        self.radar = None
         self.remote = remote
         self.calls = calls
         self.stop = threading.Event()
@@ -91,13 +92,13 @@ class MusicPublisher:
     def publish(self, message):
         with self.lock:
             # Bounded to one latest snapshot per configured railing.
-            self.pending[message['railing_id']] = (time.monotonic(), message)
+            self.pending[(message.get('type'), message['railing_id'])] = (time.monotonic(), message)
 
     def drain(self):
         with self.lock:
             values = list(self.pending.values())
             self.pending.clear()
-        return [m for t, m in values if time.monotonic() - t < 5]
+        return [m for t, m in values if time.monotonic() - t < (1.5 if m.get('type') == 'radar_state' else 5)]
 
     def start(self):
         from websockets.asyncio.client import connect  # fail at startup if optional dependency absent
@@ -117,6 +118,7 @@ class MusicPublisher:
                         await self._connection(ws, alive)
                     finally:
                         alive.clear()
+                        if self.radar: self.radar.disconnect()
                         if self.calls: self.calls.disconnect()
                         if self.command_task:
                             await self.command_task
@@ -157,6 +159,9 @@ class MusicPublisher:
             while not self.stop.is_set():
                 raw = await ws.recv()
                 message = json.loads(raw)
+                if message.get('type') == 'radar.demand' and self.radar:
+                    self.radar.demand(message)
+                    continue
                 if message.get('type')=='voice.pause' and self.calls:
                     current=self.calls.current
                     if current and message.get('call_id')==current[0]: self.calls.disconnect()

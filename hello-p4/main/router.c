@@ -3,6 +3,7 @@
 #include "router.h"
 #include "call_manager.h"
 #include "event_outbox.h"
+#include "radar_cache.h"
 
 
 QueueHandle_t router_queue = NULL;
@@ -86,6 +87,12 @@ void router_task(void *arg)
 
 
         if (!call_manager_voice_allowed(&frame)) continue;
+        if (radar_cache_capture(&frame)) continue;
+        protocol_frame_t radar_reply = {0};
+        if (radar_cache_reply(&frame, &radar_reply)) {
+            if (radar_reply.length) xQueueSend(plc_tx_queue, &radar_reply, pdMS_TO_TICKS(20));
+            continue;
+        }
         switch (frame.dst)
         {
             /* ================================================
