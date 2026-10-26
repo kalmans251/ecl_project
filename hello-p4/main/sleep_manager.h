@@ -103,3 +103,4 @@ activity_state_t sleep_manager_get_state(void);
 void sleep_manager_on_led_mode_changed(
     led_mode_t mode
 );
+void sleep_manager_resume_after_emergency(void);

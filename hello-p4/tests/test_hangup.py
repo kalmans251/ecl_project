@@ -9,6 +9,7 @@ HARNESS=r'''
 
 #include <assert.h>
 #include "call_manager.c"
+void emergency_manager_call_ended(void) {}
 static int64_t now;
 static unsigned sent, restores, removes;
 static protocol_frame_t last, terminal;

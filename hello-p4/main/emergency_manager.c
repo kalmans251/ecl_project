@@ -1,6 +1,8 @@
 #include "emergency_manager.h"
 
 #include <string.h>
+#include <stdatomic.h>
+#include "sleep_manager.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -19,7 +21,7 @@ static const char *TAG =
     "EMERGENCY";
 
 
-static bool
+static atomic_bool
     s_active =
         false;
 
@@ -28,6 +30,8 @@ static uint32_t
     s_active_seq =
         0;
 
+
+static uint32_t s_call_seq, s_ended_seq;
 
 static uint8_t
     s_source =
@@ -151,21 +155,27 @@ static void build_event_payload(
 }
 
 
+static void confirm_button(uint8_t state, uint32_t seq) {
+    uint8_t p[5]; p[0]=state; write_u32_be(p+1,seq);
+    send_frame(NODE_S3,CMD_DATA,p,5);
+}
+void emergency_manager_call_ended(void) {
+    if (!s_call_seq) return;
+    s_ended_seq=s_call_seq; s_call_seq=0;
+    confirm_button(0x82,s_ended_seq);
+    sleep_manager_resume_after_emergency();
+}
+
 /* ============================================================
  * INIT
  * ============================================================ */
 
 void emergency_manager_init(void)
 {
-    s_active =
-        false;
-
-    s_active_seq =
-        0;
-
-    s_source =
-        0;
-
+    s_active = false;
+    s_active_seq = 0;
+    s_call_seq = s_ended_seq = 0;
+    s_source = 0;
 
     ESP_LOGI(
         TAG,
@@ -183,6 +193,10 @@ bool emergency_manager_start(
     uint32_t seq
 )
 {
+    if (!seq) return false;
+    if (seq==s_ended_seq) { confirm_button(0x82,seq); return true; }
+    if (seq==s_call_seq) { confirm_button(0x81,seq); return true; }
+    if (call_manager_is_active()) return false;
     /*
      * 동일 프레임 재전송.
      */
@@ -202,6 +216,10 @@ bool emergency_manager_start(
             );
 
 
+            uint8_t retry[5]; build_event_payload(retry,source,seq);
+            if (!send_frame(NODE_WROOM,CMD_START,retry,5)) return false;
+            send_frame(NODE_PI,CMD_START,retry,5);
+            confirm_button(0x80,seq);
             return true;
         }
 
@@ -252,12 +270,7 @@ bool emergency_manager_start(
      * WROOM:
      * 현장 비상음 시작.
      */
-    send_frame(
-        NODE_WROOM,
-        CMD_START,
-        payload,
-        sizeof(payload)
-    );
+    if (!send_frame(NODE_WROOM,CMD_START,payload,sizeof(payload))) return false;
 
 
     /*
@@ -280,6 +293,7 @@ bool emergency_manager_start(
     );
 
 
+    confirm_button(0x80,seq);
     return true;
 }
 
@@ -295,6 +309,12 @@ bool emergency_manager_cancel(
     uint32_t seq
 )
 {
+    if (seq && seq==s_ended_seq) { confirm_button(0x82,seq); return true; }
+    if (seq && seq==s_call_seq) {
+        if (call_manager_is_active() && call_manager_get_origin()==CALL_ORIGIN_EMERGENCY)
+            return call_manager_end(); // async; END confirmation follows endpoint readiness
+        emergency_manager_call_ended(); return true;
+    }
     if (
         !s_active
     )
@@ -305,6 +325,12 @@ bool emergency_manager_cancel(
         );
 
 
+        if (seq && !call_manager_is_active()) {
+            uint8_t stop[5]; build_event_payload(stop,source,seq);
+            if (!send_frame(NODE_WROOM,CMD_STOP,stop,5)) return false;
+            send_frame(NODE_PI,CMD_STOP,stop,5);
+            s_ended_seq=seq; confirm_button(0x82,seq); return true;
+        }
         return false;
     }
 
@@ -341,12 +367,7 @@ bool emergency_manager_cancel(
     /*
      * 현장 비상음 종료.
      */
-    send_frame(
-        NODE_WROOM,
-        CMD_STOP,
-        payload,
-        sizeof(payload)
-    );
+    if (!send_frame(NODE_WROOM,CMD_STOP,payload,sizeof(payload))) return false;
 
 
     /*
@@ -388,6 +409,9 @@ bool emergency_manager_cancel(
     );
 
 
+    s_ended_seq=seq;
+    confirm_button(0x82,seq);
+    sleep_manager_resume_after_emergency();
     return true;
 }
 
@@ -497,18 +521,18 @@ bool emergency_manager_ack(
 
 
     /*
-     * S3의 emergency latch 해제.
+     * Keep S3's emergency identity through the call so a second hold ends it.
      *
      * payload:
      *
-     * [0] ACK
+     * [0] accepted (0x81)
      * [1..4] seq
      */
     uint8_t ack_payload[5];
 
 
-    ack_payload[0] =
-        EMERGENCY_ACTION_ACK;
+    ack_payload[0] = 0x81;
+    s_call_seq=seq;
 
 
     write_u32_be(
@@ -519,7 +543,7 @@ bool emergency_manager_ack(
 
     send_frame(
         NODE_S3,
-        CMD_SET,
+        CMD_DATA,
         ack_payload,
         sizeof(ack_payload)
     );

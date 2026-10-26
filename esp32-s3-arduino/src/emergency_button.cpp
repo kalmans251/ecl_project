@@ -16,6 +16,23 @@ static void send_emergency_start(void);
 static void send_emergency_cancel(void);
 
 static void handle_long_press(void);
+static void emergency_button_retry_frame(protocol_frame_t *);
+static uint8_t s_pending_command;
+static unsigned s_attempts;
+static uint32_t s_last_attempt;
+static void transmit_pending(void) {
+    if (!s_pending_command || s_attempts >= 6 || !ble_link_is_connected()) return;
+    protocol_frame_t f = {};
+    f.railing_id=RAILING_ID; f.src=NODE_S3; f.dst=NODE_P4;
+    f.service=SERVICE_EMERGENCY; f.command=s_pending_command; f.length=5;
+    f.payload[0]=EMERGENCY_SOURCE_BUTTON;
+    // Filled below by the sender, after the event sequence is reserved.
+    emergency_button_retry_frame(&f);
+    ble_send_frame(&f);
+    s_last_attempt=millis(); ++s_attempts;
+    if (s_attempts==6) Serial.println("[EMERGENCY] Confirmation pending; hold again to retry cancel");
+}
+
 
 // ============================================================
 // STATE
@@ -93,6 +110,7 @@ static void write_u32_be(
 
 void emergency_button_init(void)
 {
+    s_active_emergency_seq=0; s_pending_command=0; s_attempts=0; s_long_press_consumed=false;
     /*
      * 외부 10k pull-down이 있으므로 INPUT.
      */
@@ -147,6 +165,7 @@ void emergency_button_init(void)
 
 void emergency_button_process(void)
 {
+    if (s_pending_command && millis()-s_last_attempt >= 1000) transmit_pending();
     bool raw_pressed =
         digitalRead(
             PIN_VOICE_CALL_BUTTON
@@ -286,151 +305,31 @@ bool emergency_button_is_active(void)
 }
 
 
-// ============================================================
-// CLEAR
-// ============================================================
-
-void emergency_button_clear(void)
-{
-    s_emergency_active =
-        false;
-
-
-    s_button_down_ms =
-        0;
-
-    s_active_emergency_seq = 0;
-
-    Serial.println(
-        "[EMERGENCY] Cleared by ACK"
-    );
+static void emergency_button_retry_frame(protocol_frame_t *f) {
+    write_u32_be(f->payload+1,s_active_emergency_seq);
 }
-
-static void send_emergency_start(void)
-{
-    s_active_emergency_seq =
-        s_emergency_seq;
-
-
-    protocol_frame_t frame = {};
-
-    frame.railing_id =
-        RAILING_ID;
-
-    frame.src =
-        NODE_S3;
-
-    frame.dst =
-        NODE_P4;
-
-    frame.service =
-        SERVICE_EMERGENCY;
-
-    frame.command =
-        CMD_START;
-
-    frame.length =
-        5;
-
-    frame.payload[0] =
-        EMERGENCY_SOURCE_BUTTON;
-
-
-    write_u32_be(
-        &frame.payload[1],
-        s_active_emergency_seq
-    );
-
-
-    ble_send_frame(
-        &frame
-    );
-
-
-    Serial.printf(
-        "[EMERGENCY] START seq=%lu\n",
-        (unsigned long)
-            s_active_emergency_seq
-    );
-
-
-    s_emergency_seq++;
-
-    if (
-        s_emergency_seq ==
-        0
-    )
-    {
-        s_emergency_seq =
-            1;
+static void send_emergency_start(void) {
+    s_active_emergency_seq=s_emergency_seq++;
+    if (!s_emergency_seq) s_emergency_seq=1;
+    s_pending_command=CMD_START; s_attempts=0;
+    transmit_pending();
+}
+static void send_emergency_cancel(void) {
+    s_pending_command=CMD_STOP; s_attempts=0;
+    transmit_pending();
+}
+void emergency_button_confirm(uint8_t state, uint32_t seq) {
+    if (!s_active_emergency_seq || seq!=s_active_emergency_seq) return;
+    if (state==0x82) {
+        s_emergency_active=false; s_active_emergency_seq=0; s_pending_command=0;
+        Serial.println("[EMERGENCY] END confirmed");
+    } else if (state==0x80 || state==0x81) {
+        s_emergency_active=true;
+        if (s_pending_command==CMD_START) s_pending_command=0;
+        Serial.println("[EMERGENCY] START/CALL confirmed");
     }
 }
-
-static void send_emergency_cancel(void)
-{
-    protocol_frame_t frame = {};
-
-    frame.railing_id =
-        RAILING_ID;
-
-    frame.src =
-        NODE_S3;
-
-    frame.dst =
-        NODE_P4;
-
-    frame.service =
-        SERVICE_EMERGENCY;
-
-    frame.command =
-        CMD_STOP;
-
-    frame.length =
-        5;
-
-    frame.payload[0] =
-        EMERGENCY_SOURCE_BUTTON;
-
-
-    write_u32_be(
-        &frame.payload[1],
-        s_active_emergency_seq
-    );
-
-
-    ble_send_frame(
-        &frame
-    );
-
-
-    Serial.printf(
-        "[EMERGENCY] CANCEL seq=%lu\n",
-        (unsigned long)
-            s_active_emergency_seq
-    );
-
-
-    s_active_emergency_seq =
-        0;
-}
-
-static void handle_long_press(void)
-{
-    if (
-        !s_emergency_active
-    )
-    {
-        s_emergency_active =
-            true;
-
-        send_emergency_start();
-
-        return;
-    }
-
-
-    s_emergency_active =
-        false;
-
-    send_emergency_cancel();
+static void handle_long_press(void) {
+    if (s_active_emergency_seq) { send_emergency_cancel(); return; }
+    send_emergency_start();
 }

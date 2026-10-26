@@ -176,7 +176,7 @@ void led_task(void *arg) {
         if(state.call_active || !state.music_playing) {
             s_latest_eq.length=0;s_have_eq=false;
         }
-        if(!state.led_enabled || state.sleep_active) {
+        if((!state.led_enabled || state.sleep_active) && !emergency_manager_is_active() && !state.call_active) {
             led_output_off();
             /* Wake starts a clean frame; no pre-sleep trails/EQ are replayed. */
             s_design.initialized=false;s_have_eq=false;
