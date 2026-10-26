@@ -26,6 +26,24 @@ let emergencyAudio;
 function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>text('emergencyAudioState',message));}
 function enableEmergencyAudio(){return guarded(()=>alarmAudio().enable());}
 function muteEmergencyAudio(){alarmAudio().mute();}
+let emergencyQueue;
+function renderEmergencyQueue(){
+ if(typeof EmergencyQueue==='undefined')return;
+ const rows=(emergencyQueue??=new EmergencyQueue()).rows(site,view?.rails||[],view?.calls||[]);
+ text('emergencyQueueTitle',`비상 호출 ${rows.length}건${stateFetchFailed?' · 서버 연결 실패, 마지막 확인 정보':''}`);
+ const root=$('emergencyQueue');root.replaceChildren();
+ if(!rows.length){root.textContent=stateFetchFailed?'현재 호출 상태 확인 불가':'현재 현장에 수신된 미처리 호출 없음';return;}
+ for(const row of rows){
+  const line=document.createElement('div');line.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid #555';
+  const label=document.createElement('span');label.textContent=`${row.rail.name} · ${row.at?new Date(row.at).toLocaleString('ko-KR'):'발생 시각 미확인'} · ${row.status} · 담당 ${row.call?.OWNER_NAME||'미배정'}${row.rail.online?'':' · Pi 연결 끊김'}`;line.append(label);
+  const button=(label,disabled,action)=>{const b=document.createElement('button');b.textContent=label;b.disabled=disabled;b.onclick=action;line.append(b);};
+  const busy=emergencyAccepting||controlBusy||pttChanging||musicBusy;
+  button('해당 난간 보기',busy||!!activeCall&&!selected.has(row.rail.id),()=>{if(!selected.has(row.rail.id)||selected.size!==1)choose(row.rail.id);});
+  button('통화 수락',busy||stateFetchFailed||!row.active||!row.rail.online||!!row.call||view.role==='VIEWER'||view.calls.some(c=>c.OWNED),()=>{modalRail=row.rail.id;acceptEmergencyCallFromModal();});
+  button('이 호출 알림음 끄기',false,()=>alarmAudio().muteRail(row.rail.id));
+  root.append(line);
+ }
+}
 function rails(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
 function requireSelection(single=false){const items=rails();if(!items.length || (single&&items.length!==1))throw Error(single?'난간 하나를 선택하세요.':'난간을 선택하세요.');if(view.role==='VIEWER')throw Error('조회 계정은 제어할 수 없습니다.');return items;}
 let controlBusy=false,pttChanging=false,emergencyAccepting=false,emergencyModalOpen=false;
@@ -172,6 +190,7 @@ function renderLive(){
  $('btnPttTalk').disabled=!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available;$('btnPttTalk').classList.toggle('active',activeCall?.DIRECTION==='CONTROL_TX');
  if(!activeCall?.OWNED || !['ACTIVE','SWITCHING','ENDING'].includes(activeCall.STATUS))closeVoice();
  else if(activeCall.STATUS!=='ACTIVE')portalVoice?.pause();
+ renderEmergencyQueue();
  for(const item of view.rails){if(item.reported.emergency && (item.reported.emergency_at||item.seen_at) && !lastEmergency.has(item.id) && !emergencyModalOpen && !emergencyAccepting){emergencyModalOpen=true;lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
  radarView.select(rails().length===1 && $('viewRadarContainer').style.display!=='none' ? r.id : null);
 }

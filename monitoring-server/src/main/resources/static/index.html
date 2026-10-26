@@ -543,6 +543,10 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
  <button onclick="muteEmergencyAudio()">현재 호출 알림음 끄기</button>
  <span id="emergencyAudioState" role="status">비상 알림음 비활성 · 활성화 필요</span>
 </div>
+<section aria-label="비상 호출 목록" style="flex-shrink:0;margin:0 16px 10px;padding:10px;border:1px solid #b45353;border-radius:8px">
+ <strong id="emergencyQueueTitle">비상 호출 목록</strong>
+ <div id="emergencyQueue" style="max-height:180px;overflow:auto"></div>
+</section>
 <div class="main-header">
     <div class="top-left-menu-group">
         <button class="menu-dropdown-btn" id="btnStatsMenu" onclick="toggleStatsMenu(event)">📊 통계 데이터 ▾</button>
@@ -844,5 +848,5 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 <dialog id="portalDialog" class="portal-dialog"><button class="close" onclick="document.getElementById('portalDialog').close()">닫기</button><h2 id="dialogTitle"></h2><div id="dialogBody"></div></dialog>
 <script src="/music-status.js"></script>
 <script src="/web-voice.js"></script>
-<script src="/detection-count.js"></script><script src="/radar-view.js"></script><script src="/emergency-audio.js"></script><script src="/portal.js"></script>
+<script src="/detection-count.js"></script><script src="/radar-view.js"></script><script src="/emergency-queue.js"></script><script src="/emergency-audio.js"></script><script src="/portal.js"></script>
 </body></html>

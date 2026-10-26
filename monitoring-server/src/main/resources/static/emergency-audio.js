@@ -11,6 +11,7 @@ class EmergencyAudio {
   this.muted=new Set([...this.muted].filter(id=>this.pending.has(id)));
   this.inCall=calls.some(c=>c.OWNED);this.render();
  }
+ muteRail(rail){for(const id of this.pending)if(id.startsWith(rail+':'))this.muted.add(id);this.render();}
  mute(){for(const id of this.pending)this.muted.add(id);this.render();}
  render(){
   const wanted=[...this.pending].some(id=>!this.muted.has(id))&&!this.inCall;
