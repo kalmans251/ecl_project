@@ -181,6 +181,18 @@ class PortalTest {
   assertTrue(stored.path("emergency").asBoolean());assertFalse(stored.path("sleep").asBoolean());
   assertThrows(Exception.class,()->telemetry.emergency("wrong-gateway",json.valueToTree(alarm)));
  }
+ @Test void durableAlarmsSurviveAgeAndDuplicateWithoutUndoingEnd()throws Exception{
+  String id=rail();db.update("UPDATE rails SET snapshot=NULL WHERE id=?",id);
+  long at=System.currentTimeMillis()-120000;
+  var start=new HashMap<String,Object>(Map.of("version",2,"type","emergency_state","event_id",UUID.randomUUID().toString(),"railing_id",1,"observed_at",Instant.ofEpochMilli(at).toString(),"state",Map.of("active",true)));
+  try(var device=new Device()){
+   device.ws.sendText(json.writeValueAsString(start),true).join();
+   var ack=json.readTree(device.next());assertEquals("emergency_ack",ack.path("type").asText());assertEquals(start.get("event_id"),ack.path("event_id").asText());
+   var end=new HashMap<String,Object>(start);end.put("event_id",UUID.randomUUID().toString());end.put("observed_at",Instant.ofEpochMilli(at+1).toString());end.put("state",Map.of("active",false));
+   telemetry.emergency("gateway-01",json.valueToTree(end));telemetry.emergency("gateway-01",json.valueToTree(start));
+   assertFalse(json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id)).path("emergency").asBoolean());
+  }
+ }
  @Test void telemetryIsBoundAndDoesNotInventState(){
   String id=rail();var data=Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.now().toString(),"state",Map.of("volume",13,"left_watt",1.5,"right_watt",2.5,"battery_percent",70,"emergency",false,"radar",List.of(Map.of("x",.3,"y",2.0))));
   telemetry.accept("gateway-01",json.valueToTree(data));assertTrue(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id).contains("13"));

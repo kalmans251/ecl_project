@@ -85,6 +85,7 @@ class MusicPublisher:
         self.connected = threading.Event()
         self.radar = None
         self.status = None
+        self.emergency_outbox = None
         self.remote = remote
         self.calls = calls
         self.stop = threading.Event()
@@ -152,7 +153,7 @@ class MusicPublisher:
                 LOG.warning('Gateway command result unavailable (%s)', type(exc).__name__)
         async def sender():
             while not self.stop.is_set():
-                messages = self.drain() + (self.calls.drain() if self.calls else [])
+                messages = (await asyncio.to_thread(self.emergency_outbox.drain) if self.emergency_outbox else []) + self.drain() + (self.calls.drain() if self.calls else [])
                 for message in messages:
                     await ws.send(json.dumps(message, ensure_ascii=False))
                 await asyncio.sleep(.02)
@@ -165,6 +166,9 @@ class MusicPublisher:
             while not self.stop.is_set():
                 raw = await ws.recv()
                 message = json.loads(raw)
+                if message.get('type') == 'emergency_ack' and self.emergency_outbox:
+                    await asyncio.to_thread(self.emergency_outbox.acknowledge,message)
+                    continue
                 if message.get('type') == 'call_end_ack' and self.calls:
                     self.calls.confirm_end_receipt(message)
                     continue
