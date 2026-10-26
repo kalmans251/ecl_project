@@ -22,6 +22,10 @@ function statusCheck(r){
  return {fresh:!stateFetchFailed&&r.online&&!!r.seen_at&&Date.now()-r.seen_at<15000&&advanced,
  waiting:!advanced&&performance.now()-baseline.at<15000};
 }
+let emergencyAudio;
+function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>text('emergencyAudioState',message));}
+function enableEmergencyAudio(){return guarded(()=>alarmAudio().enable());}
+function muteEmergencyAudio(){alarmAudio().mute();}
 function rails(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
 function requireSelection(single=false){const items=rails();if(!items.length || (single&&items.length!==1))throw Error(single?'난간 하나를 선택하세요.':'난간을 선택하세요.');if(view.role==='VIEWER')throw Error('조회 계정은 제어할 수 없습니다.');return items;}
 let controlBusy=false,pttChanging=false,emergencyAccepting=false,emergencyModalOpen=false;
@@ -155,6 +159,7 @@ function renderMusicStatus(){
  if(d.durationMs)showSeekTarget();else text('musicSeekTarget','--:--');
 }
 function renderLive(){
+ if(typeof EmergencyAudio!=='undefined')alarmAudio().sync(view?.rails||[],view?.calls||[]);
  renderMusicStatus();
  const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=fresh?r.reported:{};
  text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':s.battery_percent.toFixed(1)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
@@ -171,7 +176,7 @@ function renderLive(){
  radarView.select(rails().length===1 && $('viewRadarContainer').style.display!=='none' ? r.id : null);
 }
 async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length&&!statusBaselines.size){selected.add(view.rails[0].id);awaitStatus(selected);}renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();await renewStatusDemand();}catch(e){if(requestedSite!==site)return;stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
-async function changeSite(){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');site=$('siteSelect').value;selected.clear();statusBaselines.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
+async function changeSite(){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');if(emergencyAudio)emergencyAudio.sync([],[]);site=$('siteSelect').value;selected.clear();statusBaselines.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
 async function logout(){await guarded(async()=>{if(view?.calls.some(c=>c.OWNED))throw Error('통화를 종료한 뒤 로그아웃하세요.');closeVoice();await api('/api/auth/logout','POST');location.href='/login.html';});}
 function dialog(title){text('dialogTitle',title);$('dialogBody').replaceChildren();$('portalDialog').showModal();return $('dialogBody');}
 function table(parent,headers,rows){const t=document.createElement('table');let tr=document.createElement('tr');for(const h of headers){const th=document.createElement('th');th.textContent=h;tr.append(th);}t.append(tr);for(const row of rows){tr=document.createElement('tr');for(const val of row){const td=document.createElement('td');td.textContent=val??'--';tr.append(td);}t.append(tr);}parent.append(t);}
