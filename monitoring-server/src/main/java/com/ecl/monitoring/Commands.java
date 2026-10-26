@@ -79,6 +79,22 @@ public class Commands {
         });
         dispatch(); return result;
     }
+    public synchronized List<Map<String,Object>> recoverIncident(String username,String incident,UUID requestId){
+        var incidents=db.queryForList("SELECT * FROM emergency_incidents WHERE id=?",incident);
+        if(incidents.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Incident not found");
+        String railId=(String)incidents.get(0).get("RAIL_ID");var rail=registry.rail(railId);
+        accounts.permit(username,(String)rail.get("SITE_ID"),true);
+        var attempts=db.queryForList("SELECT * FROM emergency_incident_calls WHERE incident_id=? AND ended_at IS NULL AND not_started_at IS NULL ORDER BY requested_at DESC",incident);
+        if(attempts.size()!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"No unique unresolved call; check field emergency state, no forced completion");
+        var calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=?",rail.get("GATEWAY_ID"));
+        if(calls.size()!=1 || !calls.get(0).get("ID").equals(attempts.get(0).get("CALL_ID")))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Incident call does not match current call; no action sent");
+        if(!Set.of("UNKNOWN","ENDING").contains(calls.get(0).get("STATUS")))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Call is active or being processed; use normal call controls");
+        if(db.queryForObject("SELECT COUNT(*) FROM commands WHERE gateway_id=? AND status IN ('QUEUED','SENT','RECEIVED')",Integer.class,rail.get("GATEWAY_ID"))>0)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Wait for the current command result before recovery");
+        return submit(username,new Input(requestId,List.of(railId),"call.end",null));
+    }
     private void reserve(String username,String user,Map<String,Object> rail,String operation) {
         String gateway=(String)rail.get("GATEWAY_ID"); List<Map<String,Object>> calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=?",gateway);
         if(Set.of("call.start","call.accept").contains(operation)) {

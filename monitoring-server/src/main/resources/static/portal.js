@@ -40,10 +40,23 @@ function renderEmergencyQueue(){
   const busy=emergencyAccepting||controlBusy||pttChanging||musicBusy;
   button('해당 난간 보기',busy||!!activeCall&&!selected.has(row.rail.id),()=>{if(!selected.has(row.rail.id)||selected.size!==1)choose(row.rail.id);});
   button('통화 수락',busy||stateFetchFailed||!row.active||!row.rail.online||!!row.call||view.role==='VIEWER'||view.calls.some(c=>c.OWNED),()=>{modalRail=row.rail.id;acceptEmergencyCallFromModal();});
+  if(row.incidentId && row.call && ['UNKNOWN','ENDING'].includes(row.call.STATUS))button('종료 확인 재시도',busy||stateFetchFailed||!row.rail.online||view.role==='VIEWER',()=>recoverEmergencyIncident(row.incidentId,row.rail.name));
   button('이 호출 알림음 끄기',false,()=>alarmAudio().muteRail(row.rail.id));
   root.append(line);
  }
 }
+function recoverEmergencyIncident(id,name){return guarded(async()=>{
+ if(controlBusy||emergencyAccepting||pttChanging)throw Error('현재 요청 처리가 끝난 뒤 다시 시도하세요.');
+ if(!confirm(`${name}의 미확정 통화에 종료 명령을 다시 보내 실제 종료 응답을 확인할까요? 비상 상태를 강제로 해제하지는 않습니다.`))return;
+ controlBusy=true;
+ try{
+  const rows=await api(`/api/portal/incidents/${encodeURIComponent(id)}/recover`,'POST',{request_id:newId()});
+  toast('종료 확인 복구 요청 · 장치 응답 대기');
+  const results=await waitControlResults(rows);await poll();
+  if(results.some(r=>r.status!=='APPLIED'))throw Error('종료가 확인되지 않았습니다. 미확정 기록을 유지합니다. 통신과 장치 로그를 확인하세요.');
+  toast('장치 통화 종료 확인 완료 · 현장 비상 해제 여부는 별도로 확인합니다.');
+ }finally{controlBusy=false;}
+});}
 function showEmergencyHistory(){return guarded(async()=>{
  const requested=site,rows=await api(`/api/portal/sites/${requested}/incidents?history=true`);if(site!==requested)return;
  const body=dialog('완료된 비상 사건 · 최근 100건');

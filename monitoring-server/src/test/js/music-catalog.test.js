@@ -87,3 +87,11 @@ test('alarm cleared during audio preparation does not change selection or send',
  const a=app();a.run(`selected=new Set(['old']);view={role:'OPERATOR',calls:[],rails:[{id:'new',reported:{emergency:true}}]};modalRail='new';guarded=async f=>f();ensureAudio=async()=>{};voiceClient=()=>({prepare:async()=>{view.rails[0].reported.emergency=false;}});send=async()=>{throw Error('must not send');};`);
  await assert.rejects(a.run('acceptEmergencyCallFromModal()'),/해제/);assert.equal(a.run('[...selected][0]'),'old');assert.equal(a.run('emergencyAccepting'),false);
 });
+
+test('incident recovery sends exact incident and retains uncertainty on failed confirmation',async()=>{
+ const a=app(),sent=[];a.context.confirm=()=>true;a.context.capture=(p,d)=>sent.push([p,d]);
+ a.run(`guarded=async f=>f();toast=()=>{};api=async(p,m,d)=>{capture(p,d);return [{id:'cmd',status:'SENT'}];};waitControlResults=async()=>[{status:'UNKNOWN'}];poll=async()=>{};`);
+ await assert.rejects(a.run(`recoverEmergencyIncident('incident-a','난간')`),/미확정/);
+ assert.equal(sent[0][0],'/api/portal/incidents/incident-a/recover');assert.equal(a.run('controlBusy'),false);
+ a.context.confirm=()=>false;await a.run(`recoverEmergencyIncident('incident-b','난간')`);assert.equal(sent.length,1);
+});

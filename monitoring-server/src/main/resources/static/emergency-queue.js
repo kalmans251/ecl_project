@@ -5,7 +5,7 @@ class EmergencyQueue {
    const rail=rails.find(r=>r.id===e.rail_id);if(!rail)return null;
    const attempt=[...(e.attempts||[])].reverse().find(a=>!a.ENDED_AT&&!a.NOT_STARTED_AT);
    const call=attempt?(calls.find(c=>c.ID===attempt.CALL_ID)||{STATUS:attempt.CALL_STATUS||'UNKNOWN',OWNER_NAME:attempt.OWNER_NAME}):null;
-   return {rail,call,at:e.started_at,active:e.cleared_at==null,status:call?({ACTIVE:'통화 중',PENDING:'연결 중',SWITCHING:'음성 방향 전환 중',ENDING:'종료 확인 중'}[call.STATUS]||'상태 미확정 · 종료 확인 필요'):'수락 대기'};
+   return {incidentId:e.id,rail,call,at:e.started_at,active:e.cleared_at==null,status:call?({ACTIVE:'통화 중',PENDING:'연결 중',SWITCHING:'음성 방향 전환 중',ENDING:'종료 확인 중'}[call.STATUS]||'상태 미확정 · 종료 확인 필요'):'수락 대기'};
   }).filter(Boolean);
 
   if(this.site!==site){this.known.clear();this.site=site;}
