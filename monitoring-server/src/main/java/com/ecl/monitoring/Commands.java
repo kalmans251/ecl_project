@@ -13,13 +13,13 @@ public class Commands {
     private final JdbcTemplate db; private final Accounts accounts; private final Registry registry; private final Gateways gateways;
     private final org.springframework.transaction.support.TransactionTemplate transaction;
     private final JsonMapper json=JsonMapper.builder().build();
-    private static final Set<String> CONFIRMABLE=Set.of("volume","music.stop","call.start","call.end","ptt.on","ptt.off");
+    private static final Set<String> CONFIRMABLE=Set.of("volume","music.stop","call.start","call.accept","call.end","ptt.on","ptt.off");
     private static final Map<String,Set<String>> VALUES=Map.ofEntries(
         Map.entry("power",Set.of("ac","battery","on","off")),Map.entry("projector",Set.of("on","off")),
         Map.entry("led",Set.of("on","off","basic","music")),Map.entry("weather",Set.of("clear","cloudy","rain","snow")),
         Map.entry("music.mode",Set.of("sequential","shuffle","age")),Map.entry("sleep",Set.of("on","off")),
         Map.entry("detection",Set.of("radar","cctv")),Map.entry("query",Set.of("p4","wroom","s3")));
-    private static final Set<String> ACTIONS=Set.of("music.start","music.stop","music.pause","music.resume","music.next","call.start","call.end","ptt.on","ptt.off","emergency.ack","detection.count","detection.reset");
+    private static final Set<String> ACTIONS=Set.of("music.start","music.stop","music.pause","music.resume","music.next","call.start","call.accept","call.end","ptt.on","ptt.off","detection.count","detection.reset");
     public Commands(JdbcTemplate db, Accounts accounts, Registry registry, Gateways gateways) {
         this.db=db;this.accounts=accounts;this.registry=registry;this.gateways=gateways;
         this.transaction=new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.datasource.DataSourceTransactionManager(db.getDataSource()));
@@ -81,7 +81,7 @@ public class Commands {
     }
     private void reserve(String username,String user,Map<String,Object> rail,String operation) {
         String gateway=(String)rail.get("GATEWAY_ID"); List<Map<String,Object>> calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=?",gateway);
-        if(operation.equals("call.start")) {
+        if(Set.of("call.start","call.accept").contains(operation)) {
             if(!calls.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Gateway call already reserved");
             db.update("INSERT INTO calls(gateway_id,id,rail_id,user_id,status,touched_at) VALUES(?,?,?,?,?,?)",gateway,UUID.randomUUID().toString(),rail.get("ID"),user,"PENDING",System.currentTimeMillis());
         } else {
@@ -142,7 +142,7 @@ public class Commands {
         if(status.equals("APPLIED")) {
             String operation=(String)row.get("OPERATION");
             if(operation.equals("call.end"))db.update("DELETE FROM calls WHERE gateway_id=? AND rail_id=?",gateway,row.get("RAIL_ID"));
-            else if(operation.equals("call.start"))db.update("UPDATE calls SET status='ACTIVE',touched_at=? WHERE gateway_id=? AND status='PENDING'",System.currentTimeMillis(),gateway);
+            else if(Set.of("call.start","call.accept").contains(operation))db.update("UPDATE calls SET status='ACTIVE',touched_at=? WHERE gateway_id=? AND status='PENDING'",System.currentTimeMillis(),gateway);
             else if(operation.startsWith("ptt."))db.update("UPDATE calls SET direction=?,touched_at=? WHERE gateway_id=?",operation.equals("ptt.on")?"CONTROL_TX":"FIELD_TX",System.currentTimeMillis(),gateway);
         } else if(!status.equals("RECEIVED")) uncertain(row);
         return true;
@@ -185,13 +185,27 @@ public class Commands {
         db.update("UPDATE calls SET status='UNKNOWN',voice_epoch=NULL WHERE gateway_id=?",gateway);
     }
     @org.springframework.transaction.annotation.Transactional
+    public synchronized void callEnded(String gateway,tools.jackson.databind.JsonNode node) {
+        if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").intValue()!=1 ||
+           !node.path("type").asText().equals("call_ended") || !node.path("call_id").isString() ||
+           !node.path("railing_id").isInt() || !node.path("session_id").isIntegralNumber() ||
+           node.path("session_id").asLong()<1 || node.path("session_id").asLong()>0xffffffffL)
+            throw Accounts.bad("Invalid physical call end");
+        var rows=db.queryForList("SELECT * FROM calls WHERE gateway_id=? AND id=?",gateway,node.path("call_id").asText());
+        if(rows.isEmpty())return; // duplicate END cannot affect a new call
+        var call=rows.get(0);var rail=registry.rail((String)call.get("RAIL_ID"));
+        if(((Number)rail.get("NUMBER")).intValue()!=node.path("railing_id").asInt() ||
+           call.get("PLC_SESSION")==null || ((Number)call.get("PLC_SESSION")).longValue()!=node.path("session_id").asLong())return;
+        db.update("UPDATE commands SET status='UNKNOWN',detail='Physical call ended during request' WHERE gateway_id=? AND rail_id=? AND status IN ('QUEUED','SENT','RECEIVED') AND (operation LIKE 'call.%' OR operation LIKE 'ptt.%')",gateway,call.get("RAIL_ID"));
+        db.update("DELETE FROM calls WHERE gateway_id=? AND id=?",gateway,call.get("ID"));
+    }
     public synchronized void callResult(String gateway,tools.jackson.databind.JsonNode node) {
         if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1 ||
            !node.path("type").asText().equals("call_result") || !node.path("message_id").isString())throw Accounts.bad("Invalid call result");
         var rows=db.queryForList("SELECT * FROM commands WHERE id=? AND gateway_id=?",node.path("message_id").asText(),gateway);
         if(rows.isEmpty())throw Accounts.bad("Unknown call request");
         var row=rows.get(0);String op=(String)row.get("OPERATION"),status=node.path("status").asText();
-        if(!Set.of("call.start","call.end","ptt.on","ptt.off").contains(op) || !Set.of("APPLIED","FAILED","UNKNOWN","EXPIRED","NOT_STARTED").contains(status))throw Accounts.bad("Invalid call operation/status");
+        if(!Set.of("call.start","call.accept","call.end","ptt.on","ptt.off").contains(op) || !Set.of("APPLIED","FAILED","UNKNOWN","EXPIRED","NOT_STARTED").contains(status))throw Accounts.bad("Invalid call operation/status");
         if(!Set.of("SENT","RECEIVED").contains(row.get("STATUS")))return;
         var calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=? AND rail_id=?",gateway,row.get("RAIL_ID"));
         if(calls.isEmpty())throw Accounts.bad("No reserved call");
@@ -199,7 +213,7 @@ public class Commands {
         var data=node.path("data");
         if(status.equals("NOT_STARTED")){
             var rail=registry.rail((String)row.get("RAIL_ID"));
-            if(!op.equals("call.start") || calls.get(0).get("PLC_SESSION")!=null ||
+            if(!Set.of("call.start","call.accept").contains(op) || calls.get(0).get("PLC_SESSION")!=null ||
                data.size()!=3 || !data.path("call_id").asText().equals(calls.get(0).get("ID")) ||
                !data.path("railing_id").isInt() || data.path("railing_id").asInt()!=((Number)rail.get("NUMBER")).intValue() ||
                !data.path("epoch").asText().equals(row.get("ID")))throw Accounts.bad("Invalid not-started proof");

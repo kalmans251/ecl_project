@@ -285,7 +285,7 @@ def main() -> int:
                 calls = None
                 if args.web_voice:
                     from call_remote import CallRemote
-                    calls = CallRemote(audio, voice, railings, args.event_railings, remote.path)
+                    calls = CallRemote(audio, voice, railings, args.event_railings, remote.path, emergency=emergency)
                     voice.set_field_handler(calls.field)
                 publisher = MusicPublisher(args.monitor_url, os.environ['MONITOR_GATEWAY_TOKEN'], remote, calls)
                 from radar_sync import RadarSync

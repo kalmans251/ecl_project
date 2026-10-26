@@ -169,7 +169,7 @@ class MusicPublisher:
                 if message.get('type')=='voice' and self.calls:
                     if not incoming.full(): incoming.put_nowait((time.monotonic(),message))
                     continue
-                if message.get('type')=='command' and message.get('operation')=='call.start' and not self.calls:
+                if message.get('type')=='command' and message.get('operation') in ('call.start','call.accept') and not self.calls:
                     LOG.warning('Web call not started: restart main.py with --web-voice')
                     await ws.send(json.dumps(dict(version=1,type='call_result',
                         message_id=message['message_id'],status='NOT_STARTED',

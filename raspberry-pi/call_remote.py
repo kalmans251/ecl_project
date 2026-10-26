@@ -15,10 +15,13 @@ from voice.packet import VoicePacket
 
 LOG = logging.getLogger('call.remote')
 
-OPERATIONS = frozenset(('call.start', 'call.end', 'ptt.on', 'ptt.off'))
+OPERATIONS = frozenset(('call.start', 'call.accept', 'call.end', 'ptt.on', 'ptt.off'))
 
 class CallRemote:
-    def __init__(self, audio, relay, states, rails, journal):
+    def __init__(self, audio, relay, states, rails, journal, emergency=None):
+        self.emergency = emergency
+        self._ended_notice = None
+        self._ended_last = 0
         self.audio, self.relay, self.states = audio, relay, states
         self.rails, self.path = frozenset(rails), journal
         self.lock = threading.RLock()
@@ -64,7 +67,7 @@ class CallRemote:
                 if old[0] != fingerprint: return result
                 return json.loads(old[1]) if old[1] else dict(result, status='UNKNOWN')
             binding = db.execute('SELECT rail,session,epoch,ended FROM web_calls WHERE id=?', (call_id,)).fetchone()
-            if op == 'call.start':
+            if op in ('call.start', 'call.accept'):
                 if binding:
                     return result  # Existing call identity must never release a reservation.
                 if (db.execute('SELECT COUNT(*) FROM web_calls').fetchone()[0]>=10000 or
@@ -108,12 +111,16 @@ class CallRemote:
                 self.sequence = None
                 self._clear()
             with self.relay.control_transition():
-                if op == 'call.start':
+                if op in ('call.start', 'call.accept'):
                     def reserved():
                         session = self.states.snapshot(rail)['call']['session_id']
                         with sqlite3.connect(self.path) as db:
                             db.execute('INSERT INTO web_calls(id,rail,session,epoch) VALUES(?,?,?,?)', (call_id,rail,session,ident))
-                    if not self.audio.start_call(rail, guard=guard, reserved=reserved):
+                    if op == 'call.accept':
+                        if self.emergency is None:
+                            raise RuntimeError('Emergency call handler unavailable')
+                        self.emergency.ack(rail, guard=guard, reserved=reserved)
+                    elif not self.audio.start_call(rail, guard=guard, reserved=reserved):
                         raise RuntimeError('Call not newly confirmed')
                     session = self.states.snapshot(rail)['call']['session_id']
                     direction = 'FIELD_TX'
@@ -142,7 +149,7 @@ class CallRemote:
         except (ValueError, RuntimeError, OSError, sqlite3.Error) as exc:
             LOG.warning('Web call failed rail=%s operation=%s: %s', rail, op, exc)
             result['status'] = 'UNKNOWN'
-            if op == 'call.start':
+            if op in ('call.start', 'call.accept'):
                 with sqlite3.connect(self.path) as db:
                     reserved = db.execute('SELECT 1 FROM web_calls WHERE id=?', (call_id,)).fetchone()
                 # AudioManager invokes reserved() before any START transmission.
@@ -186,6 +193,18 @@ class CallRemote:
     def drain(self):
         result=[]
         with self.lock:
+            if self.current:
+                cid,rail,session,epoch,direction=self.current
+                state=self.states.snapshot(rail)['call']
+                if state['phase']=='ended' and state['session_id']==session:
+                    self._ended_notice=(time.monotonic()+30,dict(version=1,type='call_ended',
+                        call_id=cid,railing_id=rail,session_id=session))
+                    self.current=None
+                    self._clear()
+                    with sqlite3.connect(self.path) as db:
+                        db.execute('UPDATE web_calls SET ended=1 WHERE id=? AND session=?',(cid,session))
+            if self._ended_notice and time.monotonic()<self._ended_notice[0] and time.monotonic()-self._ended_last>=1:
+                result.append(self._ended_notice[1]);self._ended_last=time.monotonic()
             while True:
                 try: at,current,message=self.outbound.get_nowait()
                 except queue.Empty: break

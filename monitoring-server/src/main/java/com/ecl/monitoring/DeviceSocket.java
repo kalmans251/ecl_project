@@ -37,6 +37,7 @@ public class DeviceSocket extends TextWebSocketHandler {
             }
             var node=json.readTree(message.getPayload());
             if(node.path("type").asText().equals("radar_state")){radar.accept(id(session),session.getId(),node);return;}
+            if(node.path("type").asText().equals("call_ended")){commands.callEnded(id(session),node);return;}
             if(node.path("type").asText().equals("call_result")){commands.callResult(id(session),node);return;}
             if(node.path("type").asText().equals("control_result")){commands.controlResult(id(session),node);return;}
             if(node.isObject() && node.path("version").isInt() && node.path("version").intValue()==1 && node.path("type").asText().equals("music_result")){commands.musicResult(id(session),node);return;}
