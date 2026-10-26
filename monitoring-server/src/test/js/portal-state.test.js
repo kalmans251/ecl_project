@@ -1,0 +1,13 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+const source=fs.readFileSync(path.join(__dirname,'../../main/resources/static/portal.js'),'utf8');
+function app(){
+ const elements={},buttons=[true,false].map(value=>element(`toggleDeviceState('projector', ${value})`));
+ function element(onclick=''){const classes=new Set();return {value:'',textContent:'',classList:{toggle(k,on){on?classes.add(k):classes.delete(k)},remove(k){classes.delete(k)},contains(k){return classes.has(k)}},getAttribute(){return onclick}};}
+ const c=vm.createContext({elements,buttons,dirty:new Map(),$:id=>elements[id]??=element(),document:{querySelectorAll:q=>q.startsWith('[onclick')?buttons:[]},text:(id,v)=>(elements[id]??=element()).textContent=v,updateVolUI(){},toggleSleepStateUI(){},switchCategoryTabUI(){},switchDisplayView(){}});
+ vm.runInContext(source.slice(source.indexOf('function syncReportedControls'),source.indexOf('function mark(')),c);
+ return {c,elements,buttons,run:s=>vm.runInContext(s,c)};
+}
+test('fresh observations update projector selection and actual display in both directions',()=>{const a=app();a.run('syncReportedControls({projector:true});renderProjector({projector:true})');assert.equal(a.buttons[0].classList.contains('active'),true);assert.equal(a.elements.projectorLogoWrapper.classList.contains('spinning'),true);a.run('syncReportedControls({projector:false});renderProjector({projector:false})');assert.equal(a.buttons[1].classList.contains('active'),true);assert.equal(a.elements.projectorLogoWrapper.classList.contains('spinning'),false);assert.match(a.elements.projectorStateText.textContent,/OFF/);});
+test('pending edits survive polling while actual indicator follows device',()=>{const a=app();a.c.dirty.set('projector','on');a.buttons[0].classList.toggle('active',true);a.run('syncReportedControls({projector:false});renderProjector({projector:false})');assert.equal(a.buttons[0].classList.contains('active'),true);assert.match(a.elements.projectorStateText.textContent,/OFF/);a.c.dirty.clear();a.run('syncReportedControls({projector:false})');assert.equal(a.buttons[1].classList.contains('active'),true);});
+test('missing or stale observations never display confirmed OFF or retain prior selection',()=>{const a=app();a.run('syncReportedControls({projector:true});syncReportedControls({});renderProjector({})');assert.equal(a.buttons.some(b=>b.classList.contains('active')),false);assert.equal(a.elements.projectorStateText.textContent,'상태 미확인');});
+test('poll render synchronizes controls with freshness-gated observations',()=>{assert.match(source,/s=fresh\?r.reported:\{\}/);assert.match(source,/syncReportedControls\(s\);renderProjector\(s\)/);});
