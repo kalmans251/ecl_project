@@ -84,6 +84,7 @@ class MusicPublisher:
         self.url, self.token = url, token
         self.connected = threading.Event()
         self.radar = None
+        self.status = None
         self.remote = remote
         self.calls = calls
         self.stop = threading.Event()
@@ -123,6 +124,7 @@ class MusicPublisher:
                         alive.clear()
                         self.connected.clear()
                         if self.radar: self.radar.disconnect()
+                        if self.status: self.status.disconnect()
                         if self.calls: self.calls.disconnect()
                         if self.command_task:
                             await self.command_task
@@ -165,6 +167,9 @@ class MusicPublisher:
                 message = json.loads(raw)
                 if message.get('type') == 'call_end_ack' and self.calls:
                     self.calls.confirm_end_receipt(message)
+                    continue
+                if message.get('type') == 'status.demand' and self.status:
+                    self.status.demand(message)
                     continue
                 if message.get('type') == 'radar.demand' and self.radar:
                     self.radar.demand(message)

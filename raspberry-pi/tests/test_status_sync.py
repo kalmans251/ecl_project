@@ -17,6 +17,7 @@ class StatusTests(unittest.TestCase):
   self.audio=SimpleNamespace(_control_lock=threading.Lock(),_keepalive_due=threading.Event())
   self.publisher=SimpleNamespace(connected=self.connected,publish=self.messages.append)
   self.sync=StatusSync(self.controls,self.audio,[1,2],self.publisher)
+  self.sync.demand(dict(version=1,rails=[1]))
   def send(f):
    self.bus.sent.append(f)
    self.assertEqual((Service.SYSTEM,Command.APPLY,b'\x01'),(f.service,f.command,f.payload[5:]))
@@ -47,3 +48,10 @@ class StatusTests(unittest.TestCase):
   self.assertTrue(self.messages[0]['state']['active'])
   self.states.emergency_stop(1,123);self.sync.emergency(1)
   self.assertFalse(self.messages[1]['state']['active']);self.assertEqual([],self.bus.sent)
+
+ def test_demand_expiry_and_disconnect_stop_queries(self):
+  self.sync.disconnect();self.assertFalse(self.sync.sample(1))
+  self.sync.demand(dict(version=1,rails=[2,99]));self.assertFalse(self.sync.sample(1))
+  self.sync.demand(dict(version=1,rails=[1]));self.sync.wanted[1]=0
+  self.assertFalse(self.sync.sample(1));self.assertEqual([],self.bus.sent)
+  self.sync.demand(dict(version=1,rails=[1]));self.assertTrue(self.sync.sample(1))

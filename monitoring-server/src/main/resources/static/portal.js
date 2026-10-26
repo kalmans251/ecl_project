@@ -1,4 +1,6 @@
 'use strict';
+const statusViewId=crypto.randomUUID();
+async function renewStatusDemand(){if(!site)return;await api('/api/portal/status-demand','POST',{view:statusViewId,rails:document.hidden?[]:[...selected]});}
 let csrf, me, site, view, selected=new Set(), dirty=new Map(), isSleepMode=false, currentCategory=0, map, markers=new Map(), activeCall, audioContext, toastTimer, polling=false, stateFetchFailed=false, lastEmergency=new Set(), modalRail, pttPressed=false;
 let musicReceivedAt=0, musicPage=null, musicBusy=false, musicSelectionKey=null, musicSeekEditing=false, musicSeekKey=null;
 const $=id=>document.getElementById(id);
@@ -159,7 +161,7 @@ function renderLive(){
  for(const item of view.rails){if(item.reported.emergency && (item.reported.emergency_at||item.seen_at) && Date.now()-(item.reported.emergency_at||item.seen_at)<15000 && !lastEmergency.has(item.id)){lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
  radarView.select(rails().length===1 && $('viewRadarContainer').style.display!=='none' ? r.id : null);
 }
-async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length)selected.add(view.rails[0].id);renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();}catch(e){stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
+async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length)selected.add(view.rails[0].id);renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();await renewStatusDemand();}catch(e){stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
 async function changeSite(){if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');site=$('siteSelect').value;selected.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
 async function logout(){await guarded(async()=>{if(view?.calls.some(c=>c.OWNED))throw Error('통화를 종료한 뒤 로그아웃하세요.');closeVoice();await api('/api/auth/logout','POST');location.href='/login.html';});}
 function dialog(title){text('dialogTitle',title);$('dialogBody').replaceChildren();$('portalDialog').showModal();return $('dialogBody');}
@@ -199,7 +201,7 @@ function stopPttTalk(){
  if(!pttPressed)return;pttPressed=false;voiceClient().pause();if(pttChanging)return;
  pttChanging=true;guarded(async()=>{try{await send('ptt.off');}finally{pttChanging=false;await openVoice();}});
 }
-window.addEventListener('blur',stopPttTalk);document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPttTalk();});
+window.addEventListener('blur',stopPttTalk);document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPttTalk();renewStatusDemand().catch(()=>{});});
 function updateTotalDevicesCount(){if(me?.user.ADMIN)openAdmin('rail');else toast('등록된 난간만 표시합니다. 난간 추가는 관리자에게 요청하세요.');}
 const adminForms={
  user:{name:'사용자 등록',path:'users',method:'POST',fields:[['username','계정'],['name','표시 이름'],['password','비밀번호 (12자 이상)','password']]},

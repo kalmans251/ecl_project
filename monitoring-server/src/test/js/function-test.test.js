@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 function app(){const elements={};const element=()=>({value:'',textContent:'',disabled:false,children:[],dataset:{},setAttribute(){},replaceChildren(){this.children=[];this.value='';},append(...v){this.children.push(...v);}});
-const context=vm.createContext({module:{exports:{}},performance,crypto:require('node:crypto').webcrypto,setTimeout,AbortSignal,location:{},Option:class{constructor(t,v){this.text=t;this.value=v;}},document:{getElementById(id){return elements[id]??=element();},createElement:element,querySelectorAll(){return [];}}});
+const context=vm.createContext({module:{exports:{}},performance,crypto:require('node:crypto').webcrypto,setTimeout,AbortSignal,location:{},Option:class{constructor(t,v){this.text=t;this.value=v;}},document:{addEventListener(){},getElementById(id){return elements[id]??=element();},createElement:element,querySelectorAll(){return [];}}});
 for(const f of ['music-status.js','detection-count.js','function-test.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../../main/resources/static',f),'utf8'),context);
 const run=s=>vm.runInContext(s,context);run(`view={role:'OPERATOR',rails:[{id:'a',name:'A',online:true},{id:'b',name:'B',online:true}]};selected=new Set(['a']);`);return {run,context,elements};}
 test('viewer and offline selection cannot submit',async()=>{const a=app();a.run(`view.role='VIEWER'`);await assert.rejects(a.run(`send('power','on')`),/권한/);a.run(`view.role='OPERATOR';view.rails[0].online=false`);await assert.rejects(a.run(`send('power','on')`),/연결/);});
@@ -22,7 +22,7 @@ test('microphone preparation excludes poll media sync and duplicate controls',as
  a.context.gate=gate;a.context.sync=()=>syncs++;a.context.post=()=>posts++;
  a.run(`site='s';view.calls=[{RAIL_ID:'a',OWNED:true,STATUS:'ACTIVE',DIRECTION:'FIELD_TX'}];
  webVoice={pause(){},close(){},prepare:async()=>{},mic:()=>gate,sync};
- api=async(p,m)=>{if(m==='POST'){post();return [{id:'cmd',status:'APPLIED'}];}return {...view,calls:[{RAIL_ID:'a',OWNED:true,STATUS:'ACTIVE',DIRECTION:'CONTROL_TX'}]};};`);
+ api=async(p,m)=>{if(p==='/api/portal/status-demand')return {accepted:true};if(m==='POST'){post();return [{id:'cmd',status:'APPLIED'}];}return {...view,calls:[{RAIL_ID:'a',OWNED:true,STATUS:'ACTIVE',DIRECTION:'CONTROL_TX'}]};};`);
  const pending=a.run(`callControl('ptt.on')`);await new Promise(r=>setImmediate(r));
  await a.run('refresh()');assert.equal(syncs,0);assert.equal(a.run('writable()'),false);
  await assert.rejects(a.run(`callControl('ptt.off')`),/기다려/);
@@ -35,3 +35,5 @@ test('failed microphone preparation releases transition and restores listening w
  await assert.rejects(a.run(`callControl('ptt.on')`),/permission denied/);
  assert.equal(a.run('callChanging'),false);assert.equal(syncs,1);
 });
+
+test('status demand contains only selected rails and hidden tabs release it',async()=>{const a=app(),sent=[];a.context.capture=x=>sent.push(x);a.run(`site='site';api=async(p,m,d)=>capture(d);`);await a.run('renewStatusDemand()');assert.deepEqual([...sent[0].rails],['a']);a.run('document.hidden=true');await a.run('renewStatusDemand()');assert.deepEqual([...sent[1].rails],[]);assert.equal(sent[0].view,sent[1].view);});

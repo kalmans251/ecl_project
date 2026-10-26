@@ -25,6 +25,17 @@ class StatusSync:
     def __init__(self, controls, audio, rails, publisher):
         self.controls,self.audio,self.rails,self.publisher=controls,audio,tuple(rails),publisher
         self.stop=threading.Event();self.thread=None;self.due={};self.emergencies={}
+        self.lock=threading.Lock();self.wanted={}
+    def demand(self, message):
+        ids=message.get('rails')
+        if type(message.get('version')) is not int or message['version']!=1 or not isinstance(ids,list) or len(ids)>255:
+            raise ValueError('Invalid status demand')
+        with self.lock:
+            self.wanted={r:time.monotonic()+6 for r in ids if type(r) is int and r in self.rails}
+    def disconnect(self):
+        with self.lock:self.wanted.clear()
+    def wanted_now(self, rail):
+        with self.lock:return self.wanted.get(rail,0)>time.monotonic()
     def emergency(self, rail):
         if rail not in self.rails: return
         e=self.controls.railings.snapshot(rail).get('emergency',{})
@@ -36,9 +47,9 @@ class StatusSync:
             observed_at=datetime.now(timezone.utc).isoformat(),
             state=dict(active=identity[0])))
     def sample(self, rail):
-        if not self.publisher.connected.is_set(): return False
+        if not self.publisher.connected.is_set() or not self.wanted_now(rail): return False
         def guard():
-            if self.audio._keepalive_due.is_set() or not self.publisher.connected.is_set():
+            if self.audio._keepalive_due.is_set() or not self.publisher.connected.is_set() or not self.wanted_now(rail):
                 raise RuntimeError('Priority control or disconnected')
         try:
             state=decode(request(self.controls,rail,Command.STATUS_REQUEST,b'\x01',
@@ -46,7 +57,7 @@ class StatusSync:
         except (RuntimeError,ValueError,OSError) as exc:
             LOG.debug('Status not refreshed rail=%s: %s',rail,exc)
             return False
-        if not self.publisher.connected.is_set(): return False
+        if not self.publisher.connected.is_set() or not self.wanted_now(rail): return False
         self.publisher.publish(dict(version=1,type='telemetry',railing_id=rail,
             observed_at=datetime.now(timezone.utc).isoformat(),state=state))
         return True
@@ -56,7 +67,7 @@ class StatusSync:
         while not self.stop.wait(.5):
             if not self.publisher.connected.is_set(): continue
             now=time.monotonic()
-            candidates=[r for r in self.rails if self.due.get(r,0)<=now]
+            candidates=[r for r in self.rails if self.wanted_now(r) and self.due.get(r,0)<=now]
             if not candidates: continue
             rail=min(candidates,key=lambda r:self.due.get(r,0))
             self.sample(rail);self.due[rail]=time.monotonic()+5

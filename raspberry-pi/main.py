@@ -297,6 +297,7 @@ def main() -> int:
                 radar_sync.start()
                 from status_sync import StatusSync
                 status_sync = StatusSync(controls, audio, args.event_railings, publisher)
+                publisher.status = status_sync
                 status_sync.start()
             music_sync = MusicSync(controls, args.event_railings, args.music_poll_interval,
                                    publisher.publish if publisher else None)
