@@ -29,7 +29,7 @@ function muteEmergencyAudio(){alarmAudio().mute();}
 let emergencyQueue;
 function renderEmergencyQueue(){
  if(typeof EmergencyQueue==='undefined')return;
- const rows=(emergencyQueue??=new EmergencyQueue()).rows(site,view?.rails||[],view?.calls||[]);
+ const rows=(emergencyQueue??=new EmergencyQueue()).rows(site,view?.rails||[],view?.calls||[],view?.incidents);
  text('emergencyQueueTitle',`비상 호출 ${rows.length}건${stateFetchFailed?' · 서버 연결 실패, 마지막 확인 정보':''}`);
  const root=$('emergencyQueue');root.replaceChildren();
  if(!rows.length){root.textContent=stateFetchFailed?'현재 호출 상태 확인 불가':'현재 현장에 수신된 미처리 호출 없음';return;}
@@ -44,6 +44,16 @@ function renderEmergencyQueue(){
   root.append(line);
  }
 }
+function showEmergencyHistory(){return guarded(async()=>{
+ const requested=site,rows=await api(`/api/portal/sites/${requested}/incidents?history=true`);if(site!==requested)return;
+ const body=dialog('완료된 비상 사건 · 최근 100건');
+ const time=value=>value?new Date(value).toLocaleString('ko-KR'):'미확인';
+ for(const item of rows){const section=document.createElement('section'),title=document.createElement('h3');
+ title.textContent=`${view.rails.find(r=>r.id===item.rail_id)?.name||item.rail_id} · 사건 ${item.id}`;section.append(title);
+ const info=document.createElement('p');info.textContent=`발생 ${time(item.started_at)} · 현장 해제 ${time(item.cleared_at)}`;section.append(info);
+ for(const a of item.attempts){const line=document.createElement('p');line.textContent=`담당 ${a.OWNER_NAME||'미확인'} · 수락 요청 ${time(a.REQUESTED_AT)} · 연결 확인 ${time(a.CONNECTED_AT)} · 종료 확인 ${time(a.ENDED_AT)}${a.NOT_STARTED_AT?' · 실행 전 거부':''}`;section.append(line);}body.append(section);}
+ if(!rows.length)body.textContent='완료된 비상 사건이 없습니다.';
+});}
 function rails(){return (view?.rails||[]).filter(r=>selected.has(r.id));}
 function requireSelection(single=false){const items=rails();if(!items.length || (single&&items.length!==1))throw Error(single?'난간 하나를 선택하세요.':'난간을 선택하세요.');if(view.role==='VIEWER')throw Error('조회 계정은 제어할 수 없습니다.');return items;}
 let controlBusy=false,pttChanging=false,emergencyAccepting=false,emergencyModalOpen=false;
@@ -194,7 +204,7 @@ function renderLive(){
  for(const item of view.rails){if(item.reported.emergency && (item.reported.emergency_at||item.seen_at) && !lastEmergency.has(item.id) && !emergencyModalOpen && !emergencyAccepting){emergencyModalOpen=true;lastEmergency.add(item.id);modalRail=item.id;text('modalDeviceNum',item.name+' 비상 호출');$('emergencyModal').classList.add('show');$('emergencyModal').style.display='flex';}if(item.reported.emergency===false)lastEmergency.delete(item.id);}
  radarView.select(rails().length===1 && $('viewRadarContainer').style.display!=='none' ? r.id : null);
 }
-async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const next=await api(`/api/portal/sites/${site}/state`);if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length&&!statusBaselines.size){selected.add(view.rails[0].id);awaitStatus(selected);}renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();await renewStatusDemand();}catch(e){if(requestedSite!==site)return;stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
+async function poll(){if(polling||!site)return;polling=true;const requestedSite=site;try{const [next,incidents]=await Promise.all([api(`/api/portal/sites/${requestedSite}/state`),api(`/api/portal/sites/${requestedSite}/incidents`)]);next.incidents=incidents;if(requestedSite!==site)return;stateFetchFailed=false;view=next;musicReceivedAt=performance.now();selected=new Set([...selected].filter(id=>view.rails.some(r=>r.id===id)));if(!selected.size&&view.rails.length&&!statusBaselines.size){selected.add(view.rails[0].id);awaitStatus(selected);}renderLive();if(!document.querySelector('#idBadgeGrid button')||Number($('inputTotalDevices').value)!==view.rails.length)renderSelection();await renewStatusDemand();}catch(e){if(requestedSite!==site)return;stateFetchFailed=true;toast(e.message);musicReceivedAt=-Infinity;if(view)renderLive();text('systemCommState','서버 연결 실패');renderMusicStatus();closeVoice();}finally{polling=false;}}
 async function changeSite(){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall)return toast('통화 종료 후 현장을 변경하세요.');if(emergencyAudio)emergencyAudio.sync([],[]);site=$('siteSelect').value;selected.clear();statusBaselines.clear();dirty.clear();lastEmergency.clear();view=null;if(map)map._portalFitted=false;await poll();if(view){renderSelection();loadContacts();}}
 async function logout(){await guarded(async()=>{if(view?.calls.some(c=>c.OWNED))throw Error('통화를 종료한 뒤 로그아웃하세요.');closeVoice();await api('/api/auth/logout','POST');location.href='/login.html';});}
 function dialog(title){text('dialogTitle',title);$('dialogBody').replaceChildren();$('portalDialog').showModal();return $('dialogBody');}
