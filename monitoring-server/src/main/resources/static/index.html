@@ -221,6 +221,12 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 .radar-canvas-wrap { flex: 1; min-height: 0; width: 100%; height: 100%; position: relative; }
 #ld2450RadarCanvas { width: 100%; height: 100%; display: block; }
 
+/* CCTV mode dedicates the entire card to video. */
+#mediaDisplayCard.cctv-only { padding: 0; gap: 0; }
+#mediaDisplayCard.cctv-only > #detectionCountSummary,
+#mediaDisplayCard.cctv-only > #detectionCountActions,
+#mediaDisplayCard.cctv-only > #mediaDisplayTitle { display: none !important; }
+#mediaDisplayCard.cctv-only > .media-display-container { flex: 1; border: 0; }
 /* 레이더/CCTV 통합 디스플레이 */
 .media-display-container { display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0; background: #050811; border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 12px; overflow: hidden; position: relative; }
 .cctv-full-wrap { flex: 1; width: 100%; height: 100%; min-width: 0; min-height: 0; display: none; overflow: hidden; background: #000; position: relative; }
@@ -763,8 +769,8 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     </div>
     
     <!-- 레이더/CCTV 통합 카드 -->
-    <div class="card projector-merged-square-card2" style="grid-column: 4 / span 2; grid-row: 3 / span 3; ">
-        <p id="detectionCountSummary" style="font-size:12px;margin:4px 0;flex-shrink:0">누적 감지 카운트 미조회</p><div style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0"><button id="detectionCountRead" onclick="detectionCountAction(false)">카운트 조회</button><button id="detectionCountReset" onclick="detectionCountAction(true)">카운트 초기화</button></div>
+    <div id="mediaDisplayCard" class="card projector-merged-square-card2" style="grid-column: 4 / span 2; grid-row: 3 / span 3; ">
+        <p id="detectionCountSummary" style="font-size:12px;margin:4px 0;flex-shrink:0">누적 감지 카운트 미조회</p><div id="detectionCountActions" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0"><button id="detectionCountRead" onclick="detectionCountAction(false)">카운트 조회</button><button id="detectionCountReset" onclick="detectionCountAction(true)">카운트 초기화</button></div>
         <div class="card-title" id="mediaDisplayTitle">출입인원 CHECK (레이더)</div>
         <div class="media-display-container">
             <!-- 레이더 화면 -->
@@ -777,7 +783,6 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             </div>
             <!-- CCTV WebRTC 화면 -->
             <div class="cctv-full-wrap" id="viewCctvContainer">
-                <div class="cctv-live-watermark">● CCTV — 연결 확인 필요</div>
                 <iframe class="cctv-full-frame" id="cctvMainIframe" src="about:blank" allow="autoplay; fullscreen" allowfullscreen></iframe>
             </div>
         </div>
