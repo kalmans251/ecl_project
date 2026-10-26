@@ -510,6 +510,13 @@ static void handle_emergency(
     const protocol_frame_t *frame
 )
 {
+    if (frame->src!=NODE_P4 || frame->railing_id!=RAILING_ID) return;
+    if (frame->command==CMD_DATA && frame->length==5) {
+        uint32_t seq=((uint32_t)frame->payload[1]<<24)|((uint32_t)frame->payload[2]<<16)|
+                     ((uint32_t)frame->payload[3]<<8)|frame->payload[4];
+        emergency_button_confirm(frame->payload[0],seq);
+        return;
+    }
     switch (
         frame->command
     )
@@ -531,7 +538,7 @@ static void handle_emergency(
                 EMERGENCY_ACTION_ACK
             )
             {
-                emergency_button_clear();
+                /* Legacy ACK is not an END confirmation. Keep the button session. */
 
                 Serial.println(
                     "[EMERGENCY] CONTROL ACK"

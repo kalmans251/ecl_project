@@ -1,4 +1,5 @@
 #include "sleep_manager.h"
+#include "emergency_manager.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -420,7 +421,7 @@ void sleep_manager_on_new_detection(
 
     if (
         !system.sleep_mode_enabled ||
-        system.call_active
+        (system.call_active || emergency_manager_is_active())
     )
     {
         return;
@@ -597,7 +598,7 @@ void sleep_manager_on_cctv_age_result(
 
     if (
         !system.sleep_mode_enabled ||
-        system.call_active
+        (system.call_active || emergency_manager_is_active())
     )
     {
         return;
@@ -693,7 +694,7 @@ void sleep_manager_on_music_finished(void)
 
     if (
         !system.sleep_mode_enabled ||
-        system.call_active
+        (system.call_active || emergency_manager_is_active())
     )
     {
         return;
@@ -837,7 +838,7 @@ void sleep_manager_task(
         * last_detection_ms는 계속 갱신될 수 있음.
         */
         if (
-            system.call_active
+            (system.call_active || emergency_manager_is_active())
         )
         {
             vTaskDelay(
@@ -1095,7 +1096,7 @@ void sleep_manager_on_led_mode_changed(
 
     if (
         !system.sleep_mode_enabled ||
-        system.call_active
+        (system.call_active || emergency_manager_is_active())
     )
     {
         return;
@@ -1137,5 +1138,15 @@ void sleep_manager_on_led_mode_changed(
              */
             enter_active();
         }
+    }
+}
+/* The alarm leaves the pre-existing sleep/activity state intact. Detection
+ * timestamps continue to update while transitions are suspended. */
+void sleep_manager_resume_after_emergency(void) {
+    p4_system_state_t state; system_state_get(&state);
+    if (state.call_active || emergency_manager_is_active() || !state.sleep_mode_enabled) return;
+    if (sleep_manager_get_state()!=ACTIVITY_ACTIVE && !idle_timeout_expired()) {
+        enter_active();
+        music_manager_on_wake();
     }
 }

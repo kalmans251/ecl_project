@@ -13,12 +13,15 @@ HARNESS=r'''
 #include "music_policy.h"
 static int64_t clock_us;
 static bool projector;
+static bool alarm;
+static int64_t last_detection;
+bool emergency_manager_is_active(void) {return alarm;}
 static unsigned commands;
 static uint8_t last_command;
 QueueHandle_t router_queue=(void *)1;
 int64_t esp_timer_get_time(void) { return clock_us; }
 void projector_control_set(bool enabled) { projector=enabled; }
-void detection_manager_get_summary(detection_summary_t *summary) { memset(summary,0,sizeof(*summary)); }
+void detection_manager_get_summary(detection_summary_t *summary) { memset(summary,0,sizeof(*summary));summary->last_detection_ms=last_detection; }
 SemaphoreHandle_t xSemaphoreCreateMutex(void) { return (void *)1; }
 int xSemaphoreTake(SemaphoreHandle_t handle,unsigned wait) { (void)handle;(void)wait;return 1; }
 int xSemaphoreGive(SemaphoreHandle_t handle) { (void)handle;return 1; }
@@ -96,6 +99,15 @@ int main(void) {
     assert(music_manager_start());assert(commands==before+1 && last_command==CMD_RESUME);
     music_manager_selected_prepared();music_policy_add_pause_reason(MUSIC_PAUSE_REASON_CALL);
     before=commands;assert(music_manager_start());assert(commands==before); // don't bypass call
+    setup();last_detection=0;sleep_via_led(true);alarm=true;
+    last_detection=clock_us/1000;
+    sleep_manager_on_new_detection(DETECTION_SOURCE_RADAR,9,false);
+    assert(sleep_manager_get_state()==ACTIVITY_SLEEPING); // suspended during alarm
+    alarm=false;sleep_manager_resume_after_emergency();
+    assert(sleep_manager_get_state()==ACTIVITY_ACTIVE); // detection during alarm wakes on end
+    setup();last_detection=0;sleep_via_led(true);alarm=true;alarm=false;
+    sleep_manager_resume_after_emergency();
+    assert(sleep_manager_get_state()==ACTIVITY_SLEEPING && !projector); // no detection: preserve sleep
     return 0;
 }
 '''

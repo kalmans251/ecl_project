@@ -11,7 +11,5 @@ void emergency_button_process(void);
 bool emergency_button_is_active(void);
 
 
-/*
- * 관제 ACK 후 P4가 S3에게 알려줄 때 사용.
- */
-void emergency_button_clear(void);
+/* P4 emergency state response, correlated by the original button sequence. */
+void emergency_button_confirm(uint8_t state, uint32_t seq);

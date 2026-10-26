@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "call_manager.h"
+#include "emergency_manager.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
@@ -813,6 +814,7 @@ static bool finalize_end(bool polled_only)
     unlock_manager();
 
 
+    if (origin==CALL_ORIGIN_EMERGENCY) emergency_manager_call_ended();
     notify_call_end(origin, polled_only);
 
 
