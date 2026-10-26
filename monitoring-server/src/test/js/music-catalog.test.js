@@ -59,7 +59,7 @@ test('batch settings stop when selection changes while confirmation is pending',
 });
 test('emergency accept prepares audio and opens it only after one confirmed request',async()=>{
  const a=app(),steps=[];a.context.capture=x=>steps.push(x);
- a.run(`modalRail='rail-b';guarded=async f=>f();renderSelection=()=>{};
+ a.run(`view={role:'OPERATOR',calls:[],rails:[{id:'rail-b',reported:{emergency:true}}]};modalRail='rail-b';guarded=async f=>f();renderSelection=()=>{};
  ensureAudio=async()=>capture('audio');voiceClient=()=>({prepare:async()=>capture('prepare')});
  send=async op=>capture(op);openVoice=async()=>capture('voice');dismissEmergencyModal=()=>capture('dismiss');`);
  await a.run('acceptEmergencyCallFromModal()');
@@ -77,4 +77,13 @@ test('general status waits for a newer per-rail response and rejects offline cac
  a.run('view.rails[0].seen_at+=1');assert.equal(a.run('statusCheck(view.rails[0]).fresh'),true);
  a.run('view.rails[0].online=false');assert.equal(a.run('statusCheck(view.rails[0]).fresh'),false);
  a.run("awaitStatus(['b']);view.rails[0].seen_at+=1");assert.equal(a.run('statusCheck(view.rails[1]).fresh'),false);
+});
+
+test('emergency accept refuses an existing call without changing selection',async()=>{
+ const a=app();a.run(`selected=new Set(['old']);view={calls:[{OWNED:true}],rails:[]};guarded=async f=>f();`);
+ await assert.rejects(a.run('acceptEmergencyCallFromModal()'),/종료/);assert.equal(a.run('[...selected][0]'),'old');
+});
+test('alarm cleared during audio preparation does not change selection or send',async()=>{
+ const a=app();a.run(`selected=new Set(['old']);view={role:'OPERATOR',calls:[],rails:[{id:'new',reported:{emergency:true}}]};modalRail='new';guarded=async f=>f();ensureAudio=async()=>{};voiceClient=()=>({prepare:async()=>{view.rails[0].reported.emergency=false;}});send=async()=>{throw Error('must not send');};`);
+ await assert.rejects(a.run('acceptEmergencyCallFromModal()'),/해제/);assert.equal(a.run('[...selected][0]'),'old');assert.equal(a.run('emergencyAccepting'),false);
 });
