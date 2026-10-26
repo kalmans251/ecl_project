@@ -53,6 +53,7 @@ public class Telemetry {
         var rail=registry.deviceRail(gateway,node.path("railing_id").asInt());
         var state=(tools.jackson.databind.node.ObjectNode)json.readTree(rail.get("SNAPSHOT")==null?"{}":(String)rail.get("SNAPSHOT"));
         if(state.path("emergency_at").asLong(0)>=at)return;
+        Incidents.event(db,(String)rail.get("ID"),at,node.path("state").path("active").asBoolean());
         state.put("emergency",node.path("state").path("active").asBoolean());state.put("emergency_at",at);
         // Do not refresh the general state timestamp with an alarm-only event.
         db.update("UPDATE rails SET snapshot=? WHERE id=?",json.writeValueAsString(state),rail.get("ID"));

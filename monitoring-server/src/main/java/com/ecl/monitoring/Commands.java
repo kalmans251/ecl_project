@@ -83,7 +83,9 @@ public class Commands {
         String gateway=(String)rail.get("GATEWAY_ID"); List<Map<String,Object>> calls=db.queryForList("SELECT * FROM calls WHERE gateway_id=?",gateway);
         if(Set.of("call.start","call.accept").contains(operation)) {
             if(!calls.isEmpty()) throw new ResponseStatusException(HttpStatus.CONFLICT,"Gateway call already reserved");
-            db.update("INSERT INTO calls(gateway_id,id,rail_id,user_id,status,touched_at) VALUES(?,?,?,?,?,?)",gateway,UUID.randomUUID().toString(),rail.get("ID"),user,"PENDING",System.currentTimeMillis());
+            String callId=UUID.randomUUID().toString();
+            db.update("INSERT INTO calls(gateway_id,id,rail_id,user_id,status,touched_at) VALUES(?,?,?,?,?,?)",gateway,callId,rail.get("ID"),user,"PENDING",System.currentTimeMillis());
+            if(operation.equals("call.accept"))Incidents.reserve(db,(String)rail.get("ID"),callId,user);
         } else {
             if(calls.isEmpty() || !calls.get(0).get("RAIL_ID").equals(rail.get("ID"))) throw new ResponseStatusException(HttpStatus.CONFLICT,"No matching call");
             var c=calls.get(0);
@@ -198,10 +200,12 @@ public class Commands {
            call.get("PLC_SESSION")==null || ((Number)call.get("PLC_SESSION")).longValue()!=node.path("session_id").asLong())return false;
         transaction.executeWithoutResult(tx -> {
         db.update("UPDATE commands SET status='UNKNOWN',detail='Physical call ended during request' WHERE gateway_id=? AND rail_id=? AND status IN ('QUEUED','SENT','RECEIVED') AND (operation LIKE 'call.%' OR operation LIKE 'ptt.%')",gateway,call.get("RAIL_ID"));
+        Incidents.ended(db,(String)call.get("ID"));
         db.update("DELETE FROM calls WHERE gateway_id=? AND id=?",gateway,call.get("ID"));
         });
         return true;
     }
+    @org.springframework.transaction.annotation.Transactional
     public synchronized void callResult(String gateway,tools.jackson.databind.JsonNode node) {
         if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1 ||
            !node.path("type").asText().equals("call_result") || !node.path("message_id").isString())throw Accounts.bad("Invalid call result");
@@ -221,6 +225,7 @@ public class Commands {
                !data.path("railing_id").isInt() || data.path("railing_id").asInt()!=((Number)rail.get("NUMBER")).intValue() ||
                !data.path("epoch").asText().equals(row.get("ID")))throw Accounts.bad("Invalid not-started proof");
             db.update("UPDATE commands SET status='FAILED',detail='Pi rejected call before PLC execution; check --web-voice and local call state' WHERE id=?",row.get("ID"));
+            Incidents.notStarted(db,data.path("call_id").asText());
             db.update("DELETE FROM calls WHERE gateway_id=? AND id=?",gateway,data.path("call_id").asText());
             return;
         }
@@ -236,6 +241,8 @@ public class Commands {
         if(((Number)row.get("EXPIRES_AT")).longValue()<=System.currentTimeMillis())status="UNKNOWN";
         db.update("UPDATE commands SET status=?,result_data=? WHERE id=?",status,status.equals("APPLIED")?json.writeValueAsString(data):null,row.get("ID"));
         if(status.equals("APPLIED")){
+            if(op.equals("call.end"))Incidents.ended(db,(String)calls.get(0).get("ID"));
+            else if(op.equals("call.accept"))Incidents.connected(db,(String)calls.get(0).get("ID"));
             if(op.equals("call.end"))db.update("DELETE FROM calls WHERE gateway_id=?",gateway);
             else db.update("UPDATE calls SET status='ACTIVE',direction=?,voice_epoch=?,plc_session=?,touched_at=? WHERE gateway_id=?",expected,row.get("ID"),data.path("session_id").asLong(),System.currentTimeMillis(),gateway);
         }else uncertain(row);

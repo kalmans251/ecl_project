@@ -96,3 +96,14 @@ CREATE TABLE IF NOT EXISTS cctv_devices (
  control_hash VARCHAR(64) NOT NULL, publish_hash VARCHAR(64) NOT NULL,
  analysis_hash VARCHAR(64) NOT NULL, enabled BOOLEAN NOT NULL DEFAULT FALSE
 );
+
+CREATE TABLE IF NOT EXISTS emergency_incidents (
+ id VARCHAR(36) PRIMARY KEY, rail_id VARCHAR(36) NOT NULL REFERENCES rails(id),
+ started_at BIGINT NOT NULL, cleared_at BIGINT, UNIQUE(rail_id,started_at)
+);
+CREATE TABLE IF NOT EXISTS emergency_incident_calls (
+ call_id VARCHAR(36) PRIMARY KEY, incident_id VARCHAR(36) NOT NULL REFERENCES emergency_incidents(id),
+ user_id VARCHAR(36) NOT NULL, requested_at BIGINT NOT NULL, connected_at BIGINT,
+ ended_at BIGINT, not_started_at BIGINT
+);
+CREATE INDEX IF NOT EXISTS emergency_incidents_rail ON emergency_incidents(rail_id,started_at);

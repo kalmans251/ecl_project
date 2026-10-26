@@ -66,11 +66,13 @@ class PortalTest {
  }
  @Test void emergencyAcceptanceAndPhysicalEndAreSessionScoped()throws Exception{
   var b=new Browser("admin");String rail=rail();
+  Incidents.event(db,rail,System.currentTimeMillis(),true);
   try(var device=new Device()){
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.accept",null),true).statusCode());
    var accept=json.readTree(device.next());assertEquals("call.accept",accept.path("operation").asText());
    assertEquals(409,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());
    device.callAck(accept);
+   assertNotNull(db.queryForObject("SELECT connected_at FROM emergency_incident_calls WHERE call_id=?",Long.class,accept.path("call_id").asText()));
    var end=new HashMap<String,Object>(Map.of("version",1,"type","call_ended","call_id",accept.path("call_id").asText(),"railing_id",1,"session_id",999));
    assertFalse(commands.callEnded("gateway-01",json.valueToTree(end)));
    assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
@@ -81,6 +83,7 @@ class PortalTest {
    assertEquals(accept.path("call_id").asText(),receipt.path("call_id").asText());
    assertEquals(123,receipt.path("session_id").asInt());
    assertTrue(commands.callEnded("gateway-01",json.valueToTree(end)));
+   assertNotNull(db.queryForObject("SELECT ended_at FROM emergency_incident_calls WHERE call_id=?",Long.class,accept.path("call_id").asText()));
    assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
    assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.accept",null),true).statusCode());
    var next=json.readTree(device.next());
@@ -192,6 +195,19 @@ class PortalTest {
    telemetry.emergency("gateway-01",json.valueToTree(end));telemetry.emergency("gateway-01",json.valueToTree(start));
    assertFalse(json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id)).path("emergency").asBoolean());
   }
+ }
+ @Test void incidentsPersistSeparateClearAndPhysicalEndAndScope()throws Exception{
+  String id=rail();db.update("DELETE FROM emergency_incident_calls");db.update("DELETE FROM emergency_incidents");
+  long now=System.currentTimeMillis();Incidents.event(db,id,now,true);Incidents.event(db,id,now,true);
+  var pending=Incidents.list(db,"site-01",false);assertEquals(1,pending.size());String incident=(String)pending.get(0).get("id");
+  String user=(String)accounts.user("admin").get("ID");Incidents.reserve(db,id,"test-call",user);Incidents.connected(db,"test-call");
+  Incidents.event(db,id,now+1,false);assertEquals(1,Incidents.list(db,"site-01",false).size());
+  // A fresh service instance reads the same durable event and call records.
+  assertEquals(incident,Incidents.list(db,"site-01",false).get(0).get("id"));
+  Incidents.ended(db,"test-call");Incidents.ended(db,"test-call");assertTrue(Incidents.list(db,"site-01",false).isEmpty());
+  var history=Incidents.list(db,"site-01",true);assertEquals(1,history.size());assertEquals(now+1,history.get(0).get("cleared_at"));
+  assertTrue(Incidents.list(db,"another-site",true).isEmpty());
+  var browser=new Browser("admin");assertEquals(200,browser.request("/api/portal/sites/site-01/incidents?history=true","GET",null,false).statusCode());
  }
  @Test void telemetryIsBoundAndDoesNotInventState(){
   String id=rail();var data=Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.now().toString(),"state",Map.of("volume",13,"left_watt",1.5,"right_watt",2.5,"battery_percent",70,"emergency",false,"radar",List.of(Map.of("x",.3,"y",2.0))));
