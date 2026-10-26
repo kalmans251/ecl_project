@@ -15,3 +15,22 @@ test('poll render synchronizes controls with freshness-gated observations',()=>{
 test('stale ON keeps symbol bright and rotating with explicit last-observation label',()=>{const a=app();a.run('renderProjector({projector:true},false)');assert.equal(a.elements.projectorLogoWrapper.classList.contains('spinning'),true);assert.equal(a.elements.projectorLogoWrapper.classList.contains('power-off'),false);assert.match(a.elements.projectorStateText.textContent,/마지막 확인값/);});
 test('rail switch with no observation uses neutral symbol instead of previous ON or confirmed OFF',()=>{const a=app();a.run('renderProjector({projector:true},false);renderProjector({},false)');const c=a.elements.projectorLogoWrapper.classList;assert.equal(c.contains('spinning'),false);assert.equal(c.contains('power-off'),false);assert.equal(c.contains('power-unknown'),true);});
 test('fresh OFF stops stale ON and removes stale label',()=>{const a=app();a.run('renderProjector({projector:true},false);renderProjector({projector:false},true)');const c=a.elements.projectorLogoWrapper.classList;assert.equal(c.contains('spinning'),false);assert.equal(c.contains('power-off'),true);assert.doesNotMatch(a.elements.projectorStateText.textContent,/마지막 확인값/);});
+
+test('controls use selected rail reported values independently of freshness gating',()=>{
+ assert.ok(source.includes('syncReportedControls(r?.reported||{})'));
+ assert.ok(!source.includes('syncReportedControls(s);renderProjector'));
+ assert.ok(source.includes('최신 상태 미확인 · 마지막 수신값'));
+});
+test('repeated snapshots retain settings, new snapshots update them, edits remain pending',()=>{
+ const a=app();a.c.sleepValues=[];a.c.ledValues=[];a.c.detectionValues=[];
+ a.run('toggleSleepStateUI=(v)=>sleepValues.push(v);switchCategoryTabUI=(v)=>ledValues.push(v);switchDisplayView=(v)=>detectionValues.push(v)');
+ a.run(`const state={projector:true,sleep:true,led:'music',music_mode:'shuffle',detection:'cctv'};syncReportedControls(state);syncReportedControls(state)`);
+ assert.equal(a.buttons[0].classList.contains('active'),true);
+ assert.equal(a.elements.piPlayMode.value,1);assert.deepEqual([...a.c.sleepValues],[true,true]);
+ a.c.dirty.set('sleep','on');a.c.dirty.set('projector','on');
+ a.run(`syncReportedControls({projector:false,sleep:false,led:'basic',music_mode:'sequential',detection:'radar'})`);
+ assert.equal(a.buttons[0].classList.contains('active'),true);assert.equal(a.c.sleepValues.length,2);
+ assert.equal(a.elements.piPlayMode.value,0);assert.equal(a.c.ledValues.at(-1),'basic');
+ a.c.dirty.clear();a.run('syncReportedControls({projector:false,sleep:false})');
+ assert.equal(a.buttons[1].classList.contains('active'),true);assert.equal(a.c.sleepValues.at(-1),false);
+});
