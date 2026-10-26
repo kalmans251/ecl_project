@@ -157,7 +157,7 @@ class EmergencyManager:
 
     def ack(
         self,
-        railing_id: int,
+        railing_id: int, *, guard=lambda: None, reserved=lambda: None,
     ) -> int:
         active = self._railings.get_active_emergency(
             railing_id
@@ -179,6 +179,7 @@ class EmergencyManager:
             + write_u32_be(seq)
         )
 
+        guard()
         self._railings.reserve_call(railing_id, emergency=True)
         payload += self._railings.snapshot(railing_id)["call"]["session_id"].to_bytes(4, "big")
         frame = Frame(
@@ -191,8 +192,10 @@ class EmergencyManager:
         )
 
         try:
+            reserved()
             if self.audio is not None:
-                self.audio._start_call(railing_id, request_frame=frame, emergency=True)
+                if not self.audio._start_call(railing_id, request_frame=frame, emergency=True, guard=guard):
+                    raise RuntimeError("Emergency call not newly confirmed")
             else:
                 self._bus.send_frame(frame)
         finally:

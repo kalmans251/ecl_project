@@ -57,3 +57,15 @@ test('batch settings stop when selection changes while confirmation is pending',
  send=async()=>{count();selected=new Set(['rail-b']);return [];};`);
  await assert.rejects(a.run('applyAllUpdates()'),/선택이 변경/);assert.equal(sent,1);
 });
+test('emergency accept prepares audio and opens it only after one confirmed request',async()=>{
+ const a=app(),steps=[];a.context.capture=x=>steps.push(x);
+ a.run(`modalRail='rail-b';guarded=async f=>f();renderSelection=()=>{};
+ ensureAudio=async()=>capture('audio');voiceClient=()=>({prepare:async()=>capture('prepare')});
+ send=async op=>capture(op);openVoice=async()=>capture('voice');dismissEmergencyModal=()=>capture('dismiss');`);
+ await a.run('acceptEmergencyCallFromModal()');
+ assert.deepEqual(steps,['audio','prepare','call.accept','voice','dismiss']);
+ assert.equal(a.run('[...selected][0]'),'rail-b');
+ steps.length=0;a.run(`send=async op=>{capture(op);throw Error('unconfirmed');};`);
+ await assert.rejects(a.run('acceptEmergencyCallFromModal()'),/unconfirmed/);
+ assert.deepEqual(steps,['audio','prepare','call.accept']);
+});

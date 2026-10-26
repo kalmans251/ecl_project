@@ -64,6 +64,27 @@ class PortalTest {
   }
   public void close(){if(!ws.isOutputClosed())ws.sendClose(1000,"done").join();}
  }
+ @Test void emergencyAcceptanceAndPhysicalEndAreSessionScoped()throws Exception{
+  var b=new Browser("admin");String rail=rail();
+  try(var device=new Device()){
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.accept",null),true).statusCode());
+   var accept=json.readTree(device.next());assertEquals("call.accept",accept.path("operation").asText());
+   assertEquals(409,b.request("/api/portal/commands","POST",command(rail,"call.start",null),true).statusCode());
+   device.callAck(accept);
+   var end=new HashMap<String,Object>(Map.of("version",1,"type","call_ended","call_id",accept.path("call_id").asText(),"railing_id",1,"session_id",999));
+   commands.callEnded("gateway-01",json.valueToTree(end));
+   assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
+   end.put("session_id",123);commands.callEnded("another-gateway",json.valueToTree(end));
+   assertEquals(1,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
+   commands.callEnded("gateway-01",json.valueToTree(end));commands.callEnded("gateway-01",json.valueToTree(end));
+   assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
+   assertEquals(200,b.request("/api/portal/commands","POST",command(rail,"call.accept",null),true).statusCode());
+   var next=json.readTree(device.next());
+   var proof=Map.of("call_id",next.path("call_id").asText(),"railing_id",1,"epoch",next.path("message_id").asText());
+   commands.callResult("gateway-01",json.valueToTree(Map.of("version",1,"type","call_result","message_id",next.path("message_id").asText(),"status","NOT_STARTED","data",proof)));
+   assertEquals(0,db.queryForObject("SELECT COUNT(*) FROM calls WHERE gateway_id='gateway-01'",Integer.class));
+  }
+ }
  @Test void rejectedStartReleasesReservationButUnknownKeepsHangup()throws Exception{
   var b=new Browser("admin");String rail=rail();
   try(var device=new Device()){

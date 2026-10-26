@@ -144,3 +144,46 @@ class WebCallTests(unittest.TestCase):
         sid=self.states.snapshot(1)['call']['session_id']
         self.assertEqual('FAILED',self.remote.handle(self.recovery((sid%0xffffffff)+1))['status'])
         self.assertEqual(count,len(self.bus.sent))
+
+class EmergencyWebCallTests(WebCallTests):
+    def setUp(self):
+        super().setUp()
+        from emergency import EmergencyManager
+        self.remote.emergency=EmergencyManager(self.bus,self.states,audio=self.audio)
+
+    def test_accept_uses_ack_with_owned_session_and_duplicate_is_not_replayed(self):
+        from protocol import Service, CallOrigin
+        from dataclasses import replace
+        self.states.emergency_start(1,1,1234)
+        def reply(f):
+            self.assertEqual(Service.EMERGENCY,f.service)
+            self.assertEqual(Command.SET,f.command)
+            self.assertEqual(1234,int.from_bytes(f.payload[1:5],'big'))
+            sid=int.from_bytes(f.payload[5:9],'big')
+            self.assertEqual(self.states.snapshot(1)['call']['session_id'],sid)
+            e=event(session=sid)
+            self.audio.handle_frame(replace(e,payload=e.payload[:2]+bytes([CallOrigin.EMERGENCY])+e.payload[3:]))
+        self.bus.callback=reply
+        m=self.message('call.accept');result=self.remote.handle(m)
+        self.assertEqual('APPLIED',result['status'])
+        count=len(self.bus.sent);self.assertEqual(result,self.remote.handle(m));self.assertEqual(count,len(self.bus.sent))
+        self.assertEqual('FIELD_TX',self.remote.current[-1])
+
+    def test_accept_without_active_alarm_releases_web_reservation_proof(self):
+        self.assertEqual('NOT_STARTED',self.remote.handle(self.message('call.accept'))['status'])
+        self.assertFalse(self.bus.sent)
+
+    def test_unconfirmed_accept_retains_recovery_binding(self):
+        self.states.emergency_start(1,1,1234);self.bus.callback=lambda f:None
+        self.assertEqual('UNKNOWN',self.remote.handle(self.message('call.accept'))['status'])
+        import sqlite3
+        with sqlite3.connect(self.remote.path) as db:
+            self.assertEqual(1,db.execute('SELECT COUNT(*) FROM web_calls WHERE ended=0').fetchone()[0])
+
+    def test_physical_end_emits_correlated_notice_not_unknown_state(self):
+        result=self.remote.handle(self.message('call.start'));sid=result['data']['session_id']
+        self.assertEqual([],self.remote.drain())
+        self.states.call_ended(1,session_id=sid)
+        notice=self.remote.drain()[0]
+        self.assertEqual('call_ended',notice['type']);self.assertEqual(sid,notice['session_id'])
+        self.assertEqual(self.cid,notice['call_id']);self.assertIsNone(self.remote.current)
