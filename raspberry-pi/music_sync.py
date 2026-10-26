@@ -145,6 +145,8 @@ class MusicPublisher:
             try:
                 result = await asyncio.to_thread(handler.handle, message,
                     lambda: alive.is_set() and not self.stop.is_set())
+                if self.status and result.get('status') in ('APPLIED','COMPLETED'):
+                    self.status.refresh(message.get('railing_id'))
                 if alive.is_set() and not self.stop.is_set():
                     await ws.send(json.dumps(result, ensure_ascii=False))
             except Exception as exc:

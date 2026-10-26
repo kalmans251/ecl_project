@@ -32,7 +32,12 @@ class StatusSync:
         if type(message.get('version')) is not int or message['version']!=1 or not isinstance(ids,list) or len(ids)>255:
             raise ValueError('Invalid status demand')
         with self.lock:
+            for r in ids:
+                if type(r) is int and r in self.rails and self.wanted.get(r,0)<=time.monotonic():self.due[r]=0
             self.wanted={r:time.monotonic()+6 for r in ids if type(r) is int and r in self.rails}
+    def refresh(self, rail):
+        with self.lock:
+            if self.wanted.get(rail,0)>time.monotonic():self.due[rail]=0
     def disconnect(self):
         with self.lock:self.wanted.clear()
     def wanted_now(self, rail):

@@ -69,3 +69,12 @@ test('emergency accept prepares audio and opens it only after one confirmed requ
  await assert.rejects(a.run('acceptEmergencyCallFromModal()'),/unconfirmed/);
  assert.deepEqual(steps,['audio','prepare','call.accept']);
 });
+
+test('general status waits for a newer per-rail response and rejects offline cached state',()=>{
+ const a=app();a.run(`view={rails:[{id:'a',seen_at:Date.now(),online:true},{id:'b',seen_at:Date.now(),online:true}]};awaitStatus(['a']);`);
+ assert.equal(a.run('statusCheck(view.rails[0]).waiting'),true);
+ assert.equal(a.run('statusCheck(view.rails[0]).fresh'),false);
+ a.run('view.rails[0].seen_at+=1');assert.equal(a.run('statusCheck(view.rails[0]).fresh'),true);
+ a.run('view.rails[0].online=false');assert.equal(a.run('statusCheck(view.rails[0]).fresh'),false);
+ a.run("awaitStatus(['b']);view.rails[0].seen_at+=1");assert.equal(a.run('statusCheck(view.rails[1]).fresh'),false);
+});
