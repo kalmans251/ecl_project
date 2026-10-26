@@ -296,7 +296,9 @@ def main() -> int:
                 publisher.start()
                 radar_sync.start()
                 from status_sync import StatusSync
-                status_sync = StatusSync(controls, audio, args.event_railings, publisher)
+                from emergency_outbox import EmergencyOutbox
+                publisher.emergency_outbox = EmergencyOutbox(args.music_journal)
+                status_sync = StatusSync(controls, audio, args.event_railings, publisher, publisher.emergency_outbox)
                 publisher.status = status_sync
                 status_sync.start()
             music_sync = MusicSync(controls, args.event_railings, args.music_poll_interval,

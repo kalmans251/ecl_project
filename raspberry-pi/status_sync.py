@@ -22,7 +22,8 @@ def decode(data):
     return state
 
 class StatusSync:
-    def __init__(self, controls, audio, rails, publisher):
+    def __init__(self, controls, audio, rails, publisher, outbox=None):
+        self.outbox=outbox
         self.controls,self.audio,self.rails,self.publisher=controls,audio,tuple(rails),publisher
         self.stop=threading.Event();self.thread=None;self.due={};self.emergencies={}
         self.lock=threading.Lock();self.wanted={}
@@ -40,12 +41,7 @@ class StatusSync:
         if rail not in self.rails: return
         e=self.controls.railings.snapshot(rail).get('emergency',{})
         identity=(e.get('active',False),e.get('seq'))
-        previous=self.emergencies.get(rail)
-        if identity==previous or (previous is None and not identity[0]): return
-        self.emergencies[rail]=identity
-        self.publisher.publish(dict(version=1,type='emergency_state',railing_id=rail,
-            observed_at=datetime.now(timezone.utc).isoformat(),
-            state=dict(active=identity[0])))
+        if self.outbox:self.outbox.record(rail,identity)
     def sample(self, rail):
         if not self.publisher.connected.is_set() or not self.wanted_now(rail): return False
         def guard():

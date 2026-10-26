@@ -1,3 +1,5 @@
+import tempfile
+from emergency_outbox import EmergencyOutbox
 import threading
 import unittest
 from types import SimpleNamespace
@@ -16,7 +18,9 @@ class StatusTests(unittest.TestCase):
   self.states=RailingManager();self.controls=DeviceControls(self.bus,self.states,VoiceRelay(self.bus,self.states))
   self.audio=SimpleNamespace(_control_lock=threading.Lock(),_keepalive_due=threading.Event())
   self.publisher=SimpleNamespace(connected=self.connected,publish=self.messages.append)
-  self.sync=StatusSync(self.controls,self.audio,[1,2],self.publisher)
+  self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+  self.outbox=EmergencyOutbox(self.temp.name+"/events.db")
+  self.sync=StatusSync(self.controls,self.audio,[1,2],self.publisher,self.outbox)
   self.sync.demand(dict(version=1,rails=[1]))
   def send(f):
    self.bus.sent.append(f)
@@ -44,10 +48,10 @@ class StatusTests(unittest.TestCase):
  def test_alarm_transition_is_separate_and_no_plc_poll(self):
   self.sync.emergency(1);self.assertEqual([],self.messages)
   self.states.emergency_start(1,1,123);self.sync.emergency(1);self.sync.emergency(1)
-  self.assertEqual(1,len(self.messages));self.assertEqual('emergency_state',self.messages[0]['type'])
-  self.assertTrue(self.messages[0]['state']['active'])
+  start=self.outbox.drain()[0];self.assertTrue(start['state']['active'])
+  self.outbox.acknowledge(dict(version=2,type='emergency_ack',event_id=start['event_id'],railing_id=1))
   self.states.emergency_stop(1,123);self.sync.emergency(1)
-  self.assertFalse(self.messages[1]['state']['active']);self.assertEqual([],self.bus.sent)
+  self.outbox.last=float('-inf');self.assertFalse(self.outbox.drain()[0]['state']['active']);self.assertEqual([],self.bus.sent)
 
  def test_demand_expiry_and_disconnect_stop_queries(self):
   self.sync.disconnect();self.assertFalse(self.sync.sample(1))

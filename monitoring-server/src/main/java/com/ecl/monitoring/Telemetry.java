@@ -40,13 +40,16 @@ public class Telemetry {
         db.update("UPDATE rails SET snapshot=?,seen_at=? WHERE id=?",json.writeValueAsString(merged),observed,id);
         db.update("INSERT INTO telemetry_samples(id,rail_id,observed_at,left_watt,right_watt,battery_percent,emergency) VALUES(?,?,?,?,?,?,?)",UUID.randomUUID().toString(),id,observed,number(state,"left_watt"),number(state,"right_watt"),number(state,"battery_percent"),state.has("emergency")?state.get("emergency").booleanValue():null);
     }
+    @org.springframework.transaction.annotation.Transactional
     public synchronized void emergency(String gateway,JsonNode node) {
-        if(!node.isObject() || node.size()!=5 || !node.path("version").isInt() || node.path("version").asInt()!=1 ||
+        boolean durable=node.path("version").asInt()==2;
+        if(!node.isObject() || node.size()!=(durable?6:5) || !node.path("version").isInt() || (!durable && node.path("version").asInt()!=1) ||
+           (durable && (!node.path("event_id").isString() || !node.path("event_id").asText().matches("[0-9a-fA-F-]{36}"))) ||
            !node.path("type").asText().equals("emergency_state") || !node.path("railing_id").isInt() ||
            !node.path("state").isObject() || node.path("state").size()!=1 || !node.path("state").path("active").isBoolean())
             throw Accounts.bad("Invalid emergency state");
         long at;try{at=Instant.parse(node.path("observed_at").asText()).toEpochMilli();}catch(Exception e){throw Accounts.bad("Invalid timestamp");}
-        long now=System.currentTimeMillis();if(at>now+2000 || at<now-60000)throw Accounts.bad("Stale emergency state");
+        long now=System.currentTimeMillis();if(at>now+2000 || (!durable && at<now-60000))throw Accounts.bad("Stale emergency state");
         var rail=registry.deviceRail(gateway,node.path("railing_id").asInt());
         var state=(tools.jackson.databind.node.ObjectNode)json.readTree(rail.get("SNAPSHOT")==null?"{}":(String)rail.get("SNAPSHOT"));
         if(state.path("emergency_at").asLong(0)>=at)return;
