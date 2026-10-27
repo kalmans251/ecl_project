@@ -15,13 +15,15 @@ async function api(path,method='GET',data){
  return response.status===204 || response.headers.get('content-length')==='0'?null:response.text().then(t=>t?JSON.parse(t):null);
 }
 const statusBaselines=new Map();
-function awaitStatus(ids){for(const id of ids){const r=view?.rails.find(r=>r.id===id);statusBaselines.set(id,{seen:r?.seen_at??0,at:performance.now()});}}
+function awaitStatus(ids,reason='selection'){for(const id of ids){const r=view?.rails.find(r=>r.id===id);statusBaselines.set(id,{seen:r?.seen_at??0,at:performance.now(),reason});}}
 function statusCheck(r){
  if(!r)return {fresh:false,waiting:false};
  const baseline=statusBaselines.get(r.id),advanced=!baseline||(r.seen_at??0)>baseline.seen;
  return {fresh:!stateFetchFailed&&r.online&&!!r.seen_at&&advanced,
- waiting:!advanced&&performance.now()-baseline.at<15000};
+ waiting:!stateFetchFailed&&r.online&&!advanced,
+ applying:!stateFetchFailed&&r.online&&!advanced&&baseline?.reason==='apply'};
 }
+function displayedStatus(r,check){return r&&(check.fresh||check.waiting)?r.reported||{}:{};}
 let emergencyAudio;
 function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>text('emergencyAudioState',message));}
 function enableEmergencyAudio(){return guarded(()=>alarmAudio().enable());}
@@ -90,7 +92,7 @@ async function send(operation,value,ids){
   const rows=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:ids||items.map(r=>r.id),operation,value:value??null});
   toast(`${operation}: 요청 접수 · 장치 응답 대기`);
   if(operation==='emergency.ack'){await poll();return rows;}
-  const results=await waitControlResults(rows);DetectionCounts.ingest(results);awaitStatus(results.filter(r=>['APPLIED','COMPLETED'].includes(r.status)).map(r=>r.rail_id));await poll();
+  const results=await waitControlResults(rows);DetectionCounts.ingest(results);awaitStatus(results.filter(r=>['APPLIED','COMPLETED'].includes(r.status)).map(r=>r.rail_id),'apply');await poll();
   const label=r=>view.rails.find(x=>x.id===r.rail_id)?.name||r.rail_id;
   const failed=results.filter(r=>!['APPLIED','COMPLETED'].includes(r.status));
   if(failed.length)throw Error(failed.map(r=>`${label(r)}: ${r.status}`).join(' / ')+' · 처리 내역 확인 필요, 자동 재전송 없음');
@@ -241,16 +243,17 @@ function renderEnergy(s){
 function renderLive(){
  if(typeof EmergencyAudio!=='undefined')alarmAudio().sync(view?.rails||[],view?.calls||[]);
  renderMusicStatus();
- const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=fresh?r.reported:{};
+ const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=displayedStatus(r,check);
  renderEnergy(s);
- text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?`Pi 연결됨 · 난간 ${fresh?'응답 확인':check.waiting?'상태 확인 중':'최신 응답 미확인'}`:'Pi 연결 끊김 · 난간 상태 미확인'):'난간 하나를 선택하세요');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
+ text('envWeather',({clear:'맑음',cloudy:'흐림',rain:'비',snow:'눈'})[s.weather]||'미수신');text('envWind',s.wind===undefined?'-- m/s':s.wind+' m/s');text('envPm10',s.pm10??'미수신');text('systemCommState',r?(r.online?`Pi 연결됨 · 난간 ${fresh?'응답 확인':check.waiting?(check.applying?'적용 후 상태 확인 중':'상태 확인 중'):'최신 응답 미확인'}`:'Pi 연결 끊김 · 난간 상태 미확인'):'난간 하나를 선택하세요');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
  const age=r?.seen_at?Math.max(0,Math.floor((Date.now()-r.seen_at)/1000)):null;
  const reported=r?.reported||{};
  const summary=`전원 ${reported.power??'미확인'} / ${reported.power_on===undefined?'미확인':reported.power_on?'ON':'OFF'} · LED ${reported.led??'미확인'} / ${reported.led_enabled===undefined?'미확인':reported.led_enabled?'ON':'OFF'} · 프로젝터 ${reported.projector===undefined?'미확인':reported.projector?'ON':'OFF'} · 슬립 ${reported.sleep===undefined?'미확인':reported.sleep?'사용':'해제'}${reported.sleep_active?' (잠든 상태)':''} · 감지 ${reported.detection??'미확인'} · 음악 모드 ${reported.music_mode??'미확인'} · 누적 ${reported.detection_count??'--'}`;
  text('deviceStateSummary',!r?'난간 하나를 선택하세요':
-  `${fresh?'장치 응답 확인':check.waiting?'새 응답 대기 · 마지막 수신값':'최신 상태 미확인 · 마지막 수신값'} · ${summary} · ${age===null?'수신 시각 없음':age+'초 전'}`);
+  `${fresh?'장치 응답 확인':check.waiting?`${check.applying?'적용 후 상태 확인 중':'새 응답 대기'} · 마지막 수신값`:'최신 상태 미확인 · 마지막 수신값'} · ${summary} · ${age===null?'수신 시각 없음':age+'초 전'}`);
 
  syncReportedControls(r?.reported||{});renderProjector(r?.reported||{},fresh);
+ if(check.waiting&&typeof r?.reported?.projector==='boolean')text('projectorStateText',`${r.reported.projector?'ON · 릴레이 켜짐':'OFF · 릴레이 꺼짐'} · ${check.applying?'적용 후 상태 확인 중':'새 응답 대기'} · 마지막 수신값`);
  activeCall=view.calls.find(c=>rails().some(r=>r.id===c.RAIL_ID));const callText=activeCall?`${activeCall.STATUS} · ${activeCall.DIRECTION} · ${activeCall.OWNER_NAME}`:r?.reported?.emergency?'🚨 비상 호출':fresh?'🟢 수신대기':'상태 미수신';text('sosBigText',callText);text('sosSubDesc',activeCall?(activeCall.OWNED?'내 통화 · 적용 확인 후 송수신':'다른 운영자의 통화'):view.voice_available?'통화 시작 후 음성 연결':'통화 제어 가능 · Codec2 라이브러리 로드 실패');
  $('btnPttTalk').disabled=!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available;$('btnPttTalk').classList.toggle('active',activeCall?.DIRECTION==='CONTROL_TX');
  if(!activeCall?.OWNED || !['ACTIVE','SWITCHING','ENDING'].includes(activeCall.STATUS))closeVoice();

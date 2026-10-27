@@ -10,7 +10,7 @@ function app(){
 test('fresh observations update projector selection and actual display in both directions',()=>{const a=app();a.run('syncReportedControls({projector:true});renderProjector({projector:true})');assert.equal(a.buttons[0].classList.contains('active'),true);assert.equal(a.elements.projectorLogoWrapper.classList.contains('spinning'),true);a.run('syncReportedControls({projector:false});renderProjector({projector:false})');assert.equal(a.buttons[1].classList.contains('active'),true);assert.equal(a.elements.projectorLogoWrapper.classList.contains('spinning'),false);assert.match(a.elements.projectorStateText.textContent,/OFF/);});
 test('pending edits survive polling while actual indicator follows device',()=>{const a=app();a.c.dirty.set('projector','on');a.buttons[0].classList.toggle('active',true);a.run('syncReportedControls({projector:false});renderProjector({projector:false})');assert.equal(a.buttons[0].classList.contains('active'),true);assert.match(a.elements.projectorStateText.textContent,/OFF/);a.c.dirty.clear();a.run('syncReportedControls({projector:false})');assert.equal(a.buttons[1].classList.contains('active'),true);});
 test('missing or stale observations never display confirmed OFF or retain prior selection',()=>{const a=app();a.run('syncReportedControls({projector:true});syncReportedControls({});renderProjector({})');assert.equal(a.buttons.some(b=>b.classList.contains('active')),false);assert.equal(a.elements.projectorStateText.textContent,'상태 미확인');});
-test('poll render synchronizes controls with freshness-gated observations',()=>{assert.match(source,/s=fresh\?r.reported:\{\}/);assert.ok(source.includes('renderProjector(r?.reported||{},fresh)'));});
+test('poll render synchronizes controls with freshness-gated observations',()=>{assert.ok(source.includes('s=displayedStatus(r,check)'));assert.ok(source.includes('renderProjector(r?.reported||{},fresh)'));});
 
 test('stale ON keeps symbol bright and rotating with explicit last-observation label',()=>{const a=app();a.run('renderProjector({projector:true},false)');assert.equal(a.elements.projectorLogoWrapper.classList.contains('spinning'),true);assert.equal(a.elements.projectorLogoWrapper.classList.contains('power-off'),false);assert.match(a.elements.projectorStateText.textContent,/마지막 확인값/);});
 test('rail switch with no observation uses neutral symbol instead of previous ON or confirmed OFF',()=>{const a=app();a.run('renderProjector({projector:true},false);renderProjector({},false)');const c=a.elements.projectorLogoWrapper.classList;assert.equal(c.contains('spinning'),false);assert.equal(c.contains('power-off'),false);assert.equal(c.contains('power-unknown'),true);});
@@ -46,4 +46,21 @@ test('elapsed wall time does not expire received state; connection and new-respo
  assert.equal(vm.runInContext('statusCheck(r).fresh',c),false);
  c.r.seen_at=2;assert.equal(vm.runInContext('statusCheck(r).fresh',c),true);
  c.r.seen_at=null;assert.equal(vm.runInContext('statusCheck(r).fresh',c),false);
+});
+
+test('pending apply retains reported values without a time cutoff or optimistic replacement',()=>{
+ const c=vm.createContext({statusBaselines:new Map([['a',{seen:10,at:0,reason:'apply'}]]),stateFetchFailed:false});
+ vm.runInContext(source.slice(source.indexOf('function statusCheck('),source.indexOf('let emergencyAudio;')),c);
+ c.r={id:'a',online:true,seen_at:10,reported:{battery_percent:70,projector:false}};
+ assert.equal(vm.runInContext('statusCheck(r).applying',c),true);
+ assert.equal(vm.runInContext('displayedStatus(r,statusCheck(r)).battery_percent',c),70);
+ assert.equal(vm.runInContext('displayedStatus(r,statusCheck(r)).projector',c),false);
+ c.r.seen_at=11;c.r.reported.projector=true;
+ assert.equal(vm.runInContext('statusCheck(r).fresh',c),true);
+ assert.equal(vm.runInContext('statusCheck(r).applying',c),false);
+ assert.equal(vm.runInContext('displayedStatus(r,statusCheck(r)).projector',c),true);
+ c.r={id:'b',online:true,seen_at:null,reported:{}};
+ assert.equal(vm.runInContext('displayedStatus(r,statusCheck(r)).battery_percent',c),undefined);
+ c.r={id:'a',online:false,seen_at:10,reported:{battery_percent:70}};
+ assert.equal(vm.runInContext('displayedStatus(r,statusCheck(r)).battery_percent',c),undefined);
 });
