@@ -12,5 +12,5 @@ test('energy displays estimated SOC, signed input and clears missing observation
  vm.runInContext('renderEnergy({battery_voltage:null,battery_percent:null,left_current:null,left_watt:null})',ctx);
  assert.equal(e.batPercentTotal.textContent,'미확인');assert.equal(e.batteryVoltage.textContent,'미확인');
  vm.runInContext('renderEnergy({})',ctx);assert.equal(e.batteryVoltage.textContent,'미확인');assert.equal(e.batPercentTotal.textContent,'미확인');assert.equal(e.barTotal.style.width,'0%');
- assert.match(source,/s=fresh\?r.reported:\{\}/);assert.ok(source.includes('renderEnergy(s);'));
+ assert.ok(source.includes('s=displayedStatus(r,check)'));assert.ok(source.includes('renderEnergy(s);'));
 });
