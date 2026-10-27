@@ -190,7 +190,19 @@ async function playSelectedMusic(){
 }
 function toggleDeviceState(type,value){if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');mark('projector',value?'on':'off');document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(String(value))));}
 function switchDisplayView(mode,edit=true){$('mediaDisplayCard').classList.toggle('cctv-only',mode==='cctv');$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);radarView.select(mode==='radar'&&rails().length===1?rails()[0].id:null);}
-async function applyAllUpdates(){await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(dirty.get(op)===value)dirty.delete(op);}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}
+async function waitAppliedSnapshot(targets,targetSite){
+ const baseline=new Map(targets.map(id=>[id,view?.rails.find(r=>r.id===id)?.seen_at??0]));
+ const deadline=performance.now()+20000;
+ await renewStatusDemand();
+ while(performance.now()<deadline){
+  if(site!==targetSite)throw Error('현장이 변경되어 상태 확인을 중단했습니다.');
+  await poll();
+  if(!stateFetchFailed&&targets.every(id=>{const r=view?.rails.find(r=>r.id===id);return r?.online&&(r.seen_at??0)>baseline.get(id);}))return;
+  await new Promise(resolve=>setTimeout(resolve,250));
+ }
+ throw Error('명령 처리 후 새 상태 응답을 확인하지 못했습니다. 선택값을 유지합니다. 처리 내역을 확인하세요.');
+}
+async function applyAllUpdates(){await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
 function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
