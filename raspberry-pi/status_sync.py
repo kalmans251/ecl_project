@@ -57,7 +57,7 @@ class StatusSync:
     def __init__(self, controls, audio, rails, publisher, outbox=None):
         self.outbox=outbox
         self.controls,self.audio,self.rails,self.publisher=controls,audio,tuple(rails),publisher
-        self.stop=threading.Event();self.thread=None;self.due={};self.emergencies={}
+        self.stop=threading.Event();self.wake=threading.Event();self.pending=set();self.thread=None;self.due={};self.emergencies={}
         self.lock=threading.Lock();self.wanted={};self.versions={}
     def demand(self, message):
         ids=message.get('rails')
@@ -69,9 +69,10 @@ class StatusSync:
             self.wanted={r:time.monotonic()+6 for r in ids if type(r) is int and r in self.rails}
     def refresh(self, rail):
         with self.lock:
-            if self.wanted.get(rail,0)>time.monotonic():self.due[rail]=0
+            if self.wanted.get(rail,0)>time.monotonic():
+                self.due[rail]=0;self.pending.add(rail);self.wake.set()
     def disconnect(self):
-        with self.lock:self.wanted.clear();self.versions.clear()
+        with self.lock:self.wanted.clear();self.versions.clear();self.pending.clear()
     def wanted_now(self, rail):
         with self.lock:return self.wanted.get(rail,0)>time.monotonic()
     def emergency(self, rail):
@@ -106,14 +107,29 @@ class StatusSync:
         return True
     def start(self):
         self.thread=threading.Thread(target=self._run,name='status-poll',daemon=True);self.thread.start()
+    def _poll_once(self):
+        if not self.publisher.connected.is_set(): return
+        now=time.monotonic()
+        with self.lock:
+            candidates=[r for r in self.rails if self.wanted.get(r,0)>now and self.due.get(r,0)<=now]
+            if not candidates:return
+            rail=min(candidates,key=lambda r:(r not in self.pending,self.due.get(r,0)))
+            urgent=rail in self.pending
+            self.pending.discard(rail)
+            # Reserve next slot before I/O so a concurrent refresh cannot be lost.
+            self.due[rail]=now+5
+        ok=self.sample(rail)
+        if urgent and not ok:
+            with self.lock:
+                if self.wanted.get(rail,0)>time.monotonic():
+                    self.pending.add(rail)
+                    self.due[rail]=min(self.due[rail],time.monotonic()+.5)
     def _run(self):
-        while not self.stop.wait(.5):
-            if not self.publisher.connected.is_set(): continue
-            now=time.monotonic()
-            candidates=[r for r in self.rails if self.wanted_now(r) and self.due.get(r,0)<=now]
-            if not candidates: continue
-            rail=min(candidates,key=lambda r:self.due.get(r,0))
-            self.sample(rail);self.due[rail]=time.monotonic()+5
+        while not self.stop.is_set():
+            self.wake.wait(.5)
+            self.wake.clear()
+            if self.stop.is_set():break
+            self._poll_once()
     def close(self):
-        self.stop.set()
+        self.stop.set();self.wake.set()
         if self.thread:self.thread.join(2)
