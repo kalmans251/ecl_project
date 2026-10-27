@@ -75,3 +75,27 @@ INA219 변환 기준: bus register >>3 ×4mV, signed shunt ×10µV / 실제 션�
 https://www.ti.com/lit/ds/symlink/ina219.pdf
 I2C 드라이버: ESP-IDF master driver (`esp_driver_i2c`).
 https://docs.espressif.com/projects/esp-idf/en/v5.5/esp32p4/api-reference/peripherals/i2c.html
+
+## ENERGY 진단 로그 (측정값이 미확인일 때)
+
+시작 시 실제 SDA/SCL, 속도, 채널/션트 설정을 출력한다. 설정 로그만으로 센서 응답을
+확인한 것은 아니다. 첫 측정 실패도 경고하며 같은 실패 상태는 채널별 10초 간격으로
+다시 출력한다. 정상↔실패 전환은 즉시 출력한다. 성공 시 bus_mV와 shunt_uV도 표시한다.
+
+실패 로그의 `channel`, `addr`, `stage`, `error`, `read_mask`, `raw_bus`, `raw_shunt`를 확인한다.
+
+| stage | 의미 |
+|---|---|
+| config_write | INA219 설정 쓰기 실패 |
+| bus_read | 버스 전압 레지스터(0x02) 읽기 실패 |
+| shunt_read | 션트 전압 레지스터(0x01) 읽기 실패 |
+| conversion_not_ready | 읽기는 성공했지만 CNVR=0 |
+| overflow | OVF=1로 유효성 검사 탈락 |
+| bus_out_of_range | 버스 전압이 허용 측정 범위 초과 |
+| shunt_saturated | 션트 전압이 설정된 ±320mV 범위 끝에 도달 |
+
+`error=ESP_OK`여도 뒤의 값 검증에서 실패할 수 있다. `read_mask`의 bit0은 버스 전압,
+bit1은 션트 전압을 실제로 읽었다는 뜻이다. 해당 bit가 0일 때 raw=0은 측정된 0V가 아니다.
+I2C 초기화/장치 핸들 등록/태스크 생성 실패도 별도로 표시한다.
+진단은 기존 유효성 검사나 전류·잔량 계산을 우회하지 않는다. 하드웨어 고장 여부는
+이 로그만으로 단정하지 않고 배선·센서 전원·주소·읽은 값을 대조한다.

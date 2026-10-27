@@ -8,7 +8,8 @@ class EnergyMonitorTests(unittest.TestCase):
   headers=dict(HEADERS)
   headers['sdkconfig.h']='#define CONFIG_RAIL_ENERGY_ENABLED 1\n#define CONFIG_RAIL_BATTERY_CHANNEL 1\n#define CONFIG_RAIL_LEFT_SHUNT_MOHM 100\n#define CONFIG_RAIL_RIGHT_SHUNT_MOHM 0\n'
   headers['driver/gpio.h']='#define GPIO_NUM_8 8\n#define GPIO_NUM_9 9\n'
-  headers['esp_log.h']='#define ESP_LOGI(t,...) ((void)(t))\n#define ESP_LOGW(t,...) ((void)(t))\n'
+  headers['esp_err.h']='typedef int esp_err_t;\nconst char *esp_err_to_name(int);\n'
+  headers['esp_log.h']='void capture(int,const char*,const char*,...);\n#define ESP_LOGI(t,...) capture(0,t,__VA_ARGS__)\n#define ESP_LOGW(t,...) capture(1,t,__VA_ARGS__)\n'
   headers['freertos/FreeRTOS.h']+='\n#include <stdbool.h>\ntypedef int portMUX_TYPE;\n#define portMUX_INITIALIZER_UNLOCKED 0\n#define portENTER_CRITICAL(m) ((void)(m))\n#define portEXIT_CRITICAL(m) ((void)(m))\n#define pdPASS 1\n'
   headers['freertos/task.h']='void vTaskDelay(unsigned);\nint xTaskCreate(void(*fn)(void*),const char*,int,void*,int,void*);\n'
   headers['driver/i2c_master.h']='''#include <stddef.h>
@@ -30,10 +31,15 @@ int i2c_master_transmit_receive(void*,const uint8_t*,size_t,uint8_t*,size_t,int)
   code=r'''
 #include <assert.h>
 #include <setjmp.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include "energy_monitor.c"
 static jmp_buf end;
 static int64_t now=1000000;
 static bool fail=false;
+static int fail_reg=-1,warnings=0;static char last_log[512];
+const char *esp_err_to_name(int err){return err?"ESP_ERR_TIMEOUT":"ESP_OK";}
+void capture(int warn,const char *tag,const char *format,...){(void)tag;warnings+=warn;va_list args;va_start(args,format);vsnprintf(last_log,sizeof last_log,format,args);va_end(args);}
 static uint16_t voltage=(3300<<3)|2,shunt=5000;
 int64_t esp_timer_get_time(void){return now;}
 void vTaskDelay(unsigned ms){if(ms==1000)longjmp(end,1);}
@@ -41,17 +47,26 @@ int xTaskCreate(void(*fn)(void*),const char*n,int s,void*p,int pr,void*h){(void)
 int i2c_new_master_bus(const i2c_master_bus_config_t*c,void**o){(void)c;*o=(void*)1;return 0;}
 int i2c_master_bus_add_device(void*b,const i2c_device_config_t*c,void**o){(void)b;*o=(void*)(uintptr_t)c->device_address;return 0;}
 int i2c_master_transmit(void*d,const uint8_t*p,size_t n,int t){(void)d;assert(n==3 && p[1]==0x39 && p[2]==0x9f && t==30);return fail?-1:0;}
-int i2c_master_transmit_receive(void*d,const uint8_t*r,size_t n,uint8_t*p,size_t len,int t){(void)d;assert(n==1 && len==2 && t==30);if(fail)return -1;uint16_t v=*r==2?voltage:shunt;p[0]=v>>8;p[1]=v;return 0;}
+int i2c_master_transmit_receive(void*d,const uint8_t*r,size_t n,uint8_t*p,size_t len,int t){(void)d;assert(n==1 && len==2 && t==30);if(fail || *r==fail_reg)return -1;uint16_t v=*r==2?voltage:shunt;p[0]=v>>8;p[1]=v;return 0;}
 static void step(void){if(!setjmp(end))monitor(NULL);}
 int main(void){
  uint8_t out[15];energy_monitor_init();energy_monitor_encode(out);assert(out[0]==0);
- step();energy_monitor_encode(out);assert(out[0]==23); /* both V, only left A, battery */
+ fail=true;step();assert(warnings==2 && strstr(last_log,"stage=config_write") && strstr(last_log,"addr=0x41"));
+ step();assert(warnings==2);now+=10000000;step();assert(warnings==4);
+ fail=false;step();assert(strstr(last_log,"ready") && strstr(last_log,"bus_mV=13200"));
+ energy_monitor_encode(out);assert(out[0]==23); /* both V, only left A, battery */
  assert(out[1]==0x33 && out[2]==0x90);assert(out[9]==1 && out[10]==244); /* 13.2V, 500mA */
  shunt=(uint16_t)-1000;step();energy_monitor_encode(out);assert(out[7]==255 && out[10]==156); /* -100mA */
  now+=3000001;energy_monitor_encode(out);assert(out[0]==0);
  fail=true;step();energy_monitor_encode(out);assert(out[0]==0);
  fail=false;voltage=(3000<<3)|2;step();energy_monitor_encode(out);assert(out[1]==0x2e && out[2]==0xe0); /* recovery resets average:12V */
  voltage|=1;step();energy_monitor_encode(out);assert(out[0]==0); /* overflow */
+ assert(strstr(last_log,"stage=overflow") && strstr(last_log,"error=ESP_OK"));
+ voltage=(3300<<3)|2;step();fail_reg=2;step();assert(strstr(last_log,"stage=bus_read") && strstr(last_log,"read_mask=0"));
+ fail_reg=-1;step();fail_reg=1;step();assert(strstr(last_log,"stage=shunt_read") && strstr(last_log,"read_mask=1"));
+ fail_reg=-1;step();voltage&=~2;step();assert(strstr(last_log,"conversion_not_ready"));
+ voltage=(6600<<3)|2;now+=10000000;step();assert(strstr(last_log,"bus_out_of_range"));
+ voltage=(3300<<3)|2;shunt=32000;now+=10000000;step();assert(strstr(last_log,"shunt_saturated"));
  return 0;
 }
 '''
