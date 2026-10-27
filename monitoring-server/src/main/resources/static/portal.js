@@ -228,9 +228,15 @@ function renderMusicStatus(){
  if(d.durationMs)showSeekTarget();else text('musicSeekTarget','--:--');
 }
 function renderEnergy(s){
- text('chargeWattsLeft',s.left_watt===undefined?'--':s.left_watt.toFixed(1));text('chargeWattsRight',s.right_watt===undefined?'--':s.right_watt.toFixed(1));text('batPercentTotal',s.battery_percent===undefined?'미수신':(s.battery_estimated?'약 ':'')+s.battery_percent.toFixed(0)+'%');$('barTotal').style.width=(s.battery_percent||0)+'%';
- text('batteryVoltage',s.battery_voltage===undefined?'미확인':s.battery_voltage.toFixed(2)+' V');
- text('solarCurrentLeft',s.left_current===undefined?'--':s.left_current.toFixed(2));text('solarCurrentRight',s.right_current===undefined?'--':s.right_current.toFixed(2));
+ const percent=Number.isFinite(s.battery_percent)&&s.battery_percent>=0&&s.battery_percent<=100?s.battery_percent:undefined;
+ const voltage=Number.isFinite(s.battery_voltage)?s.battery_voltage:undefined;
+ text('chargeWattsLeft',Number.isFinite(s.left_watt)?s.left_watt.toFixed(1):'--');
+ text('chargeWattsRight',Number.isFinite(s.right_watt)?s.right_watt.toFixed(1):'--');
+ text('batPercentTotal',percent===undefined?'미확인':(s.battery_estimated?'약 ':'')+percent.toFixed(0)+'%');
+ $('barTotal').style.width=(percent??0)+'%';
+ text('batteryVoltage',voltage===undefined?'미확인':voltage.toFixed(2)+' V');
+ text('solarCurrentLeft',Number.isFinite(s.left_current)?s.left_current.toFixed(2):'--');
+ text('solarCurrentRight',Number.isFinite(s.right_current)?s.right_current.toFixed(2):'--');
 }
 function renderLive(){
  if(typeof EmergencyAudio!=='undefined')alarmAudio().sync(view?.rails||[],view?.calls||[]);

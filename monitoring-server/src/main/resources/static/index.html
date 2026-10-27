@@ -611,10 +611,12 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <div class="sub-block">
                 <div class="sub-block-title">배터리 추정 잔량 (%)</div><div style="height:13px;"></div>
                 <div class="sub-block-data">
-                    <div>배터리 전압: <span id="batteryVoltage">미확인</span></div>
-                    <small>전압 기준 추정 · 충전/부하에 따라 오차 있음</small>
-                    <span id="batPercentTotal" class="bat-single-percent">미확인</span>
+                    <div aria-live="polite">
+                        <span id="batPercentTotal" class="bat-single-percent">미확인</span>
+                        <span> · <span id="batteryVoltage">미확인</span></span>
+                    </div>
                     <div class="progress-bar-bg"><div class="progress-bar-fill" id="barTotal" style="width: 0%;"></div></div>
+                    <small>전압 기반 추정 · 충전/부하에 따라 오차 있음</small>
                 </div><div style="height:13px;"></div>
             </div>
         </div>
