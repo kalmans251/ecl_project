@@ -45,43 +45,50 @@ static void report(int n,bool ok,const char *stage,esp_err_t err,
     }
     diagnostics[n].seen=true;diagnostics[n].ok=ok;
 }
+static void sample_channels(bool configured[2]) {
+    for(int n=0;n<2;n++) {
+        if(!dev[n])continue;
+        uint16_t voltage=0,shunt=0;unsigned read_mask=0;
+        esp_err_t err=ESP_OK;const char *stage="config_write";
+        if(!configured[n]) {
+            /* 32V range, +/-320mV shunt, 12-bit bus/shunt, continuous. */
+            const uint8_t config[]={0,0x39,0x9f};
+            err=i2c_master_transmit(dev[n],config,sizeof config,30);
+            configured[n]=err==ESP_OK;
+            /* Allow an extra tick for scheduling: pdMS_TO_TICKS(5) was zero at 100Hz.
+             * A following sample may still be not-ready; never restart ADC for that. */
+            if(configured[n])vTaskDelay(pdMS_TO_TICKS(20)+1);
+        }
+        if(err==ESP_OK){stage="bus_read";err=read_reg(n,2,&voltage);if(err==ESP_OK)read_mask|=1;}
+        if(err==ESP_OK){stage="shunt_read";err=read_reg(n,1,&shunt);if(err==ESP_OK)read_mask|=2;}
+        bool ok=err==ESP_OK;
+        if(ok) {
+            if(!(voltage&2)){stage="conversion_not_ready";ok=false;}
+            else if(voltage&1){stage="overflow";ok=false;}
+            else if((voltage>>3)>6500){stage="bus_out_of_range";ok=false;}
+            else if(abs((int16_t)shunt)>=32000){stage="shunt_saturated";ok=false;}
+        }
+        uint16_t mv=(voltage>>3)*4;
+        int32_t ma=shunts[n]?((int32_t)(int16_t)shunt*10)/shunts[n]:0;
+        portENTER_CRITICAL(&mux);
+        bool was=cache[n].valid;
+        if(ok) {
+            cache[n].mv=was?(cache[n].mv*7u+mv)/8u:mv;
+            cache[n].ma=ma;cache[n].at=esp_timer_get_time();
+        }
+        cache[n].valid=ok;
+        portEXIT_CRITICAL(&mux);
+        report(n,ok,stage,err,voltage,shunt,read_mask);
+        /* Only transport failures require reconfiguration. CNVR=0 and range
+         * rejection must not continually restart continuous conversions. */
+        if(err!=ESP_OK)configured[n]=false;
+    }
+}
 static void monitor(void *unused) {
     (void)unused;
     bool configured[2]={false,false};
     for(;;) {
-        for(int n=0;n<2;n++) {
-            if(!dev[n])continue;
-            uint16_t voltage=0,shunt=0;unsigned read_mask=0;
-            esp_err_t err=ESP_OK;const char *stage="config_write";
-            if(!configured[n]) {
-                /* 32V range, +/-320mV shunt, 12-bit bus/shunt, continuous. */
-                const uint8_t config[]={0,0x39,0x9f};
-                err=i2c_master_transmit(dev[n],config,sizeof config,30);
-                configured[n]=err==ESP_OK;
-                if(configured[n])vTaskDelay(pdMS_TO_TICKS(5));
-            }
-            if(err==ESP_OK){stage="bus_read";err=read_reg(n,2,&voltage);if(err==ESP_OK)read_mask|=1;}
-            if(err==ESP_OK){stage="shunt_read";err=read_reg(n,1,&shunt);if(err==ESP_OK)read_mask|=2;}
-            bool ok=err==ESP_OK;
-            if(ok) {
-                if(!(voltage&2)){stage="conversion_not_ready";ok=false;}
-                else if(voltage&1){stage="overflow";ok=false;}
-                else if((voltage>>3)>6500){stage="bus_out_of_range";ok=false;}
-                else if(abs((int16_t)shunt)>=32000){stage="shunt_saturated";ok=false;}
-            }
-            uint16_t mv=(voltage>>3)*4;
-            int32_t ma=shunts[n]?((int32_t)(int16_t)shunt*10)/shunts[n]:0;
-            portENTER_CRITICAL(&mux);
-            bool was=cache[n].valid;
-            if(ok) {
-                cache[n].mv=was?(cache[n].mv*7u+mv)/8u:mv;
-                cache[n].ma=ma;cache[n].at=esp_timer_get_time();
-            }
-            cache[n].valid=ok;
-            portEXIT_CRITICAL(&mux);
-            report(n,ok,stage,err,voltage,shunt,read_mask);
-            if(!ok)configured[n]=false;
-        }
+        sample_channels(configured);
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
