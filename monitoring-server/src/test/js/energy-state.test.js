@@ -6,6 +6,11 @@ test('energy displays estimated SOC, signed input and clears missing observation
  vm.runInContext(source.slice(source.indexOf('function renderEnergy('),source.indexOf('function renderLive(')),ctx);
  vm.runInContext('renderEnergy({battery_voltage:13.2,battery_percent:70,battery_estimated:true,left_current:-0.1,left_watt:-1.32})',ctx);
  assert.equal(e.batPercentTotal.textContent,'약 70%');assert.equal(e.batteryVoltage.textContent,'13.20 V');assert.equal(e.solarCurrentLeft.textContent,'-0.10');assert.equal(e.chargeWattsRight.textContent,'--');
- vm.runInContext('renderEnergy({})',ctx);assert.equal(e.batteryVoltage.textContent,'미확인');assert.equal(e.batPercentTotal.textContent,'미수신');assert.equal(e.barTotal.style.width,'0%');
+ vm.runInContext('renderEnergy({battery_voltage:13.18,battery_percent:70,battery_estimated:true})',ctx);
+ assert.equal(e.batPercentTotal.textContent,'약 70%');assert.equal(e.batteryVoltage.textContent,'13.18 V');assert.equal(e.barTotal.style.width,'70%');
+ vm.runInContext('renderEnergy({battery_percent:0,battery_estimated:true})',ctx);assert.equal(e.batPercentTotal.textContent,'약 0%');
+ vm.runInContext('renderEnergy({battery_voltage:null,battery_percent:null,left_current:null,left_watt:null})',ctx);
+ assert.equal(e.batPercentTotal.textContent,'미확인');assert.equal(e.batteryVoltage.textContent,'미확인');
+ vm.runInContext('renderEnergy({})',ctx);assert.equal(e.batteryVoltage.textContent,'미확인');assert.equal(e.batPercentTotal.textContent,'미확인');assert.equal(e.barTotal.style.width,'0%');
  assert.match(source,/s=fresh\?r.reported:\{\}/);assert.ok(source.includes('renderEnergy(s);'));
 });
