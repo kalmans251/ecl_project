@@ -19,7 +19,7 @@ function awaitStatus(ids){for(const id of ids){const r=view?.rails.find(r=>r.id=
 function statusCheck(r){
  if(!r)return {fresh:false,waiting:false};
  const baseline=statusBaselines.get(r.id),advanced=!baseline||(r.seen_at??0)>baseline.seen;
- return {fresh:!stateFetchFailed&&r.online&&!!r.seen_at&&Date.now()-r.seen_at<15000&&advanced,
+ return {fresh:!stateFetchFailed&&r.online&&!!r.seen_at&&advanced,
  waiting:!advanced&&performance.now()-baseline.at<15000};
 }
 let emergencyAudio;

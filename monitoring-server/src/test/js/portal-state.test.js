@@ -34,3 +34,16 @@ test('repeated snapshots retain settings, new snapshots update them, edits remai
  a.c.dirty.clear();a.run('syncReportedControls({projector:false,sleep:false})');
  assert.equal(a.buttons[1].classList.contains('active'),true);assert.equal(a.c.sleepValues.at(-1),false);
 });
+
+test('elapsed wall time does not expire received state; connection and new-response checks remain',()=>{
+ const c=vm.createContext({statusBaselines:new Map(),stateFetchFailed:false,performance:{now:()=>20000}});
+ vm.runInContext(source.slice(source.indexOf('function statusCheck('),source.indexOf('let emergencyAudio;')),c);
+ c.r={id:'rail1',online:true,seen_at:1};
+ assert.equal(vm.runInContext('statusCheck(r).fresh',c),true);
+ c.r.online=false;assert.equal(vm.runInContext('statusCheck(r).fresh',c),false);
+ c.r.online=true;c.stateFetchFailed=true;assert.equal(vm.runInContext('statusCheck(r).fresh',c),false);
+ c.stateFetchFailed=false;c.statusBaselines.set('rail1',{seen:1,at:0});
+ assert.equal(vm.runInContext('statusCheck(r).fresh',c),false);
+ c.r.seen_at=2;assert.equal(vm.runInContext('statusCheck(r).fresh',c),true);
+ c.r.seen_at=null;assert.equal(vm.runInContext('statusCheck(r).fresh',c),false);
+});
