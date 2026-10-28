@@ -772,7 +772,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <div class="center-action-subrow">
                 <div class="modern-btn-group"><button class="modern-action-btn all-select-btn" onclick="selectAllDevices()">전체 선택</button></div>
                 <div class="center-instruction">변경한 옵션을 선택 난간에 요청 · 장치 적용 여부는 별도 확인</div>
-                <div><button class="modern-action-btn apply-btn" id="btnApplyCommand" onclick="applyAllUpdates()">전체 적용</button></div>
+                
             </div>
         </div>
     </div>
@@ -856,4 +856,13 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 <script src="/music-status.js"></script>
 <script src="/web-voice.js"></script>
 <script src="/detection-count.js"></script><script src="/radar-view.js"></script><script src="/emergency-queue.js"></script><script src="/emergency-audio.js"></script><script src="/portal.js"></script>
+<aside id="pendingSettingsBar" aria-label="변경 설정 적용" hidden><span role="status" id="pendingSettingsMessage"></span><button class="modern-action-btn apply-btn" id="btnApplyCommand" onclick="applyAllUpdates()">전체 적용</button></aside>
+<style>
+#pendingSettingsBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;align-items:center;gap:24px;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;padding:12px 18px;background:#132b3a;border:1px solid #35cbd4;border-radius:12px;box-shadow:0 6px 24px #0006;color:#e7eef5;animation:settingsSlide .2s ease-out}
+#pendingSettingsBar[hidden]{display:none}
+#pendingSettingsBar button{flex-shrink:0}
+@keyframes settingsSlide{from{opacity:0;translate:0 -24px}to{opacity:1;translate:0 0}}
+body:has(#pendingSettingsBar:not([hidden])){padding-top:76px}
+@media(prefers-reduced-motion:reduce){#pendingSettingsBar{animation:none}}
+</style>
 </body></html>
