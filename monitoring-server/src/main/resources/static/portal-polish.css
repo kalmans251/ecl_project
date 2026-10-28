@@ -1,0 +1,54 @@
+/* Main monitoring polish: retain existing layout and behavior. */
+:root{--bg-color:#090f19;--card-bg:#111b2a;--card-border:#26394b;--card-border-hover:#385469;--text-main:#e7eef5;--text-sub:#a3b4c5;--neon-blue:#35cbd4;--neon-cyan:#75bbdf;--neon-green:#53d2a0;--neon-red:#f27580;--panel-glow:0 3px 12px #0002}
+body{background-image:none;font-family:Inter,"Segoe UI","Noto Sans KR",sans-serif}
+.main-header h1{font-size:clamp(24px,2vw,36px);letter-spacing:1px;background:none;-webkit-text-fill-color:#7de0e5;color:#7de0e5;text-shadow:none}
+.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting,.center-control-panel{border-radius:12px;box-shadow:var(--panel-glow);backdrop-filter:none}
+.card:hover{box-shadow:var(--panel-glow)}
+.card-title{font-size:16px;letter-spacing:.2px;font-weight:700;line-height:1.45}
+.card-title::before,.card-title::after{background:#355366;opacity:.65}
+button,.menu-dropdown-btn,.clock-display{box-shadow:none!important;text-shadow:none!important}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #8be5ed;outline-offset:3px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button{transition:background-color .15s,border-color .15s,color .15s}
+.category-tab-btn.active,.btn-toggle.on.active,.btn-toggle.off.active,.btn-toggle.mode-radar.active,.btn-toggle.mode-cctv.active,.pwr-state-btn.active-normal,.pwr-state-btn.active-sleep{background:#173f4b;color:#a0f0f0;border-color:#35cbd4;box-shadow:none}
+.btn-toggle.active{outline:1px solid #35cbd4}
+#btnApplyCommand{background:#35cbd4;color:#072027;border:1px solid #35cbd4;font-weight:800}
+#btnApplyCommand:hover{background:#70e0e6}
+.btn-reset-setting{background:#172333;border-color:#405267;box-shadow:none}
+.geo-btn,.time-apply-btn-block{background:#173342;color:#a4dfeb;border-color:#386174;box-shadow:none}
+.mode-radio-label input[type=radio],input[type=radio],input[type=checkbox]{accent-color:#35cbd4}
+.menu-dropdown-btn,.clock-display{border-radius:7px;background:#111b2a;border-color:#304659}
+.led-radio-label{font-weight:600;line-height:1.5}
+.led-radio-label:has(input:checked){border-color:#35cbd4;background:#173342}
+.sub-block-title{color:#bdcddd!important;font-weight:600}
+.bat-single-percent{font-family:Inter,"Segoe UI",sans-serif;font-size:clamp(21px,1.7vw,30px);font-weight:700;letter-spacing:0;color:#dce9f1}
+.sub-block-data small{display:block;margin-top:8px;line-height:1.5;font-size:11px;color:#9cacbf;word-break:keep-all}
+#batteryVoltage{font-variant-numeric:tabular-nums;color:#a8c2d6;font-size:13px}
+.progress-bar-fill{background:#35cbd4;box-shadow:none}
+#systemCommState,#envPm10,#batPercentTotal{color:#b5c5d5!important}
+#deviceStateSummary{color:#b5c5d5;word-break:keep-all;overflow-wrap:anywhere}
+.projector-merged-square-card1 .card-title{display:block;text-align:left;font-size:14px;flex-shrink:0}
+.projector-merged-square-card1 .card-title::before,.projector-merged-square-card1 .card-title::after{display:none}
+#projectorStateText{display:block;font-size:11px;font-weight:500;line-height:1.6;color:#a8bdd0;word-break:keep-all;overflow-wrap:anywhere;margin-top:4px}
+.merged-logo-wrapper{box-shadow:0 0 15px #35cbd433,inset 0 0 10px #35cbd422}
+#sosCardContainer{border-color:#68414d!important}
+#sosCardContainer .card-title{font-size:21px!important;text-shadow:none!important;color:#f2949d!important}
+.sos-big-text{text-shadow:none!important}
+.top-info-group{gap:6px}
+@media(max-width:1200px){
+ html,body{height:auto;min-height:100%;overflow:auto;touch-action:auto}
+ .main-header{display:flex;flex-direction:column;align-items:center;gap:12px;min-width:0}
+ .top-left-menu-group,.top-info-group{position:static;flex-wrap:wrap;justify-content:center}
+ .grid-row-3{height:auto;min-width:0;min-height:0;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none;gap:10px}
+ .grid-row-3>div{grid-column:auto!important;grid-row:auto!important;min-height:220px}
+ .grid-row-3>.sub-cards-row-right,.grid-row-3>#mediaDisplayCard{grid-column:1/-1!important;min-height:360px}
+ .map-viewport{min-height:280px}
+}
+@media(max-width:700px){
+ .grid-row-3{display:flex;flex-direction:column}
+ .sub-cards-row-right{display:flex;flex-direction:column;height:auto}
+ .sub-cards-row-right>.card{min-height:260px}
+ .top-info-group{font-size:12px}
+ .battery-grid{gap:8px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
