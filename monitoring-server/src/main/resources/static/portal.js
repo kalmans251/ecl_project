@@ -344,7 +344,53 @@ function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Err
  const infoLoad=async()=>{info.replaceChildren();const users=await api('/api/portal/admin/users'),gateways=await api('/api/portal/admin/gateways');const heading=document.createElement('h3');heading.textContent='등록 정보';info.append(heading);table(info,['사용자','ID'],users.map(u=>[u.NAME+' ('+u.USERNAME+')',u.ID]));table(info,['현장','ID'],me.sites.map(s=>[s.NAME,s.ID]));table(info,['Pi','현장 ID'],gateways.map(g=>[g.ID,g.SITE_ID]));table(info,['현재 현장 난간','ID'],(view?.rails||[]).map(r=>[r.name,r.id]));};await infoLoad();});}
 function loadContacts(){for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}
 function fillSites(){$('siteSelect').replaceChildren();for(const s of me.sites){const o=document.createElement('option');o.value=s.ID;o.textContent=s.NAME+' · '+s.ROLE;$('siteSelect').append(o);}if(me.sites.some(s=>s.ID===site))$('siteSelect').value=site;else site=$('siteSelect').value;}
-async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!pttChanging)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
+async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;$('railLocationButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!pttChanging)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
 init();
 
 function detectionCountAction(reset){guarded(async()=>{const r=requireSelection(true)[0];if(reset&&!confirm(r.name+'의 누적 감지 횟수만 0으로 초기화할까요? 연령대 통계는 유지됩니다.'))return;await send(reset?'detection.reset':'detection.count',null,[r.id]);});}
+
+function openRailLocation(){
+ guarded(async()=>{
+  if(!me?.user.ADMIN)throw Error('관리자 전용입니다.');
+  const currentSite=site, list=[...(view?.rails||[])];
+  if(!list.length)throw Error('현재 현장에 등록된 난간이 없습니다.');
+  const body=dialog('난간 좌표 설정 · 변경'), form=document.createElement('form');
+  body.append(form);
+  const field=(title,node)=>{const label=document.createElement('label');label.textContent=title;label.append(node);form.append(label);return node;};
+  const rail=field('난간 선택',document.createElement('select'));
+  list.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;rail.append(o);});
+  const chosen=list.find(r=>selected.has(r.id));if(chosen)rail.value=chosen.id;
+  const address=field('주소',document.createElement('input'));address.maxLength=500;
+  const search=document.createElement('button');search.type='button';search.textContent='주소 검색';form.append(search);
+  const results=document.createElement('div');form.append(results);
+  const hint=document.createElement('p');hint.textContent='주소 검색은 OpenStreetMap에 입력 주소를 전송합니다. 검색 결과 좌표는 주소 중심점이므로 실제 난간 위치를 확인하세요. GPS 위도·경도를 직접 입력해도 됩니다.';form.append(hint);
+  const lat=field('위도 (GPS)',document.createElement('input')),lng=field('경도 (GPS)',document.createElement('input'));
+  for(const input of [lat,lng]){input.type='number';input.step='any';input.required=true;}lat.min=-90;lat.max=90;lng.min=-180;lng.max=180;
+  const status=document.createElement('p');status.setAttribute('role','status');form.append(status);
+  const save=document.createElement('button');save.type='submit';save.textContent='선택 난간 위치 저장';form.append(save);
+  let generation=0;
+  const fill=()=>{generation++;const r=list.find(r=>r.id===rail.value);address.value=r?.address||'';lat.value=r?.latitude??'';lng.value=r?.longitude??'';results.replaceChildren();status.textContent='';};
+  rail.onchange=fill;fill();
+  search.onclick=async()=>{
+   const query=address.value.trim();if(!query){status.textContent='검색할 주소를 입력하세요.';return;}
+   const version=++generation;search.disabled=true;status.textContent='주소 검색 중…';results.replaceChildren();
+   try{
+    const response=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=ko&q='+encodeURIComponent(query),{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000)});
+    if(!response.ok)throw Error('주소 검색 서비스가 응답하지 않습니다. GPS 좌표를 직접 입력할 수 있습니다.');
+    const items=await response.json();if(version!==generation)return;
+    status.textContent=items.length?'주소를 선택하면 GPS 좌표가 채워집니다.':'검색 결과가 없습니다. GPS 좌표를 직접 입력하세요.';
+    items.forEach(item=>{const b=document.createElement('button');b.type='button';b.textContent=item.display_name;b.style.cssText='display:block;width:100%;text-align:left;margin:6px 0';
+     b.onclick=()=>{address.value=item.display_name;lat.value=item.lat;lng.value=item.lon;results.replaceChildren();status.textContent='좌표 입력 완료 · 위치 저장을 눌러주세요.';};results.append(b);});
+   }catch(e){if(version===generation)status.textContent=e.message;}finally{search.disabled=false;}
+  };
+  form.onsubmit=async e=>{
+   e.preventDefault();if(save.disabled)return;
+   const latitude=Number(lat.value),longitude=Number(lng.value),id=rail.value;
+   if(!lat.value||!lng.value||!Number.isFinite(latitude)||!Number.isFinite(longitude)||latitude < -90||latitude >90||longitude < -180||longitude >180){status.textContent='올바른 위도·경도를 입력하세요.';return;}
+   if(site!==currentSite){status.textContent='현장이 변경되었습니다. 창을 다시 열어주세요.';return;}
+   save.disabled=true;rail.disabled=true;search.disabled=true;generation++;
+   try{await api('/api/portal/rails/'+encodeURIComponent(id)+'/location','PUT',{latitude,longitude,address:address.value.trim()});status.textContent='선택한 난간 위치를 저장했습니다.';await poll();renderMap();}
+   catch(error){status.textContent=error.message;}finally{save.disabled=false;rail.disabled=false;search.disabled=false;}
+  };
+ });
+}

@@ -766,7 +766,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
         <div class="device-center-wrapper">
             <div class="device-title-row">
                 <div><span>&nbsp;&nbsp;고유번호 선택&nbsp;&nbsp;:</span><span class="device-status-tag" id="selectedDeviceTag">SELECT #1</span></div>
-                <div class="rail-count-setting-group"><span class="rail-count-label">등록 수량 :</span><input type="number" class="rail-count-input" id="inputTotalDevices" readonly value="0"><button type="button" class="rail-count-btn" onclick="updateTotalDevicesCount()">등록</button></div>
+                <div class="rail-count-setting-group"><span class="rail-count-label">등록 수량 :</span><input type="number" class="rail-count-input" id="inputTotalDevices" readonly value="0"><button type="button" class="rail-count-btn" onclick="updateTotalDevicesCount()">등록</button><button type="button" class="rail-count-btn" id="railLocationButton" hidden onclick="openRailLocation()">좌표 설정·변경</button></div>
             </div>
             <div class="id-badge-container" id="idBadgeGrid"></div>
             <div class="center-action-subrow">
