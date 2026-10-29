@@ -62,5 +62,5 @@ button{transition:background-color .15s,border-color .15s,color .15s}
 #pendingSettingsMessage{font-size:17px;line-height:1.5}
 #pendingSettingsResult{font-size:14px;line-height:1.6;margin-top:6px;color:#c3e5ef;max-width:800px;overflow-wrap:anywhere}
 #pendingSettingsBar button{padding:13px 24px;font-size:16px}
-body:has(#pendingSettingsBar:not([hidden])){padding-top:120px}
+
 @media(max-width:700px){#pendingSettingsBar{gap:12px;padding:14px;min-width:0}#pendingSettingsMessage{font-size:14px}}
