@@ -834,20 +834,15 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 	    </div>
 
     </div>
-    <div class="card-position-setting" style="grid-column: 1 / span 2; grid-row: 3 / span 2; ">
-	    <div class="card-control-innerbox-2">
-	        <div class="card-title" style="font-size:16px;">시스템 설치정보 설정</div>
-	        <div style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 2fr 1fr; gap:5px;">
-	            <div>
-	                <div class="geo-setting-form">
-	                    <div class="geo-row"><span style="white-space:nowrap;">위도 :</span><input type="text" class="custom-geo-input" id="inputLat" value=""></div>
-	                    <div class="geo-row"><span style="white-space:nowrap;">경도 :</span><input type="text" class="custom-geo-input" id="inputLng" value=""></div>
-	                </div>
-	            </div>
-	            <div><button class="geo-btn" onclick="updateMapLocationFromInput()">좌표 변경 및 지도 저장</button></div>
-	            <div class="geo-row" style="grid-column: span 2;"><span style="white-space:nowrap;">주소 :</span><input type="text" class="custom-geo-input" id="inputAddress" value=""></div>
-	        </div>
-	    </div>
+    <div class="card-position-setting" style="grid-column:1 / span 2;grid-row:3 / span 2;">
+      <div class="card-control-innerbox-2">
+        <div class="card-title" style="font-size:16px;">시스템 설치 현황</div>
+        <dl class="installation-status" style="display:grid;grid-template-columns:50px minmax(0,1fr);gap:10px;margin:10px 0;line-height:1.5;">
+          <dt>위도</dt><dd id="installedLat" style="margin:0;">미등록</dd>
+          <dt>경도</dt><dd id="installedLng" style="margin:0;">미등록</dd>
+          <dt>주소</dt><dd id="installedAddress" style="margin:0;overflow-wrap:anywhere;">미등록</dd>
+        </dl>
+      </div>
     </div>
 </div>
 

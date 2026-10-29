@@ -107,7 +107,7 @@ function selectAllDevices(){if(emergencyAccepting)return toast('비상통화 수
 function renderSelection(){
  const grid=$('idBadgeGrid');grid.replaceChildren();for(const r of view.rails){const b=document.createElement('button');b.type='button';b.className=(selected.has(r.id)?'selected ':'')+(r.online?'':'offline');b.textContent=`${r.name} · ${r.gateway_id}/${r.number}`;b.title=r.online?'게이트웨이 연결됨':'게이트웨이 오프라인';b.onclick=()=>choose(r.id);grid.append(b);}
  text('selectedDeviceTag',rails().length?rails().map(r=>r.name).join(', '):'난간 선택');$('inputTotalDevices').value=view.rails.length;
- if(rails().length===1){const r=rails()[0];$('inputLat').value=r.latitude??'';$('inputLng').value=r.longitude??'';$('inputAddress').value=r.address??'';}
+ {const r=rails().length===1?rails()[0]:null;const empty=rails().length>1?'여러 난간 선택됨':'난간을 선택하세요';text('installedLat',r?(r.latitude??'미등록'):empty);text('installedLng',r?(r.longitude??'미등록'):empty);text('installedAddress',r?(r.address||'미등록'):empty);}
  renderLive();renderMap();
 }
 // Keep unsent edits separate from confirmed device observations.
@@ -208,12 +208,11 @@ async function applyAllUpdates(){if(settingsApplying)return;settingsApplying=tru
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
 function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
-async function updateMapLocationFromInput(){await guarded(async()=>{const latitude=Number($('inputLat').value),longitude=Number($('inputLng').value);if(!$('inputLat').value||!$('inputLng').value||!Number.isFinite(latitude)||!Number.isFinite(longitude))throw Error('위도와 경도를 입력하세요.');for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/location`,'PUT',{latitude,longitude,address:$('inputAddress').value});toast('위치 저장됨');await poll();renderMap();});}
 function renderMap(){
  if(!window.L){$('mapViewport').replaceChildren();const p=document.createElement('p');p.className='map-empty';p.textContent='지도 라이브러리를 불러오지 못했습니다. 설치 좌표는 아래에서 관리할 수 있습니다.';$('mapViewport').append(p);return;}
  if(!map){map=L.map('mapViewport').setView([36.5,127.8],6);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);}
  for(const marker of markers.values())map.removeLayer(marker);markers.clear();let coords=[];
- for(const r of view.rails){if(r.latitude==null||r.longitude==null)continue;const pos=[r.latitude,r.longitude],m=L.marker(pos,{draggable:view.role!=='VIEWER'}).addTo(map);const label=document.createElement('span');label.textContent=r.name;m.bindTooltip(label);m.on('click',()=>choose(r.id));m.on('dragend',()=>{choose(r.id);const p=m.getLatLng();$('inputLat').value=p.lat.toFixed(6);$('inputLng').value=p.lng.toFixed(6);toast('좌표 이동됨 · 좌표 변경 및 지도 저장을 누르세요.');});markers.set(r.id,m);coords.push(pos);}
+ for(const r of view.rails){if(r.latitude==null||r.longitude==null)continue;const pos=[r.latitude,r.longitude],m=L.marker(pos,{draggable:false}).addTo(map);const label=document.createElement('span');label.textContent=r.name;m.bindTooltip(label);m.on('click',()=>choose(r.id));markers.set(r.id,m);coords.push(pos);}
  if(coords.length && !map._portalFitted){map.fitBounds(coords,{padding:[30,30],maxZoom:16});map._portalFitted=true;}map.invalidateSize();
 }
 function musicTime(ms){if(ms===null||ms===undefined)return '--:--';const sec=Math.floor(ms/1000);return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
