@@ -387,6 +387,11 @@ bool audio_output_write(
     }
 
 
+    /* Cubic amplitude taper gives useful resolution at quiet listening levels.
+     * Keep voice gain unchanged; music/emergency output uses this curve. */
+    int32_t volume = s_volume_percent;
+    int32_t gain = s_voice_profile ? volume * 10000 : volume * volume * volume;
+
     for (
         size_t i = 0;
         i < sample_count;
@@ -399,11 +404,11 @@ bool audio_output_write(
 
         value =
             (
-                value *
-                s_volume_percent
+                (int64_t)value *
+                gain
             )
             /
-            100;
+            1000000;
 
 
         s_volume_buffer[i] =

@@ -95,11 +95,15 @@ int main(void) {
  /* Resume writes real PCM at the existing rate. */
  assert(audio_output_write(music,4));
  assert(tx_cycle()==12000); assert(output_rate==44100);
+ audio_output_set_volume(1);
+ assert(audio_output_write(music,4)); assert(tx_cycle()==0);
+ audio_output_set_volume(50);
+ assert(audio_output_write(music,4)); assert(tx_cycle()==1500);
  audio_output_set_volume(0);
  assert(audio_output_write(music,4)); assert(tx_cycle()==0);
  assert(audio_output_set_sample_rate(16000));
  audio_output_set_volume(10);
- assert(audio_output_write(music,4)); assert(tx_cycle()==1200);
+ assert(audio_output_write(music,4)); assert(tx_cycle()==12);
  assert(tx_cycle()==0); assert(output_rate==16000);
  audio_output_deinit();
  assert(audio_output_init(48000));
