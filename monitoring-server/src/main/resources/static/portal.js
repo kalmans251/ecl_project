@@ -6,7 +6,8 @@ let musicReceivedAt=0, musicPage=null, musicBusy=false, musicSelectionKey=null, 
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
 const newId=()=>crypto.randomUUID();
-function toast(message){text('portalToast',message);$('portalToast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('portalToast').hidden=true,8000);}
+let settingsApplying=false;
+function toast(message){if(settingsApplying){text('pendingSettingsResult',message);return;}text('portalToast',message);$('portalToast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('portalToast').hidden=true,8000);}
 async function api(path,method='GET',data){
  const headers={};if(method!=='GET'){headers[csrf.header]=csrf.token;if(data!==undefined)headers['Content-Type']='application/json';}
  const response=await fetch(path,{method,headers,body:data===undefined?undefined:JSON.stringify(data)});
@@ -137,7 +138,7 @@ function renderProjector(s,fresh=true){
  text('projectorStateText',label);logo.title=label;
 }
 
-function syncPendingSettings(){const bar=$('pendingSettingsBar');if(!bar)return;bar.hidden=!dirty.size;text('pendingSettingsMessage',`변경한 설정 ${dirty.size}개 · 전체 적용을 눌러 반영하세요.`);}
+function syncPendingSettings(){const bar=$('pendingSettingsBar');if(!bar)return;bar.hidden=!dirty.size&&!settingsApplying;text('pendingSettingsMessage',`변경한 설정 ${dirty.size}개 · 전체 적용을 눌러 반영하세요.`);}
 function mark(operation,value){dirty.set(operation,value);syncPendingSettings();toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
 function switchCategoryTabUI(name,code,edit=true){currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>b.classList.toggle('active',i===code));['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');if(edit){if(code===1)mark('weather',['clear','rain','snow'][Number(document.querySelector('input[name="ledGroup1"]:checked')?.value||0)]);else mark('led',name);}}
@@ -203,7 +204,7 @@ async function waitAppliedSnapshot(targets,targetSite){
  }
  throw Error('명령 처리 후 새 상태 응답을 확인하지 못했습니다. 선택값을 유지합니다. 처리 내역을 확인하세요.');
 }
-async function applyAllUpdates(){await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}
+async function applyAllUpdates(){if(settingsApplying)return;settingsApplying=true;syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;const bar=$('pendingSettingsBar');if(bar)bar.hidden=false;}}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
 function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
