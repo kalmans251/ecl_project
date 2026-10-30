@@ -208,12 +208,32 @@ async function applyAllUpdates(){if(settingsApplying)return;settingsApplying=tru
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
 function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
+let railRouteLayers=[];
+function railMapIcon(r){
+ const node=document.createElement('div');node.className='rail-map-node'+(selected.has(r.id)?' is-selected':'')+(r.online?' is-online':' is-offline');
+ const number=document.createElement('strong');number.textContent=String(r.number);
+ const dot=document.createElement('i');dot.setAttribute('aria-hidden','true');node.append(dot,number);
+ node.title=r.name+' · '+(r.online?'게이트웨이 연결':'게이트웨이 오프라인');
+ return L.divIcon({className:'rail-map-icon',html:node,iconSize:[38,38],iconAnchor:[19,19]});
+}
 function renderMap(){
- if(!window.L){$('mapViewport').replaceChildren();const p=document.createElement('p');p.className='map-empty';p.textContent='지도 라이브러리를 불러오지 못했습니다. 설치 좌표는 아래에서 관리할 수 있습니다.';$('mapViewport').append(p);return;}
+ if(!window.L){$('mapViewport').replaceChildren();const p=document.createElement('p');p.className='map-empty';p.textContent='지도를 불러오지 못했습니다. 관리자 좌표 설정에서 위치를 확인하세요.';$('mapViewport').append(p);return;}
  if(!map){map=L.map('mapViewport').setView([36.5,127.8],6);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(map);}
- for(const marker of markers.values())map.removeLayer(marker);markers.clear();let coords=[];
- for(const r of view.rails){if(r.latitude==null||r.longitude==null)continue;const pos=[r.latitude,r.longitude],m=L.marker(pos,{draggable:false}).addTo(map);const label=document.createElement('span');label.textContent=r.name;m.bindTooltip(label);m.on('click',()=>choose(r.id));markers.set(r.id,m);coords.push(pos);}
- if(coords.length && !map._portalFitted){map.fitBounds(coords,{padding:[30,30],maxZoom:16});map._portalFitted=true;}map.invalidateSize();
+ for(const marker of markers.values())map.removeLayer(marker);markers.clear();
+ for(const line of railRouteLayers)map.removeLayer(line);railRouteLayers=[];
+ const coords=[],groups=new Map();
+ for(const r of view.rails){
+  if(r.latitude==null||r.longitude==null)continue;
+  const pos=[r.latitude,r.longitude],m=L.marker(pos,{icon:railMapIcon(r),draggable:false,zIndexOffset:selected.has(r.id)?1000:0}).addTo(map);
+  const label=document.createElement('span');label.textContent=r.name+' · '+r.gateway_id+'/'+r.number;m.bindTooltip(label);m.on('click',()=>choose(r.id));markers.set(r.id,m);coords.push(pos);
+  if(!groups.has(r.gateway_id))groups.set(r.gateway_id,[]);groups.get(r.gateway_id).push(r);
+ }
+ for(const group of groups.values()){
+  const points=group.sort((a,b)=>a.number-b.number).map(r=>[r.latitude,r.longitude]);
+  if(points.length>1)railRouteLayers.push(L.polyline(points,{color:'#19bfd0',weight:3,opacity:.65,dashArray:'7 7',interactive:false}).addTo(map));
+ }
+ let legend=$('railMapLegend');if(!legend){legend=document.createElement('div');legend.id='railMapLegend';legend.className='rail-map-legend';legend.textContent='숫자: 난간 번호 · 청록 테두리: 선택 · 점선: 같은 Pi의 번호 순서';$('mapViewport').append(legend);}
+ if(coords.length&&!map._portalFitted){map.fitBounds(coords,{padding:[40,40],maxZoom:18});map._portalFitted=true;}map.invalidateSize();
 }
 function musicTime(ms){if(ms===null||ms===undefined)return '--:--';const sec=Math.floor(ms/1000);return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
 function showSeekTarget(){text('musicSeekTarget',musicTime(Number($('musicSeek').value)*1000));}
@@ -337,7 +357,7 @@ const adminForms={
  camera:{name:'카메라 등록',path:'cameras',method:'POST',fields:[['id','카메라 ID'],['rail_id','등록 난간 ID'],['stream_path','영상 경로 (/cctv/이름/)']]},
  membership:{name:'현장 권한 부여',path:'memberships',method:'PUT',fields:[['user_id','사용자 ID'],['site_id','현장 ID'],['role','역할','role']]}
 };
-function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Error('관리자 전용입니다.');const body=dialog('사용자 · 현장 · 장치 관리'),select=document.createElement('select');for(const [key,v]of Object.entries(adminForms)){const o=document.createElement('option');o.value=key;o.textContent=v.name;select.append(o);}select.value=initial;body.append(select);const form=document.createElement('form');body.append(form);const info=document.createElement('div');body.append(info);
+function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Error('관리자 전용입니다.');const body=dialog('사용자 · 현장 · 장치 관리'),select=document.createElement('select');for(const [key,v]of Object.entries(adminForms)){const o=document.createElement('option');o.value=key;o.textContent=v.name;select.append(o);}select.value=initial;body.append(select);const form=document.createElement('form');body.append(form);form.classList.add('rail-location-editor');const info=document.createElement('div');body.append(info);
  const build=()=>{form.replaceChildren();const conf=adminForms[select.value];for(const [key,label,type]of conf.fields){const l=document.createElement('label');l.textContent=label;let input;if(type==='role'){input=document.createElement('select');for(const role of ['VIEWER','OPERATOR','NONE']){const o=document.createElement('option');o.value=role;o.textContent=role==='VIEWER'?'조회자':role==='OPERATOR'?'운영자':'권한 해제';input.append(o);}}else{input=document.createElement('input');input.type=type||'text';input.maxLength=type==='password'?128:200;if(type==='number'){input.min=1;input.max=255;}}input.name=key;input.required=key!=='stream_path';input.autocomplete=type==='password'?'new-password':'off';l.append(input);form.append(l);}const button=document.createElement('button');button.textContent='저장';form.append(button);};select.onchange=build;build();
  form.onsubmit=e=>{e.preventDefault();guarded(async()=>{const conf=adminForms[select.value],value=Object.fromEntries(new FormData(form));if(value.number)value.number=Number(value.number);const result=await api('/api/portal/admin/'+conf.path,conf.method,value);toast('저장 완료'+(result?.id?' · 사용자 ID '+result.id:''));form.reset();me=await api('/api/portal/me');fillSites();await poll();await infoLoad();});};
  const infoLoad=async()=>{info.replaceChildren();const users=await api('/api/portal/admin/users'),gateways=await api('/api/portal/admin/gateways');const heading=document.createElement('h3');heading.textContent='등록 정보';info.append(heading);table(info,['사용자','ID'],users.map(u=>[u.NAME+' ('+u.USERNAME+')',u.ID]));table(info,['현장','ID'],me.sites.map(s=>[s.NAME,s.ID]));table(info,['Pi','현장 ID'],gateways.map(g=>[g.ID,g.SITE_ID]));table(info,['현재 현장 난간','ID'],(view?.rails||[]).map(r=>[r.name,r.id]));};await infoLoad();});}
@@ -359,7 +379,7 @@ function openRailLocation(){
   const rail=field('난간 선택',document.createElement('select'));
   list.forEach(r=>{const o=document.createElement('option');o.value=r.id;o.textContent=r.name;rail.append(o);});
   const chosen=list.find(r=>selected.has(r.id));if(chosen)rail.value=chosen.id;
-  const address=field('주소',document.createElement('input'));address.maxLength=500;
+  const address=field('주소',document.createElement('input'));address.maxLength=200;
   const search=document.createElement('button');search.type='button';search.textContent='주소 검색';form.append(search);
   const results=document.createElement('div');form.append(results);
   const hint=document.createElement('p');hint.textContent='주소 검색은 OpenStreetMap에 입력 주소를 전송합니다. 검색 결과 좌표는 주소 중심점이므로 실제 난간 위치를 확인하세요. GPS 위도·경도를 직접 입력해도 됩니다.';form.append(hint);
@@ -367,8 +387,24 @@ function openRailLocation(){
   for(const input of [lat,lng]){input.type='number';input.step='any';input.required=true;}lat.min=-90;lat.max=90;lng.min=-180;lng.max=180;
   const status=document.createElement('p');status.setAttribute('role','status');form.append(status);
   const save=document.createElement('button');save.type='submit';save.textContent='선택 난간 위치 저장';form.append(save);
+  const preview=document.createElement('div');preview.className='location-map-preview';form.insertBefore(preview,status);
+  const mapHelp=document.createElement('p');mapHelp.className='location-map-help';mapHelp.textContent='지도 클릭 또는 핀 드래그로 위치 지정 → 위치 저장';form.insertBefore(mapHelp,status);
+  let previewMap=null,previewMarker=null;
+  if(window.L){previewMap=L.map(preview).setView([36.5,127.8],6);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(previewMap);
+   previewMap.on('click',e=>{if(save.disabled)return;lat.value=e.latlng.lat.toFixed(6);lng.value=e.latlng.lng.toFixed(6);syncLocationPreview(false);status.textContent='지도 위치 지정됨 · 저장을 눌러주세요.';});
+   $('portalDialog').addEventListener('close',()=>previewMap.remove(),{once:true});
+  }else preview.textContent='지도 로드 실패 · GPS 좌표를 직접 입력하세요.';
+  function syncLocationPreview(center=true){
+   if(!previewMap)return;
+   if(lat.value===''||lng.value===''){if(previewMarker){previewMarker.remove();previewMarker=null;}return;}
+   const a=Number(lat.value),b=Number(lng.value);if(!Number.isFinite(a)||!Number.isFinite(b)||Math.abs(a)>90||Math.abs(b)>180)return;
+   if(!previewMarker){previewMarker=L.marker([a,b],{draggable:true}).addTo(previewMap);previewMarker.on('dragend',()=>{const p=previewMarker.getLatLng();lat.value=p.lat.toFixed(6);lng.value=p.lng.toFixed(6);status.textContent='핀 위치 변경됨 · 저장을 눌러주세요.';});}
+   else previewMarker.setLatLng([a,b]);
+   previewMap.invalidateSize();if(center)previewMap.setView([a,b],18);
+  }
+  lat.addEventListener('change',()=>syncLocationPreview());lng.addEventListener('change',()=>syncLocationPreview());
   let generation=0;
-  const fill=()=>{generation++;const r=list.find(r=>r.id===rail.value);address.value=r?.address||'';lat.value=r?.latitude??'';lng.value=r?.longitude??'';results.replaceChildren();status.textContent='';};
+  const fill=()=>{generation++;const r=list.find(r=>r.id===rail.value);address.value=r?.address||'';lat.value=r?.latitude??'';lng.value=r?.longitude??'';results.replaceChildren();status.textContent='';syncLocationPreview();};
   rail.onchange=fill;fill();
   search.onclick=async()=>{
    const query=address.value.trim();if(!query){status.textContent='검색할 주소를 입력하세요.';return;}
@@ -379,7 +415,7 @@ function openRailLocation(){
     const items=await response.json();if(version!==generation)return;
     status.textContent=items.length?'주소를 선택하면 GPS 좌표가 채워집니다.':'검색 결과가 없습니다. GPS 좌표를 직접 입력하세요.';
     items.forEach(item=>{const b=document.createElement('button');b.type='button';b.textContent=item.display_name;b.style.cssText='display:block;width:100%;text-align:left;margin:6px 0';
-     b.onclick=()=>{address.value=item.display_name;lat.value=item.lat;lng.value=item.lon;results.replaceChildren();status.textContent='좌표 입력 완료 · 위치 저장을 눌러주세요.';};results.append(b);});
+     b.onclick=()=>{address.value=item.display_name;lat.value=item.lat;lng.value=item.lon;syncLocationPreview();results.replaceChildren();status.textContent='좌표 입력 완료 · 위치 저장을 눌러주세요.';};results.append(b);});
    }catch(e){if(version===generation)status.textContent=e.message;}finally{search.disabled=false;}
   };
   form.onsubmit=async e=>{
@@ -387,9 +423,9 @@ function openRailLocation(){
    const latitude=Number(lat.value),longitude=Number(lng.value),id=rail.value;
    if(!lat.value||!lng.value||!Number.isFinite(latitude)||!Number.isFinite(longitude)||latitude < -90||latitude >90||longitude < -180||longitude >180){status.textContent='올바른 위도·경도를 입력하세요.';return;}
    if(site!==currentSite){status.textContent='현장이 변경되었습니다. 창을 다시 열어주세요.';return;}
-   save.disabled=true;rail.disabled=true;search.disabled=true;generation++;
-   try{await api('/api/portal/rails/'+encodeURIComponent(id)+'/location','PUT',{latitude,longitude,address:address.value.trim()});status.textContent='선택한 난간 위치를 저장했습니다.';await poll();renderMap();}
-   catch(error){status.textContent=error.message;}finally{save.disabled=false;rail.disabled=false;search.disabled=false;}
+   save.disabled=true;rail.disabled=true;search.disabled=true;lat.disabled=true;lng.disabled=true;if(previewMarker)previewMarker.dragging.disable();generation++;
+   try{await api('/api/portal/rails/'+encodeURIComponent(id)+'/location','PUT',{latitude,longitude,address:address.value.trim()});Object.assign(list.find(r=>r.id===id),{latitude,longitude,address:address.value.trim()});status.textContent='선택한 난간 위치를 저장했습니다.';await poll();renderMap();}
+   catch(error){status.textContent=error.message;}finally{save.disabled=false;rail.disabled=false;search.disabled=false;lat.disabled=false;lng.disabled=false;if(previewMarker)previewMarker.dragging.enable();}
   };
  });
 }
