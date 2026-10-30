@@ -209,8 +209,8 @@ function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','m
 function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
 let railRouteLayers=[];
-function railMapIcon(r){
- const node=document.createElement('div');node.className='rail-map-node'+(selected.has(r.id)?' is-selected':'')+(r.online?' is-online':' is-offline');
+function railMapIcon(r,highlight=selected.has(r.id)){
+ const node=document.createElement('div');node.className='rail-map-node'+(highlight?' is-selected':'')+(r.online?' is-online':' is-offline');
  const number=document.createElement('strong');number.textContent=String(r.number);
  const dot=document.createElement('i');dot.setAttribute('aria-hidden','true');node.append(dot,number);
  node.title=r.name+' · '+(r.online?'게이트웨이 연결':'게이트웨이 오프라인');
@@ -399,8 +399,10 @@ function openRailLocation(){
    if(!previewMap)return;
    if(lat.value===''||lng.value===''){if(previewMarker){previewMarker.remove();previewMarker=null;}return;}
    const a=Number(lat.value),b=Number(lng.value);if(!Number.isFinite(a)||!Number.isFinite(b)||Math.abs(a)>90||Math.abs(b)>180)return;
-   if(!previewMarker){previewMarker=L.marker([a,b],{draggable:true}).addTo(previewMap);previewMarker.on('dragend',()=>{const p=previewMarker.getLatLng();lat.value=p.lat.toFixed(6);lng.value=p.lng.toFixed(6);status.textContent='핀 위치 변경됨 · 저장을 눌러주세요.';});}
-   else previewMarker.setLatLng([a,b]);
+   const currentRail=list.find(r=>r.id===rail.value);
+   const icon=railMapIcon(currentRail,true);
+   if(!previewMarker){previewMarker=L.marker([a,b],{icon,draggable:true}).addTo(previewMap);previewMarker.on('dragend',()=>{const p=previewMarker.getLatLng();lat.value=p.lat.toFixed(6);lng.value=p.lng.toFixed(6);status.textContent='핀 위치 변경됨 · 저장을 눌러주세요.';});}
+   else {previewMarker.setIcon(icon);previewMarker.setLatLng([a,b]);}
    previewMap.invalidateSize();if(center)previewMap.setView([a,b],18);
   }
   lat.addEventListener('change',()=>syncLocationPreview());lng.addEventListener('change',()=>syncLocationPreview());
