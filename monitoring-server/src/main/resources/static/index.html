@@ -860,4 +860,20 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 
 @media(prefers-reduced-motion:reduce){#pendingSettingsBar{animation:none}}
 </style>
+<dialog id="settingsBusyDialog" class="settings-busy-dialog" aria-labelledby="settingsBusyTitle" aria-describedby="settingsBusyMessage" oncancel="event.preventDefault()">
+ <div class="settings-busy-spinner" aria-hidden="true"></div>
+ <h2 id="settingsBusyTitle">설정 적용 중</h2>
+ <p id="settingsBusyMessage" role="status" aria-live="polite">장치 응답을 확인하고 있습니다.</p>
+ <small>완료될 때까지 다른 조작은 잠시 기다려주세요.</small>
+</dialog>
+<style>
+.settings-busy-dialog{width:min(460px,calc(100vw - 48px));box-sizing:border-box;padding:30px;border:1px solid #35cbd4;border-radius:16px;background:#102332;color:#e7eef5;text-align:center;box-shadow:0 12px 50px #0008}
+.settings-busy-dialog::backdrop{background:#02091199;backdrop-filter:blur(2px)}
+.settings-busy-dialog h2{font-size:21px;margin:16px 0 10px}
+.settings-busy-dialog p{line-height:1.6;overflow-wrap:anywhere}
+.settings-busy-dialog small{color:#a4bdcb}
+.settings-busy-spinner{width:36px;height:36px;margin:auto;border:3px solid #365265;border-top-color:#35dbe6;border-radius:50%;animation:settingsBusySpin .9s linear infinite}
+@keyframes settingsBusySpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.settings-busy-spinner{animation:none;border-color:#35dbe6}}
+</style>
 </body></html>
