@@ -357,7 +357,7 @@ const adminForms={
  camera:{name:'카메라 등록',path:'cameras',method:'POST',fields:[['id','카메라 ID'],['rail_id','등록 난간 ID'],['stream_path','영상 경로 (/cctv/이름/)']]},
  membership:{name:'현장 권한 부여',path:'memberships',method:'PUT',fields:[['user_id','사용자 ID'],['site_id','현장 ID'],['role','역할','role']]}
 };
-function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Error('관리자 전용입니다.');const body=dialog('사용자 · 현장 · 장치 관리'),select=document.createElement('select');for(const [key,v]of Object.entries(adminForms)){const o=document.createElement('option');o.value=key;o.textContent=v.name;select.append(o);}select.value=initial;body.append(select);const form=document.createElement('form');body.append(form);form.classList.add('rail-location-editor');const info=document.createElement('div');body.append(info);
+function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Error('관리자 전용입니다.');const body=dialog('사용자 · 현장 · 장치 관리'),select=document.createElement('select');for(const [key,v]of Object.entries(adminForms)){const o=document.createElement('option');o.value=key;o.textContent=v.name;select.append(o);}select.value=initial;body.append(select);const form=document.createElement('form');body.append(form);const info=document.createElement('div');body.append(info);
  const build=()=>{form.replaceChildren();const conf=adminForms[select.value];for(const [key,label,type]of conf.fields){const l=document.createElement('label');l.textContent=label;let input;if(type==='role'){input=document.createElement('select');for(const role of ['VIEWER','OPERATOR','NONE']){const o=document.createElement('option');o.value=role;o.textContent=role==='VIEWER'?'조회자':role==='OPERATOR'?'운영자':'권한 해제';input.append(o);}}else{input=document.createElement('input');input.type=type||'text';input.maxLength=type==='password'?128:200;if(type==='number'){input.min=1;input.max=255;}}input.name=key;input.required=key!=='stream_path';input.autocomplete=type==='password'?'new-password':'off';l.append(input);form.append(l);}const button=document.createElement('button');button.textContent='저장';form.append(button);};select.onchange=build;build();
  form.onsubmit=e=>{e.preventDefault();guarded(async()=>{const conf=adminForms[select.value],value=Object.fromEntries(new FormData(form));if(value.number)value.number=Number(value.number);const result=await api('/api/portal/admin/'+conf.path,conf.method,value);toast('저장 완료'+(result?.id?' · 사용자 ID '+result.id:''));form.reset();me=await api('/api/portal/me');fillSites();await poll();await infoLoad();});};
  const infoLoad=async()=>{info.replaceChildren();const users=await api('/api/portal/admin/users'),gateways=await api('/api/portal/admin/gateways');const heading=document.createElement('h3');heading.textContent='등록 정보';info.append(heading);table(info,['사용자','ID'],users.map(u=>[u.NAME+' ('+u.USERNAME+')',u.ID]));table(info,['현장','ID'],me.sites.map(s=>[s.NAME,s.ID]));table(info,['Pi','현장 ID'],gateways.map(g=>[g.ID,g.SITE_ID]));table(info,['현재 현장 난간','ID'],(view?.rails||[]).map(r=>[r.name,r.id]));};await infoLoad();});}
@@ -374,6 +374,7 @@ function openRailLocation(){
   const currentSite=site, list=[...(view?.rails||[])];
   if(!list.length)throw Error('현재 현장에 등록된 난간이 없습니다.');
   const body=dialog('난간 좌표 설정 · 변경'), form=document.createElement('form');
+  form.classList.add('rail-location-editor');
   body.append(form);
   const field=(title,node)=>{const label=document.createElement('label');label.textContent=title;label.append(node);form.append(label);return node;};
   const rail=field('난간 선택',document.createElement('select'));
@@ -406,6 +407,7 @@ function openRailLocation(){
   let generation=0;
   const fill=()=>{generation++;const r=list.find(r=>r.id===rail.value);address.value=r?.address||'';lat.value=r?.latitude??'';lng.value=r?.longitude??'';results.replaceChildren();status.textContent='';syncLocationPreview();};
   rail.onchange=fill;fill();
+  requestAnimationFrame(()=>{if(previewMap&&preview.isConnected){previewMap.invalidateSize();syncLocationPreview();}});
   search.onclick=async()=>{
    const query=address.value.trim();if(!query){status.textContent='검색할 주소를 입력하세요.';return;}
    const version=++generation;search.disabled=true;status.textContent='주소 검색 중…';results.replaceChildren();
