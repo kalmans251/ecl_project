@@ -478,12 +478,11 @@ void detection_manager_init(void)
 
 
     /*
-     * 일단 기본 감지 모드는 RADAR로 시작.
-     * 필요하면 CCTV 기본으로 변경 가능.
+     * 전원 재투입 시 CCTV 감지를 기본으로 사용한다.
      */
 
     s_summary.source =
-        DETECTION_SOURCE_RADAR;
+        DETECTION_SOURCE_CCTV;
 
 
     s_summary.total_detected_count =
@@ -509,7 +508,7 @@ void detection_manager_init(void)
 
     ESP_LOGI(
         TAG,
-        "Detection manager initialized / source=RADAR"
+        "Detection manager initialized / source=CCTV"
     );
 }
 
