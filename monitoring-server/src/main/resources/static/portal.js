@@ -170,11 +170,6 @@ function syncLedPatterns(s){
   row.classList.toggle('is-pending',i===chosen);
   row.title=running?(i===chosen?'실행 중인 패턴 · 적용 요청 대기':'장치 응답 기준 실행 중'):i===chosen?'변경 선택 · 전체 적용 대기':'';
  });
- const modeName={basic:'LED 모드',weather:'날씨 연동',music:'음악 연동'}[s.led];
- const running=s.led_enabled===true&&s.power_on===true&&!s.sleep_active;
- const detail=observed?.closest('label').textContent.trim()||'패턴 번호 미확인';
- const summary=document.getElementById('ledCurrentPattern');
- if(summary){summary.textContent=modeName?(running?'실행 중: ':'설정 모드: ')+modeName+' · '+detail+(running?'':' · 출력 정지/슬립'):'현재 모드: 상태 미확인';summary.classList.toggle('is-running',!!modeName&&running);}
 
 }
 function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit){dirty.set('volume',String(value));syncPendingSettings();}}
