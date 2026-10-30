@@ -109,6 +109,14 @@ async function send(operation,value,ids){
 async function guarded(action){try{await action();}catch(error){toast(error.message);}}
 function choose(id){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall && !selected.has(id)){toast('통화 종료 후 난간을 변경하세요.');return;}selected=selected.has(id)?new Set():new Set([id]);dirty.clear();syncPendingSettings();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
 function selectAllDevices(){if(emergencyAccepting)return toast('비상통화 수락 처리 중입니다.');if(activeCall)return toast('통화 종료 후 선택을 변경하세요.');selected=new Set(view.rails.map(r=>r.id));dirty.clear();syncPendingSettings();awaitStatus(selected);renewStatusDemand().catch(()=>{});renderSelection();}
+function renderSelectedRailSummary(){
+ const items=rails(),connection=$('systemSelectedRailConnection');
+ text('systemSelectedRailName',items.length===1?items[0].name:items.length?`난간 ${items.length}개 선택`:'난간을 선택하세요');
+ const online=items.filter(r=>r.online).length;
+ connection.dataset.state=stateFetchFailed?'unknown':!items.length?'unknown':online===items.length?'online':online?'mixed':'offline';
+ text('systemSelectedRailConnection',stateFetchFailed?'서버 연결 실패 · 마지막 확인 정보':!items.length?'연결 상태 미확인':items.length===1?(online?'● Pi 연결됨':'○ Pi 연결 끊김'):`Pi 연결됨 ${online}개 · 연결 끊김 ${items.length-online}개`);
+ text('systemSelectedRailDetail',items.length===1?`${items[0].gateway_id} / 난간 ${items[0].number}`:items.length?items.map(r=>r.name).join(' · '):'제어할 난간을 선택하면 정보가 표시됩니다.');
+}
 function renderSelection(){
  const grid=$('idBadgeGrid');grid.replaceChildren();for(const r of view.rails){const b=document.createElement('button');b.type='button';b.className=(selected.has(r.id)?'selected ':'')+(r.online?'':'offline');b.textContent=`${r.name} · ${r.gateway_id}/${r.number}`;b.title=r.online?'게이트웨이 연결됨':'게이트웨이 오프라인';b.onclick=()=>choose(r.id);grid.append(b);}
  text('selectedDeviceTag',rails().length?rails().map(r=>r.name).join(', '):'난간 선택');$('inputTotalDevices').value=view.rails.length;
@@ -318,6 +326,7 @@ function renderEnergy(s){
  text('solarCurrentRight',Number.isFinite(s.right_current)?s.right_current.toFixed(2):'--');
 }
 function renderLive(){
+ renderSelectedRailSummary();
  if(typeof EmergencyAudio!=='undefined')alarmAudio().sync(view?.rails||[],view?.calls||[]);
  renderMusicStatus();
  const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=displayedStatus(r,check);
