@@ -8,7 +8,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 public class Telemetry {
     private final JdbcTemplate db; private final Registry registry; private final JsonMapper json=JsonMapper.builder().build();
-    private static final Set<String> NUMERIC=Set.of("left_watt","right_watt","battery_percent","battery_voltage","left_voltage","right_voltage","left_current","right_current","volume","wind","pm10","led_basic_pattern","led_music_pattern");
+    private static final Set<String> NUMERIC=Set.of("left_watt","right_watt","battery_percent","battery_voltage","left_voltage","right_voltage","left_current","right_current","volume","wind","pm10","led_basic_pattern","led_music_pattern","led_sequence_seconds");
     private static final Set<String> FLAGS=Set.of("battery_estimated","emergency","projector","led_enabled","sleep","sleep_active","power_on");
     private static final Map<String,Set<String>> ENUMS=Map.of("power",Set.of("ac","battery"),"led",Set.of("basic","music","weather"),"weather",Set.of("clear","cloudy","rain","snow"),"music",Set.of("playing","paused","stopped"),"music_mode",Set.of("sequential","shuffle","age"),"detection",Set.of("radar","cctv"));
     public Telemetry(JdbcTemplate db,Registry registry){this.db=db;this.registry=registry;}
@@ -23,7 +23,8 @@ public class Telemetry {
             JsonNode value=state.get(key);
             if(NUMERIC.contains(key)) {
                 double n=value.asDouble();double max=key.equals("battery_percent")||key.equals("volume")?100:100000;
-                if(key.equals("led_basic_pattern")||key.equals("led_music_pattern")){max=key.equals("led_basic_pattern")?5:2;if(!value.isIntegralNumber())throw Accounts.bad("Invalid LED pattern");}
+                if(key.equals("led_basic_pattern")||key.equals("led_music_pattern")){max=key.equals("led_basic_pattern")?9:2;if(!value.isIntegralNumber())throw Accounts.bad("Invalid LED pattern");}
+                if(key.equals("led_sequence_seconds")){max=120;if(!value.isIntegralNumber()||n<1)throw Accounts.bad("Invalid LED interval");}
                 if(key.equals("battery_voltage"))max=16;
                 if(key.equals("left_voltage")||key.equals("right_voltage"))max=26;
                 if(key.endsWith("_current"))max=320;

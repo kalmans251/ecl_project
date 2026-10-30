@@ -107,3 +107,5 @@ CREATE TABLE IF NOT EXISTS emergency_incident_calls (
  ended_at BIGINT, not_started_at BIGINT
 );
 CREATE INDEX IF NOT EXISTS emergency_incidents_rail ON emergency_incidents(rail_id,started_at);
+
+CREATE TABLE IF NOT EXISTS weather_auto(rail_id VARCHAR(36) PRIMARY KEY REFERENCES rails(id),username VARCHAR(200) NOT NULL,enabled BOOLEAN NOT NULL DEFAULT FALSE,last_sent BIGINT NOT NULL DEFAULT 0);

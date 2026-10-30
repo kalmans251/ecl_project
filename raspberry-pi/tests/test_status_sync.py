@@ -24,7 +24,7 @@ class StatusTests(unittest.TestCase):
   self.sync.demand(dict(version=1,rails=[1]))
   def send(f):
    self.bus.sent.append(f)
-   self.assertEqual((Service.SYSTEM,Command.APPLY,b'\x02'),(f.service,f.command,f.payload[5:]))
+   self.assertEqual((Service.SYSTEM,Command.APPLY,b'\x04'),(f.service,f.command,f.payload[5:]))
    for rail,token in [(2,f.payload[:4]),(1,bytes(4))]:
     self.controls.handle_frame(Frame(rail,Node.P4,Node.PI,Service.SYSTEM,Command.APPLY_RESULT,token+f.payload[4:5]+b'\x00'+DATA))
     self.assertIsNone(self.controls.result)
@@ -38,14 +38,14 @@ class StatusTests(unittest.TestCase):
   versions=[]
   def send(f):
    versions.append(f.payload[-1])
-   status=b'\x01' if f.payload[-1]==2 else b'\x00'
+   status=b'\x01' if f.payload[-1]>1 else b'\x00'
    data=b'\x00' if status==b'\x01' else DATA
    self.controls.handle_frame(Frame(1,Node.P4,Node.PI,Service.SYSTEM,Command.APPLY_RESULT,f.payload[:5]+status+data))
   self.bus.send_frame=send
   self.assertTrue(self.sync.sample(1));self.assertTrue(self.sync.sample(1))
-  self.assertEqual([2,1,1],versions)
+  self.assertEqual([4,3,2,1,1],versions)
   self.sync.disconnect();self.sync.demand(dict(version=1,rails=[1]))
-  self.assertTrue(self.sync.sample(1));self.assertEqual([2,1],versions[-2:])
+  self.assertTrue(self.sync.sample(1));self.assertEqual([4,3,2,1],versions[-4:])
  def test_no_network_or_busy_control_or_call_does_not_poll(self):
   self.connected.clear();self.assertFalse(self.sync.sample(1));self.connected.set()
   with self.audio._control_lock:self.assertFalse(self.sync.sample(1))
@@ -94,3 +94,12 @@ class EnergyTests(unittest.TestCase):
   from status_sync import estimate_percent
   values=[estimate_percent(v/100) for v in range(800,1601)]
   self.assertEqual(values,sorted(values));self.assertEqual(0,values[0]);self.assertEqual(100,values[-1])
+
+class LedStatusTests(unittest.TestCase):
+ def test_version4_reports_sequence_selection_and_interval(self):
+  base=bytes([4])+DATA[1:]+bytes(15)+bytes([9,2,12])
+  state=decode(base)
+  self.assertEqual(9,state['led_basic_pattern']);self.assertEqual(2,state['led_music_pattern']);self.assertEqual(12,state['led_sequence_seconds'])
+  for index,value in ((31,10),(32,3),(33,0),(33,121)):
+   sample=bytearray(base);sample[index]=value
+   with self.assertRaises(ValueError):decode(sample)

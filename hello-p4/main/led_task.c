@@ -11,6 +11,7 @@
 #include "led_task.h"
 #include "led_eq_fresh.h"
 #include "led_design.h"
+#include "led_pattern_selection.h"
 #include "protocol.h"
 #include "router.h"
 
@@ -23,6 +24,7 @@ static led_strip_handle_t s_strip_right=NULL,s_strip_left=NULL;
 static led_design_t s_design;
 static led_eq_data_t s_latest_eq;
 static uint32_t s_last_eq_ms;
+static uint32_t s_sequence_started;
 static bool s_have_eq,s_output_currently_off=true;
 
 static void led_output_off(void) {
@@ -48,6 +50,7 @@ static void handle_command(const led_command_t *cmd) {
         case LED_COMMAND_SET_MODE:
             system_state_set_led_mode(cmd->mode);
             system_state_set_led_pattern(cmd->mode,cmd->pattern);
+            if(cmd->mode==LED_MODE_BASIC&&cmd->pattern==9){system_state_set_led_sequence_seconds(cmd->sequence_seconds);s_sequence_started=(uint32_t)(esp_timer_get_time()/1000);}
             if(cmd->mode==LED_MODE_WEATHER)system_state_set_weather(cmd->weather);
             break;
         case LED_COMMAND_SET_WEATHER:system_state_set_weather(cmd->weather);break;
@@ -160,7 +163,7 @@ void led_task_init(void) {
     init_strip(LED_DATA_PIN_RIGHT,&s_strip_right);
     init_strip(LED_DATA_PIN_LEFT,&s_strip_left);
     if(!s_strip_right || !s_strip_left)abort();
-    ESP_LOGI(TAG,"LED design ready: 6 basic / 3 weather / 3 music patterns");
+    ESP_LOGI(TAG,"LED design ready: 9 basic + sequence / 3 weather / 3 music patterns");
 }
 void led_task(void *arg) {
     (void)arg;
@@ -184,7 +187,8 @@ void led_task(void *arg) {
         }
         bool fresh=s_latest_eq.length==LED_EQ_BANDS && led_eq_is_fresh(s_have_eq,s_last_eq_ms,now);
         uint8_t pattern=state.led_mode==LED_MODE_MUSIC?state.led_music_pattern:state.led_basic_pattern;
-        if(led_design_render(&s_design,now,state.led_mode,state.weather_type,pattern,
+        led_pattern_selection_t render=led_pattern_select(state.led_mode,state.weather_type,pattern,(uint32_t)(now-s_sequence_started),state.led_sequence_seconds);
+        if(led_design_render(&s_design,now,render.mode,render.weather,render.pattern,
                              state.call_active || emergency_manager_is_active(),fresh,s_latest_eq.data))led_show_all();
         vTaskDelay(1);
     }

@@ -15,7 +15,7 @@ from protocol import Command, Frame, Node, Service
 HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop current mode
   projector <id> on|off          projector relay
   led <id> on|off|basic|music     LED enable or mode
-  led <id> basic [1..6] | music [1..3]  select animation
+  led <id> basic [1..9] | music [1..3]  select animation; led <id> sequence <1..120 seconds>
   led <id> weather clear|cloudy|rain|snow
   music <id> seek <seconds>  move within current playing track
   music <id> list [default|10|20|30|40] | status
@@ -87,8 +87,11 @@ class DeviceControls:
         elif name == 'projector':
             add(Service.PROJECTOR, one({'on': Command.START, 'off': Command.STOP}))
         elif name == 'led':
-            if len(args) == 2 and args[0] in ('basic', 'music'):
-                count = 6 if args[0] == 'basic' else 3
+            if len(args)==2 and args[0]=='sequence':
+                if args[1] not in {str(n) for n in range(1,121)}: raise ValueError('led sequence: expected 1..120 seconds')
+                add(Service.LED,Command.SET,bytes([1,9,int(args[1])]))
+            elif len(args) == 2 and args[0] in ('basic', 'music'):
+                count = 9 if args[0] == 'basic' else 3
                 if args[1] not in {str(n) for n in range(1, count + 1)}:
                     raise ValueError(f'led {args[0]}: expected 1..{count}')
                 add(Service.LED, Command.SET, bytes([1 if args[0] == 'basic' else 3, int(args[1]) - 1]))
