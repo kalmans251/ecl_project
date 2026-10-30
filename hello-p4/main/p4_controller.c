@@ -569,7 +569,7 @@ static void handle_general_apply(const protocol_frame_t *request)
     protocol_frame_t f=*request;
     f.command=request->payload[4];f.length=request->length-5;
     memmove(f.payload,request->payload+5,f.length);
-    uint8_t response[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE]={0};memcpy(response,request->payload,5);
+    uint8_t response[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE+2]={0};memcpy(response,request->payload,5);
     uint8_t response_length=7;
     response[5]=1;
     bool active=call_manager_is_active() || emergency_manager_is_active();
@@ -580,15 +580,16 @@ static void handle_general_apply(const protocol_frame_t *request)
         case SERVICE_SYSTEM:
             if(f.length==0 && (f.command==CMD_PING || f.command==CMD_STATUS_REQUEST)) {
                 response[5]=0;response[6]=1;
-            } else if(f.command==CMD_STATUS_REQUEST && f.length==1 && (f.payload[0]==1 || f.payload[0]==2)) {
+            } else if(f.command==CMD_STATUS_REQUEST && f.length==1 && (f.payload[0]==1 || f.payload[0]==2 || f.payload[0]==3)) {
                 detection_summary_t detection;detection_manager_get_summary(&detection);
                 status_snapshot_encode(response+6,&state,power_control_get_ac() || power_control_get_battery(),
                     projector_control_get(),detection.source,music_manager_get_mode(),
                     detection.total_detected_count,emergency_manager_is_active());
                 response[5]=0;response_length=6+STATUS_SNAPSHOT_SIZE;
-                if(f.payload[0]==2) {
+                if(f.payload[0]>=2) {
                     response[6]=2;energy_monitor_encode(response+6+STATUS_SNAPSHOT_SIZE);
                     response_length+=ENERGY_WIRE_SIZE;
+                    if(f.payload[0]==3){response[6]=3;response[response_length++]=state.led_basic_pattern;response[response_length++]=state.led_music_pattern;}
                 }
             }
             break;

@@ -79,3 +79,9 @@ button{transition:background-color .15s,border-color .15s,color .15s}
 .rail-location-editor .location-map-help{color:#7dd9e4;font-size:13px}
 .rail-location-editor>button[type=submit]{background:#16c4d2;color:#06272d;font-weight:700;margin-top:10px}
 @media(max-width:700px){.rail-location-editor label{grid-template-columns:1fr}.rail-map-legend{font-size:10px}.rail-location-editor .location-map-preview{height:260px}}
+
+/* One pattern selection across all three categories; actual execution is separate. */
+.led-radio-label.is-running{background:#08734f!important;border:2px solid #4affb3!important;color:#fff!important;box-shadow:0 0 0 2px #38e7a326!important}
+.led-radio-label.is-running::after{content:'실행 중';margin-left:auto;padding:2px 8px;border-radius:5px;background:#b6ffdc;color:#04452e;font-size:11px;font-weight:800;white-space:nowrap}
+.led-radio-label.is-pending:not(.is-running){background:#493d16!important;border:2px solid #ffd564!important;color:#fff1bf!important}
+.led-radio-label.is-pending:not(.is-running)::after{content:'적용 대기';margin-left:auto;font-size:11px;color:#ffdf82;white-space:nowrap}

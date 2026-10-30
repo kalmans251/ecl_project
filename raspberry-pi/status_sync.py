@@ -8,7 +8,7 @@ from protocol import Service, Node, Command
 LOG=logging.getLogger('status.sync')
 
 def decode(data):
-    if (not data or (data[0],len(data)) not in ((1,16),(2,31)) or data[1] not in (0,1,2) or
+    if (not data or (data[0],len(data)) not in ((1,16),(2,31),(3,33)) or data[1] not in (0,1,2) or
         any(data[i] not in (0,1) for i in (2,3,6,7,8,9,15)) or
         data[4] not in (1,2,3) or data[5]>3 or data[10] not in (1,2,3)):
         raise ValueError('Invalid P4 status snapshot; update P4 firmware')
@@ -19,7 +19,7 @@ def decode(data):
         detection=('radar','cctv')[data[9]],music_mode=('sequential','shuffle','age')[data[10]-1],
         detection_count=int.from_bytes(data[11:15],'big'))
     if data[1]: state['power']=('ac','battery')[data[1]-1]
-    if data[0]==2:
+    if data[0]>=2:
         flags=data[16]
         if flags & ~31: raise ValueError('Invalid energy flags')
         if flags & 16:
@@ -40,6 +40,10 @@ def decode(data):
                     if abs(a)>320: raise ValueError('Invalid input current')
                     state[side+'_current']=a
                     state[side+'_watt']=round(v*a,3)
+    if data[0]==3:
+        if data[31]>5 or data[32]>2: raise ValueError('Invalid LED pattern')
+        state['led_basic_pattern']=data[31]
+        state['led_music_pattern']=data[32]
     return state
 
 # Generic 4S LiFePO4 reference, not a manufacturer calibration or charge control.
@@ -86,7 +90,7 @@ class StatusSync:
             if self.audio._keepalive_due.is_set() or not self.publisher.connected.is_set() or not self.wanted_now(rail):
                 raise RuntimeError('Priority control or disconnected')
         try:
-            version=self.versions.get(rail,2)
+            version=self.versions.get(rail,3)
             def query(v):
                 return request(self.controls,rail,Command.STATUS_REQUEST,bytes([v]),
                     background=True,timeout=.6,service=Service.SYSTEM,expected=Node.P4,
@@ -94,9 +98,13 @@ class StatusSync:
             try:
                 data=query(version)
             except RuntimeError as exc:
-                if version!=2 or not str(exc).startswith('Music request rejected/failed'): raise
-                data=query(1)  # Old P4: retain general status, energy stays unknown.
-                self.versions[rail]=1
+                if version==1 or not str(exc).startswith('Music request rejected/failed'): raise
+                version-=1
+                try: data=query(version)
+                except RuntimeError as fallback:
+                    if version!=2 or not str(fallback).startswith('Music request rejected/failed'): raise
+                    version=1;data=query(version)
+                self.versions[rail]=version
             state=decode(data)
         except (RuntimeError,ValueError,OSError) as exc:
             LOG.debug('Status not refreshed rail=%s: %s',rail,exc)

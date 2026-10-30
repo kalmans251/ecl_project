@@ -121,8 +121,9 @@ function syncReportedControls(s){
  if(!dirty.has('led')&&!dirty.has('weather')){
   if(['basic','weather','music'].includes(s.led))switchCategoryTabUI(s.led,{basic:0,weather:1,music:2}[s.led],false);
   else document.querySelectorAll('.category-tab-btn').forEach(b=>b.classList.remove('active'));
-  document.querySelectorAll('input[name="ledGroup1"]').forEach(i=>i.checked=i.value===({clear:'0',rain:'1',snow:'2'}[s.weather]));
+
  }
+ syncLedPatterns(s);
  if(!dirty.has('music.mode'))$('piPlayMode').value=({sequential:0,shuffle:1,age:2}[s.music_mode])??'';
  if(!dirty.has('detection')&&s.detection)switchDisplayView(s.detection,false);
  if(!dirty.has('projector'))document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',typeof s.projector==='boolean'&&b.getAttribute('onclick').includes(String(s.projector))));
@@ -141,8 +142,26 @@ function renderProjector(s,fresh=true){
 function syncPendingSettings(){const bar=$('pendingSettingsBar');if(!bar)return;bar.hidden=!dirty.size&&!settingsApplying;text('pendingSettingsMessage',`변경한 설정 ${dirty.size}개 · 전체 적용을 눌러 반영하세요.`);}
 function mark(operation,value){dirty.set(operation,value);syncPendingSettings();toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
-function switchCategoryTabUI(name,code,edit=true){currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>b.classList.toggle('active',i===code));['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');if(edit){if(code===1)mark('weather',['clear','rain','snow'][Number(document.querySelector('input[name="ledGroup1"]:checked')?.value||0)]);else mark('led',name);}}
-function setSubModeUI(value){if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);else mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
+function switchCategoryTabUI(name,code,edit=true){currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>b.classList.toggle('active',i===code));['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');if(edit){const value=document.querySelector('input[name="ledPattern"][data-category="'+code+'"]:checked')?.value??'0';setSubModeUI(Number(value));}}
+function setSubModeUI(value){
+ for(const key of ['led','weather','led.basic_pattern','led.music_pattern'])dirty.delete(key);
+ if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);
+ else{mark('led',currentCategory===0?'basic':'music');mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
+ document.querySelectorAll('input[name="ledPattern"]').forEach(i=>i.checked=Number(i.dataset.category)===currentCategory&&Number(i.value)===value);
+ syncLedPatterns(rails().length===1?rails()[0].reported||{}:{});
+}
+function syncLedPatterns(s){
+ const group={basic:0,weather:1,music:2}[s.led];
+ const value=group===0?s.led_basic_pattern:group===2?s.led_music_pattern:({clear:0,cloudy:1,rain:1,snow:2})[s.weather];
+ const pending=['led','weather','led.basic_pattern','led.music_pattern'].some(k=>dirty.has(k));
+ document.querySelectorAll('input[name="ledPattern"]').forEach(i=>{
+  const running=s.led_enabled===true&&s.power_on===true&&!s.sleep_active&&Number(i.dataset.category)===group&&Number(i.value)===value;
+  const row=i.closest('label');row.classList.toggle('is-running',running);
+  if(!pending)i.checked=Number(i.dataset.category)===group&&Number(i.value)===value;
+  row.classList.toggle('is-pending',pending&&i.checked);
+  row.title=running?'장치 응답 기준 실행 중':pending&&i.checked?'변경 선택 · 전체 적용 대기':'';
+ });
+}
 function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit){dirty.set('volume',String(value));syncPendingSettings();}}
 function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','age'][Number(value)]);}
 function resetMusicCatalog(){musicPage=null;fillMusicTracks();renderMusicCatalog();}
