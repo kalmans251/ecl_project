@@ -193,9 +193,9 @@ body .card-title,body .dashboard-section .section-heading,body #sosCardContainer
  display:flex;align-items:center;justify-content:center;text-align:center;box-sizing:border-box;
  flex-shrink:0;min-height:36px;height:36px!important;padding:5px 9px;margin:0 0 9px!important;
  font-size:18px!important;font-weight:800!important;letter-spacing:.35px;line-height:1.25;
- color:#deebf4!important;background:var(--section-tint,#182b3c);border:1px solid #3d5367;border-radius:7px;text-shadow:none!important;
+ color:#deebf4!important;background:transparent!important;border:none!important;border-radius:0;text-shadow:none;
 }
-body .card-title::before,body .card-title::after{display:none!important}
+/* Title separators are restored below; no title background boxes. */
 #projectorStateText.projector-state-caption{display:block;text-align:center;margin:0 0 6px;line-height:1.4;font-size:11px;overflow-wrap:anywhere}
 .card-system-setting .system-settings-content{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;overflow:auto;scrollbar-width:thin}
 .system-settings-top{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(105px,1fr);gap:10px;align-items:start}
@@ -254,7 +254,7 @@ body{background-image:radial-gradient(at 0% 0%,rgba(0,242,254,.045),transparent 
  .card-position-setting:hover,.center-control-panel:hover{
   border-color:var(--card-border-hover);box-shadow:0 0 15px rgba(0,255,204,.2),inset 0 0 0 1px rgba(0,242,254,.08);
  }
- .dashboard-section:hover .section-heading{border-color:rgba(0,242,254,.42);background-color:#173442;color:#e6fcff!important}
+ .dashboard-section:hover .section-heading{color:#e6fcff!important}
  .sub-block:hover,.env-item:hover,.ctrl-item:hover{border-color:#49818e;background-color:#142735}
  .card-led-setting .led-radio-label:not(.is-running):not(.is-pending):hover{border-color:#00dce8;background:rgba(0,242,254,.10)}
  .category-tab-btn:not(.active):hover{background:rgba(0,242,254,.12);color:#deffff;border-color:#4fbec8}
@@ -270,4 +270,41 @@ body{background-image:radial-gradient(at 0% 0%,rgba(0,242,254,.045),transparent 
  .card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting,.center-control-panel,
  .sub-block,.env-item,.ctrl-item,.led-radio-label,.category-tab-btn{transition:none}
  .menu-dropdown-item:hover{transform:none}
+}
+
+
+/* Original centered line-title-line treatment, with a one-shot light sweep. */
+body .card-title,body .dashboard-section .section-heading,body #sosCardContainer .card-title{
+ background:transparent!important;border:none!important;border-radius:0;justify-content:center;
+}
+body :is(.card-title,.dashboard-section .section-heading)::before,body :is(.card-title,.dashboard-section .section-heading)::after{
+ content:'';display:block!important;flex:1 1 0;min-width:12px;width:auto;height:1px;border-radius:0;
+ opacity:.42;box-shadow:none;transition:opacity .25s ease,box-shadow .25s ease;
+ background-size:100% 100%;background-repeat:no-repeat;
+}
+body :is(.card-title,.dashboard-section .section-heading)::before{
+ margin:0 10px 0 0;background-image:linear-gradient(270deg,var(--section-accent,#00ffcc),rgba(255,255,255,.035));
+}
+body :is(.card-title,.dashboard-section .section-heading)::after{
+ margin:0 0 0 10px;background-image:linear-gradient(90deg,var(--section-accent,#00ffcc),rgba(255,255,255,.035));
+}
+.minor-section-title,.card-led-setting .audio-ctrl-title{background:transparent;border:0;border-radius:0;padding:4px 0}
+#sosCardContainer{--section-accent:#ff7582}
+@media(hover:hover) and (pointer:fine){
+ :is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):hover .card-title{
+  color:#ecffff!important;text-shadow:0 0 10px rgba(0,242,254,.38)!important;
+ }
+ :is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):hover .card-title::before,
+ :is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):hover .card-title::after{
+  opacity:1;box-shadow:0 0 8px var(--section-accent,#00dccb);
+  background-image:linear-gradient(100deg,transparent 5%,var(--section-accent,#00ffcc) 35%,#efffff 50%,var(--section-accent,#00ffcc) 65%,transparent 95%);
+  background-size:220% 100%;animation:titleLightSweep .85s ease-out 1;
+ }
+ #sosCardContainer:hover .card-title{text-shadow:0 0 10px rgba(255,100,120,.4)!important}
+}
+:is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):focus-within .card-title::before,
+:is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):focus-within .card-title::after{opacity:1;box-shadow:0 0 6px var(--section-accent,#00dccb)}
+@keyframes titleLightSweep{from{background-position:180% center}to{background-position:-180% center}}
+@media(prefers-reduced-motion:reduce){
+ body .card-title,body :is(.card-title,.dashboard-section .section-heading)::before,body :is(.card-title,.dashboard-section .section-heading)::after{animation:none!important;transition:none!important}
 }
