@@ -395,3 +395,30 @@ body :is(.card-title,.dashboard-section .section-heading)::after{
 @media(max-width:700px){
  .card-system-setting .reservation-target-layout{gap:9px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
 }
+
+/* Align the two system columns and keep reservation actions on one baseline. */
+.card-system-setting .system-settings-top,
+.card-system-setting .reservation-target-layout{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px}
+.card-system-setting .system-check-compact{width:100%;box-sizing:border-box;min-width:0;justify-self:stretch;padding:12px;gap:7px}
+.card-system-setting .system-controls-compact .sys-pwr-btn-group{width:100%;max-width:220px;box-sizing:border-box}
+.card-system-setting .reservation-target-layout{padding:14px 0;align-items:stretch}
+.card-system-setting .reservation-target-layout .reservation-compact{display:flex;flex-direction:column;gap:10px}
+.card-system-setting .reservation-target-layout .schedule-section-title{margin:0;padding:0;line-height:1.4}
+.card-system-setting .reservation-target-layout .time-action-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:center;margin:0;width:100%;max-width:230px}
+.card-system-setting .reservation-target-layout .time-inputs-col{display:contents}
+.card-system-setting .reservation-target-layout .time-row{display:grid;grid-template-columns:48px minmax(0,1fr);gap:6px;grid-column:1/-1;width:100%;align-items:center}
+.card-system-setting .reservation-target-layout .time-row span{width:auto;font-size:12px;line-height:1.4}
+.card-system-setting .reservation-target-layout .custom-time-input{width:100%;max-width:145px;min-width:0;height:32px;min-height:32px;box-sizing:border-box;margin:0}
+.card-system-setting .reservation-target-layout .time-apply-btn-block,
+.card-system-setting .reservation-target-layout .btn-reset-setting{grid-row:3;align-self:center;justify-self:stretch;width:100%;max-width:none;min-width:0;height:30px;min-height:30px;margin:2px 0 0;padding:4px 6px;font-size:12px;box-sizing:border-box;white-space:nowrap}
+.card-system-setting .reservation-target-layout .time-apply-btn-block{grid-column:1}
+.card-system-setting .reservation-target-layout .btn-reset-setting{grid-column:2}
+.card-system-setting .reservation-target-layout .selected-rail-summary{padding:14px;gap:7px;justify-content:center;box-sizing:border-box}
+.card-system-setting .reservation-target-layout #systemSelectedRailName{font-size:17px}
+@media(max-width:700px){
+ .card-system-setting .system-settings-top,
+ .card-system-setting .reservation-target-layout{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:10px}
+ .card-system-setting .reservation-target-layout .time-row{grid-template-columns:42px minmax(0,1fr);gap:4px}
+ .card-system-setting .reservation-target-layout .custom-time-input{font-size:12px;padding:3px}
+ .card-system-setting .reservation-target-layout .selected-rail-summary{padding:10px}
+}
