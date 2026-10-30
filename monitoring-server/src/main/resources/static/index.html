@@ -518,7 +518,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 .top-info-group{gap:8px; flex-wrap:wrap;justify-content:flex-end}.top-info-group button,.top-info-group select{background:#121929;border:1px solid #294956;color:#b0e8ed;border-radius:7px;padding:7px;cursor:pointer}.clock-display{font-size:12px!important}button:disabled,input:disabled,select:disabled{opacity:.38;cursor:not-allowed!important}.portal-toast{position:fixed;bottom:18px;right:18px;max-width:520px;z-index:10000;background:#122336;border:1px solid #4facfe;padding:14px;border-radius:10px;box-shadow:0 6px 30px #000;color:#fff;font-size:14px}.portal-dialog{color:#dce9f5;background:#0e1726;border:1px solid #28516c;border-radius:14px;width:min(900px,90vw);max-height:85vh;overflow:auto}.portal-dialog::backdrop{background:#000a}.portal-dialog table{width:100%;border-collapse:collapse;font-size:13px}.portal-dialog td,.portal-dialog th{border-bottom:1px solid #263646;padding:10px;text-align:left}.portal-dialog h2{font-size:20px}.portal-dialog button,.portal-dialog input,.portal-dialog select{padding:10px;background:#192d40;color:#fff;border:1px solid #3c6278;border-radius:6px}.portal-dialog label{display:grid;grid-template-columns:150px 1fr;gap:10px;margin:12px 0}.portal-dialog .close{float:right}#siteSelect{max-width:160px}#userName{font-size:12px}.id-badge-container button{background:#142338;color:#dce9f5;border:1px solid #385471;border-radius:8px;padding:9px;margin:3px;cursor:pointer}.id-badge-container button.selected{border-color:#00f2fe;box-shadow:0 0 8px #00f2fe66}.id-badge-container button.offline{opacity:.5}#mapViewport .map-empty{padding:24px;color:#829caf}.portal-readonly{color:#ffb300}.request-status{color:#ffb300}.main-header h1{white-space:nowrap}
 @media(max-width:1100px){body{overflow:auto!important;height:auto!important}.grid-row-3{min-width:1000px;min-height:850px}.main-header{min-width:1000px}.main-header h1{font-size:20px!important}}
 </style><link rel="stylesheet" href="/portal-polish.css">
-</head>
+<style>.led-current-pattern{padding:10px 12px;margin:8px 0 12px;border:1px solid #50677b;border-radius:8px;background:#172839;color:#cbd8e5;font-size:13px;line-height:1.5}.led-current-pattern.is-running{border:2px solid #45f0a3;background:#086044;color:#eafff4;font-weight:700}</style></head>
 <body>
 
 
@@ -637,6 +637,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <button class="category-tab-btn" onclick="switchCategoryTabUI('weather', 1)">☀️ 날씨 연동</button>
             <button class="category-tab-btn" onclick="switchCategoryTabUI('music', 2)">🎵 음악 연동</button>
         </div>
+        <div id="ledCurrentPattern" class="led-current-pattern" role="status" aria-live="polite">현재 모드: 상태 미확인</div>
         <div id="tabContentBasic" class="led-select-group">
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="0" onchange="setSubModeUI(0)"> 모드1 : 상하 왕복 라인</label>
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="1" onchange="setSubModeUI(1)"> 모드2 : 바람돌이 시퀀스</label>
