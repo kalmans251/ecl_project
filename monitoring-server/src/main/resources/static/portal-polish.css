@@ -145,3 +145,44 @@ button{transition:background-color .15s,border-color .15s,color .15s}
 @media(max-width:1200px){.card-system-setting .system-setting-split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media(max-width:700px){.card-system-setting .system-setting-split{grid-template-columns:1fr}.card-system-setting .system-setting-main{max-height:450px}.card-system-setting .system-diagnostic-side{min-height:170px}}
 @media(prefers-reduced-motion:reduce){.system-diagnostic-button{transition:none}}
+
+
+/* A little visual hierarchy: tinted title bands rather than extra neon. */
+.section-system{--section-accent:#78d5df;--section-tint:#142c3b}
+.section-map{--section-accent:#8bbff2;--section-tint:#192c42}
+.section-led{--section-accent:#84d9b1;--section-tint:#17382f}
+.section-position{--section-accent:#b8b4e9;--section-tint:#272c43}
+.section-controls{--section-accent:#e4c194;--section-tint:#362f27}
+.section-projector{--section-accent:#80d2df;--section-tint:#19333d}
+.section-weather{--section-accent:#92cdec;--section-tint:#1a3042}
+.section-contacts{--section-accent:#e4b5b0;--section-tint:#382c35}
+.dashboard-section{border-top:2px solid var(--section-accent);border-top-color:color-mix(in srgb,var(--section-accent) 65%,#26394b)}
+.dashboard-section .section-heading{
+ box-sizing:border-box;flex-shrink:0;min-height:32px;height:auto;padding:6px 10px;margin-bottom:10px;
+ justify-content:flex-start;border:1px solid color-mix(in srgb,var(--section-accent) 24%,transparent);
+ border-left:3px solid var(--section-accent);border-radius:7px;background:var(--section-tint);
+ color:var(--section-accent)!important;font-size:16px;letter-spacing:.25px;line-height:1.4;text-shadow:none!important;
+}
+.dashboard-section .section-heading::before{content:'';display:inline-block;flex:0 0 5px;width:5px;height:5px;margin:0 8px 2px 0;border-radius:50%;background:var(--section-accent);opacity:.85;vertical-align:middle}
+.dashboard-section .section-heading::after{display:none}
+.minor-section-title{padding:5px 8px;margin:10px 0 8px;border-left:3px solid #648fa5;border-radius:0 5px 5px 0;background:#142837;color:#bddce9!important;font-size:13px!important;font-weight:750}
+.energy-section-title{border-left-color:#b6c686;background:#232f29;color:#d3dfaf!important}
+.section-system .sub-block-title{color:#a9d3dd!important}
+.section-system .sub-block:last-child .sub-block-title{color:#becfa3!important}
+.section-controls .ctrl-label{color:#e0d0b8}
+.section-controls .ctrl-item{border-color:#4b4540;background:#19232f}
+.section-weather .env-label{color:#a6cde1}
+.section-weather .env-item{border-color:#34495c;background:#112231}
+.section-contacts .contact-label{color:#dfc3c3}
+.section-position .installation-status dt{color:#b9b9dd}
+.section-position .installation-status dd{color:#e2e8f4;font-variant-numeric:tabular-nums}
+.card-led-setting .audio-ctrl-title{padding:5px 8px;border-left:3px solid #74c9af;background:#16312d;border-radius:4px;color:#b9e8da}
+.menu-dropdown-btn{background:#15303e!important;border-color:#406579!important;color:#d2ecf4!important}
+.menu-dropdown-item:hover,.menu-dropdown-item:focus-visible{background:#1c3d4c;color:#dcf7ff}
+.card-system-setting .system-diagnostic-side{border-color:#46677e;background:linear-gradient(150deg,#1b394b,#142334 70%)}
+.system-diagnostic-side .diagnostic-accent{border:1px solid #4a8095;background:#234b60;color:#b8edf1}
+.system-diagnostic-side .system-diagnostic-button{background:#20647b;border-color:#65afbf;box-sizing:border-box}
+.system-diagnostic-side .system-diagnostic-button:hover{background:#2d7c90}
+.card-system-setting .system-setting-main .time-row span{flex:0 0 auto;white-space:nowrap}
+.card-system-setting .system-setting-main .custom-time-input{width:100%;flex:1;min-width:0;max-width:118px;box-sizing:border-box}
+@media(max-width:700px){.dashboard-section .section-heading{font-size:14px;padding:6px 9px}}
