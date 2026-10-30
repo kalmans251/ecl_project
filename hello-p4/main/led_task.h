@@ -34,6 +34,7 @@ typedef struct
     led_mode_t mode;
 
     uint8_t pattern;
+    uint8_t sequence_seconds;
 
     weather_type_t weather;
 

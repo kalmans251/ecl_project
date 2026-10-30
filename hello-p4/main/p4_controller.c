@@ -369,16 +369,17 @@ static void handle_led(
             /* Backward compatible SET: [mode] retains the selected pattern;
              * BASIC/MUSIC may add a zero-based pattern in byte 1.
              * WEATHER byte 1 keeps its existing weather meaning. */
-            if (frame->length > 2 ||
-                (frame->length == 2 &&
-                 ((mode == LED_MODE_BASIC && frame->payload[1] >= 6) ||
+            if (frame->length > 3 ||
+                (frame->length==3 && (mode!=LED_MODE_BASIC || frame->payload[1]!=9 || frame->payload[2]<1 || frame->payload[2]>120)) ||
+                (frame->length >= 2 &&
+                 ((mode == LED_MODE_BASIC && frame->payload[1] >= 10) ||
                   (mode == LED_MODE_MUSIC && frame->payload[1] >= 3) ||
                   (mode == LED_MODE_WEATHER && frame->payload[1] > WEATHER_SNOW)))) {
                 break;
             }
             uint8_t pattern = mode == LED_MODE_MUSIC
                 ? previous_state.led_music_pattern : previous_state.led_basic_pattern;
-            if (mode != LED_MODE_WEATHER && frame->length == 2) pattern=frame->payload[1];
+            if (mode != LED_MODE_WEATHER && frame->length >= 2) pattern=frame->payload[1];
 
             led_mode_t old_mode =
                 previous_state.led_mode;
@@ -394,6 +395,7 @@ static void handle_led(
                     LED_COMMAND_SET_MODE,
 
                 .pattern = pattern,
+                .sequence_seconds = frame->length==3?frame->payload[2]:10,
                 .weather = (mode == LED_MODE_WEATHER && frame->length == 2)
                     ? (weather_type_t)frame->payload[1] : previous_state.weather_type,
 
@@ -569,7 +571,7 @@ static void handle_general_apply(const protocol_frame_t *request)
     protocol_frame_t f=*request;
     f.command=request->payload[4];f.length=request->length-5;
     memmove(f.payload,request->payload+5,f.length);
-    uint8_t response[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE+2]={0};memcpy(response,request->payload,5);
+    uint8_t response[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE+3]={0};memcpy(response,request->payload,5);
     uint8_t response_length=7;
     response[5]=1;
     bool active=call_manager_is_active() || emergency_manager_is_active();
@@ -580,7 +582,7 @@ static void handle_general_apply(const protocol_frame_t *request)
         case SERVICE_SYSTEM:
             if(f.length==0 && (f.command==CMD_PING || f.command==CMD_STATUS_REQUEST)) {
                 response[5]=0;response[6]=1;
-            } else if(f.command==CMD_STATUS_REQUEST && f.length==1 && (f.payload[0]==1 || f.payload[0]==2 || f.payload[0]==3)) {
+            } else if(f.command==CMD_STATUS_REQUEST && f.length==1 && (f.payload[0]==1 || f.payload[0]==2 || f.payload[0]==3 || f.payload[0]==4)) {
                 detection_summary_t detection;detection_manager_get_summary(&detection);
                 status_snapshot_encode(response+6,&state,power_control_get_ac() || power_control_get_battery(),
                     projector_control_get(),detection.source,music_manager_get_mode(),
@@ -589,13 +591,14 @@ static void handle_general_apply(const protocol_frame_t *request)
                 if(f.payload[0]>=2) {
                     response[6]=2;energy_monitor_encode(response+6+STATUS_SNAPSHOT_SIZE);
                     response_length+=ENERGY_WIRE_SIZE;
-                    if(f.payload[0]==3){response[6]=3;response[response_length++]=state.led_basic_pattern;response[response_length++]=state.led_music_pattern;}
+                    if(f.payload[0]>=3){response[6]=f.payload[0];response[response_length++]=state.led_basic_pattern;response[response_length++]=state.led_music_pattern;}
+                    if(f.payload[0]==4)response[response_length++]=state.led_sequence_seconds?state.led_sequence_seconds:10;
                 }
             }
             break;
         case SERVICE_LED:
             if((f.length==0 && (f.command==CMD_START || f.command==CMD_STOP)) ||
-               (f.command==CMD_SET && f.length>=1 && f.length<=2)) {
+               (f.command==CMD_SET && f.length>=1 && f.length<=3)) {
                 s_apply_request=request;handle_led(&f);s_apply_request=NULL;
                 if(s_apply_accepted)return; /* task sends completion */
                 response[5]=2;

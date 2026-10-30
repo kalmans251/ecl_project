@@ -33,8 +33,10 @@ public class Commands {
         if(operation==null) throw Accounts.bad("Operation required");
         if(MusicCommands.supports(operation)) { MusicCommands.validate(operation,value); return; }
         if(operation.equals("led.basic_pattern") || operation.equals("led.music_pattern")) {
-            int max=operation.equals("led.basic_pattern")?5:2;
+            int max=operation.equals("led.basic_pattern")?8:2;
             if(value==null || !value.matches("[0-"+max+"]")) throw Accounts.bad("Unsupported LED pattern");
+        } else if(operation.equals("led.sequence")) {
+            if(value==null||!value.matches("(?:[1-9]|[1-9][0-9]|1[01][0-9]|120)"))throw Accounts.bad("Sequence interval must be 1..120 seconds");
         } else if(operation.equals("volume")) {
             if(value==null || !value.matches("(?:[0-9]|[1-9][0-9]|100)")) throw Accounts.bad("Volume must be 0..100");
         } else if(VALUES.containsKey(operation)) {

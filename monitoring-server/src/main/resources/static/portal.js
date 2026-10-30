@@ -85,13 +85,17 @@ async function waitControlResults(rows){
 }
 async function send(operation,value,ids){
  if(emergencyAccepting && operation!=='call.accept')throw Error('비상통화 수락 처리 중입니다.');
- const items=requireSelection(operation.startsWith('call.')||operation.startsWith('ptt.'));
+ const items=requireSelection(operation==='weather.auto'||operation.startsWith('call.')||operation.startsWith('ptt.'));
  const general=!operation.startsWith('call.')&&!operation.startsWith('ptt.')&&operation!=='emergency.ack';
  if(general&&controlBusy)throw Error('이전 제어의 장치 응답을 기다리고 있습니다.');
  if(general)controlBusy=true;
  try{
   if(general)awaitStatus(ids||items.map(r=>r.id),'apply');
-  const rows=await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:ids||items.map(r=>r.id),operation,value:value??null});
+  const targetIds=ids||items.map(r=>r.id);
+  if(operation==='led.sequence'||operation==='weather'||operation.startsWith('led.')||operation==='led'&&['basic','music'].includes(value)){
+   for(const id of targetIds)await api('/api/portal/rails/'+encodeURIComponent(id)+'/weather-auto','PUT',{enabled:false});
+  }
+  const rows=operation==='weather.auto'?await api('/api/portal/rails/'+encodeURIComponent(targetIds[0])+'/weather-auto','PUT',{enabled:true}):await api('/api/portal/commands','POST',{request_id:newId(),rail_ids:targetIds,operation,value:value??null});
   toast(`${operation}: 요청 접수 · 장치 응답 대기`);
   if(operation==='emergency.ack'){await poll();return rows;}
   const results=await waitControlResults(rows);DetectionCounts.ingest(results);if(!general)awaitStatus(results.filter(r=>['APPLIED','COMPLETED'].includes(r.status)).map(r=>r.rail_id),'apply');await poll();
@@ -149,16 +153,20 @@ function syncLedCategory(s){
 }
 function switchCategoryTabUI(name,code,edit=true){if(edit)ledTabState={key:ledSelectionKey(),chosen:true};currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>{b.classList.toggle('active',i===code);b.setAttribute('aria-selected',String(i===code));});['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');}
 function setSubModeUI(value){
- for(const key of ['led','weather','led.basic_pattern','led.music_pattern'])dirty.delete(key);
- if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);
+ for(const key of ['led','weather','led.basic_pattern','led.music_pattern','led.sequence','weather.auto'])dirty.delete(key);
+ if(currentCategory===1&&value===3)mark('weather.auto','on');
+ else if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);
+ else if(currentCategory===0&&value===9)mark('led.sequence',String(Math.max(1,Math.min(120,Number($('ledSequenceSeconds').value)||10))));
  else{mark('led',currentCategory===0?'basic':'music');mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
  syncLedPatterns(rails().length===1?rails()[0].reported||{}:{});
 }
 function syncLedPatterns(s){
+ if(!dirty.has('led.sequence')&&Number.isInteger(s.led_sequence_seconds)&&$('ledSequenceSeconds'))$('ledSequenceSeconds').value=s.led_sequence_seconds;
  const group={basic:0,weather:1,music:2}[s.led];
- const value=group===0?s.led_basic_pattern:group===2?s.led_music_pattern:({clear:0,cloudy:1,rain:1,snow:2})[s.weather];
- const pendingGroup=dirty.has('weather')?1:dirty.get('led')==='basic'?0:dirty.get('led')==='music'?2:null;
- const pendingValue=pendingGroup===1?['clear','rain','snow'].indexOf(dirty.get('weather')):Number(dirty.get(pendingGroup===0?'led.basic_pattern':'led.music_pattern'));
+ const auto=rails().length===1&&rails()[0].weather_auto===true;
+ const value=group===0?s.led_basic_pattern:group===2?s.led_music_pattern:auto?3:({clear:0,cloudy:1,rain:1,snow:2})[s.weather];
+ const pendingGroup=dirty.has('weather.auto')||dirty.has('weather')?1:dirty.has('led.sequence')||dirty.get('led')==='basic'?0:dirty.get('led')==='music'?2:null;
+ const pendingValue=dirty.has('weather.auto')?3:dirty.has('led.sequence')?9:pendingGroup===1?['clear','rain','snow'].indexOf(dirty.get('weather')):Number(dirty.get(pendingGroup===0?'led.basic_pattern':'led.music_pattern'));
  const inputs=[...document.querySelectorAll('input[name="ledPattern"]')];
  // Set the entire radio group first; derive row styling only after exclusivity settles.
  inputs.forEach(i=>i.checked=false);

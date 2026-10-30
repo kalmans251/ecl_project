@@ -72,6 +72,7 @@ void system_state_init(void)
 
     s_state.led_mode =
         LED_MODE_BASIC;
+    s_state.led_sequence_seconds=10;
 
     s_state.weather_type =
         WEATHER_CLEAR;
@@ -342,7 +343,9 @@ void system_state_set_call_active(
 }
 void system_state_set_led_pattern(led_mode_t mode,uint8_t pattern) {
     lock_state();
-    if(mode==LED_MODE_BASIC && pattern<6)s_state.led_basic_pattern=pattern;
+    if(mode==LED_MODE_BASIC && pattern<10)s_state.led_basic_pattern=pattern;
     if(mode==LED_MODE_MUSIC && pattern<3)s_state.led_music_pattern=pattern;
     unlock_state();
 }
+
+void system_state_set_led_sequence_seconds(uint8_t seconds){lock_state();s_state.led_sequence_seconds=seconds>=1&&seconds<=120?seconds:10;unlock_state();}

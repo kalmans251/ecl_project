@@ -35,9 +35,10 @@ class RemoteControlsTests(unittest.TestCase):
   self.assertEqual(result['status'],'UNKNOWN');self.assertEqual(len(self.bus.sent),1)
   self.assertEqual(self.remote.handle(m),result);self.assertEqual(len(self.bus.sent),1)
  def test_mapping_and_validation(self):
-  self.assertEqual(parts('led.basic_pattern','5',2),['led','2','basic','6'])
+  self.assertEqual(parts('led.basic_pattern','8',2),['led','2','basic','9'])
+  self.assertEqual(parts('led.sequence','10',2),['led','2','sequence','10'])
   self.assertEqual(parts('led.music_pattern','2',1),['led','1','music','3'])
-  for op,value in [('volume','101'),('music.stop','x'),('led.basic_pattern','6'),('power','ac; quit'),('query','pi')]:
+  for op,value in [('volume','101'),('music.stop','x'),('led.basic_pattern','9'),('power','ac; quit'),('query','pi')]:
    self.assertEqual(self.remote.handle(self.message(op,value))['status'],'FAILED')
   self.assertEqual(self.bus.sent,[])
  def test_unknown_call_blocks_controls(self):

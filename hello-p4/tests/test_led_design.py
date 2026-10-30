@@ -9,9 +9,17 @@ HARNESS = r'''
 #include <math.h>
 #include <string.h>
 #include "led_design.h"
+#include "led_pattern_selection.h"
 static bool lit(led_rgb_t p){return p.r || p.g || p.b;}
 static unsigned count(const led_design_t *d){unsigned n=0;for(unsigned i=0;i<124;i++)n+=lit(d->pixels[0][i]);return n;}
 int main(void){
+ for(unsigned i=0;i<18;i++){
+  led_pattern_selection_t p=led_pattern_select(1,0,9,i*10000,10);unsigned n=i%9;
+  assert(p.mode==(n<6?1:2));
+  if(n<6)assert(p.pattern==n);else assert(p.weather==(n==6?0:n==7?2:3));
+ }
+ assert(led_pattern_select(1,0,9,1999,2).pattern==0);
+ assert(led_pattern_select(1,0,9,2000,2).pattern==1);
  led_design_t d;uint8_t bands[8]={100,80,60,40,20,10,5,1};
  // Exact serpentine wiring, invalid coordinates never alias pixel 0.
  assert(led_design_index(0,0)==0 && led_design_index(1,0)==61);
