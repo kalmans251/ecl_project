@@ -32,7 +32,7 @@ public class SecurityConfiguration {
                 .successHandler((q,r,a) -> {r.setContentType("application/json");r.getWriter().write("{\"authenticated\":true}");})
                 .failureHandler((q,r,x) -> r.sendError(401)).permitAll())
             .logout(l -> l.logoutUrl("/api/auth/logout").logoutSuccessHandler((q,r,a) -> r.setStatus(204)))
-            .headers(h -> h.contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org; worker-src 'self'; frame-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'")))
+            .headers(h -> h.contentSecurityPolicy(c -> c.policyDirectives("default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org https://api.open-meteo.com https://air-quality-api.open-meteo.com; worker-src 'self'; frame-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'")))
             .build();
     }
 }
