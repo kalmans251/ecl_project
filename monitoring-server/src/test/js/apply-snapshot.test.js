@@ -1,16 +1,13 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../../main/resources/static/portal.js'),'utf8');
-function app(advance){
+function app({seen=10,baseline=10,advance=true,projector=true}={}){
  let now=0,calls=0;
- const c=vm.createContext({site:'s',stateFetchFailed:false,view:{rails:[{id:'r',online:true,seen_at:10}]},performance:{now:()=>now},renewStatusDemand:async()=>{},setTimeout:fn=>{now+=1000;fn();}});
+ const c=vm.createContext({site:'s',stateFetchFailed:false,statusBaselines:new Map([['r',{seen:baseline}]]),view:{rails:[{id:'r',online:true,seen_at:seen,reported:{projector}}]},performance:{now:()=>now},renewStatusDemand:async()=>{},setTimeout:fn=>{now+=1000;fn();}});
  c.poll=async()=>{calls++;if(advance&&calls===3)c.view.rails[0].seen_at=11;};
- vm.runInContext(source.slice(source.indexOf('async function waitAppliedSnapshot('),source.indexOf('async function applyAllUpdates(')),c);
- return {c,calls:()=>calls};
+ const start=source.indexOf('function matchesAppliedSetting('),end=source.indexOf('function setSettingsBusy(',start);
+ vm.runInContext(source.slice(start,end),c);return {c,calls:()=>calls};
 }
-test('old snapshots cannot complete apply confirmation; newer response can',async()=>{
- const a=app(true);await vm.runInContext("waitAppliedSnapshot(['r'],'s')",a.c);assert.equal(a.calls(),3);
-});
-test('missing post-apply response raises error rather than clearing pending selection',async()=>{
- const a=app(false);await assert.rejects(vm.runInContext("waitAppliedSnapshot(['r'],'s')",a.c),/선택값을 유지/);
- assert.ok(source.includes('await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);renderLive();'));
-});
+test('post-command snapshot already received is reused without another 5-second poll',async()=>{const a=app({seen:11,advance:false});await a.c.waitAppliedSnapshot(['r'],'s','projector','on');assert.equal(a.calls(),1);});
+test('old snapshots cannot complete apply confirmation; newer matching response can',async()=>{const a=app();await a.c.waitAppliedSnapshot(['r'],'s','projector','on');assert.equal(a.calls(),3);});
+test('new response with wrong setting does not finish application',async()=>{const a=app({seen:11,advance:false,projector:false});await assert.rejects(a.c.waitAppliedSnapshot(['r'],'s','projector','on'),/선택값을 유지/);});
+test('missing post-apply response preserves pending selection',async()=>{const a=app({advance:false});await assert.rejects(a.c.waitAppliedSnapshot(['r'],'s','projector','on'),/선택값을 유지/);assert.ok(source.includes('await waitAppliedSnapshot(targets,targetSite,op,value);if(dirty.get(op)===value)dirty.delete(op);'));});
