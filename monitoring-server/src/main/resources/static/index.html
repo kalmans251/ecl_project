@@ -568,12 +568,6 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     <div class="card-system-setting dashboard-section section-system" style="grid-column: 1 / span 2; grid-row: 1 / span 2;">
  <div class="card-title section-heading">시스템 설정</div>
  <div class="system-settings-content">
-  <section class="selected-rail-summary" aria-label="선택한 제어 대상">
-   <span class="selected-rail-eyebrow">선택한 난간</span>
-   <strong id="systemSelectedRailName">난간을 선택하세요</strong>
-   <span id="systemSelectedRailConnection" class="selected-rail-connection" role="status">연결 상태 미확인</span>
-   <small id="systemSelectedRailDetail">제어할 난간을 선택하면 정보가 표시됩니다.</small>
-  </section>
   <div class="system-settings-top">
    <div class="system-controls-compact">
     <div class="mode-select-group">
@@ -592,6 +586,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     <small>장치 상태·기능 확인</small>
    </aside>
   </div>
+  <div class="reservation-target-layout">
   <div class="time-setting-box reservation-compact">
    <div class="minor-section-title schedule-section-title">예약 설정</div>
    <div class="time-action-layout">
@@ -602,6 +597,13 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     </div>
     <button class="btn-reset-setting" onclick="resetAllConfigurations()">↻ 설정 초기화</button>
    </div>
+  </div>
+  <section class="selected-rail-summary" aria-label="선택한 제어 대상">
+   <span class="selected-rail-eyebrow">선택한 난간</span>
+   <strong id="systemSelectedRailName">난간을 선택하세요</strong>
+   <span id="systemSelectedRailConnection" class="selected-rail-connection" role="status">연결 상태 미확인</span>
+   <small id="systemSelectedRailDetail">제어할 난간을 선택하면 정보가 표시됩니다.</small>
+  </section>
   </div>
   <section class="energy-summary" aria-label="태양광 에너지 모니터링">
    <div class="battery-board-title minor-section-title energy-section-title">태양광 에너지 모니터링</div>

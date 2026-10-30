@@ -377,3 +377,21 @@ body :is(.card-title,.dashboard-section .section-heading)::after{
  .selected-rail-connection{grid-column:1}
  .card-system-setting .system-settings-top{grid-template-columns:minmax(0,1fr) auto}
 }
+
+/* Keep target identity beside the reservation, rather than above system controls. */
+.card-system-setting .reservation-target-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;flex-shrink:0;padding:12px 0;border-top:1px solid #2e4053;border-bottom:1px solid #2e4053;align-items:stretch}
+.card-system-setting .reservation-target-layout .reservation-compact{padding:0;border:0;min-width:0;margin:0}
+.card-system-setting .reservation-target-layout .time-action-layout{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.card-system-setting .reservation-target-layout .time-inputs-col{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px}
+.card-system-setting .reservation-target-layout .time-row{display:flex;flex-direction:row;align-items:center;gap:7px;width:auto;max-width:none;grid-column:1/-1}
+.card-system-setting .reservation-target-layout .time-row span{flex:0 0 30px;font-size:12px;white-space:nowrap}
+.card-system-setting .reservation-target-layout .custom-time-input{flex:0 1 130px;width:130px;min-width:0;max-width:calc(100% - 37px);min-height:31px}
+.card-system-setting .reservation-target-layout .time-apply-btn-block{grid-column:2;grid-row:auto;width:60px;min-width:0;height:30px;justify-self:end}
+.card-system-setting .reservation-target-layout .btn-reset-setting{align-self:flex-end;margin:0;height:28px;font-size:11px}
+.card-system-setting .reservation-target-layout .selected-rail-summary{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:6px;padding:11px;min-width:0;border-color:#304b5d;background:#122533}
+.card-system-setting .reservation-target-layout #systemSelectedRailName{font-size:16px;line-height:1.45}
+.card-system-setting .reservation-target-layout .selected-rail-connection{align-self:flex-start;font-size:12px}
+.card-system-setting .reservation-target-layout #systemSelectedRailDetail{font-size:11px;max-height:4.5em}
+@media(max-width:700px){
+ .card-system-setting .reservation-target-layout{gap:9px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)}
+}
