@@ -85,3 +85,63 @@ button{transition:background-color .15s,border-color .15s,color .15s}
 .led-radio-label.is-running::after{content:'실행 중';margin-left:auto;padding:2px 8px;border-radius:5px;background:#b6ffdc;color:#04452e;font-size:11px;font-weight:800;white-space:nowrap}
 .led-radio-label.is-pending:not(.is-running){background:#493d16!important;border:2px solid #ffd564!important;color:#fff1bf!important}
 .led-radio-label.is-pending:not(.is-running)::after{content:'적용 대기';margin-left:auto;font-size:11px;color:#ffdf82;white-space:nowrap}
+
+
+/* Restrained section accents: distinct headings without a saturated redesign. */
+.card-system-setting{--section-accent:#69d5df}
+.card-led-setting{--section-accent:#7bd6a8}
+.card-position-setting{--section-accent:#a6b9e8}
+.card-control-setting{--section-accent:#d9b481}
+.projector-merged-square-card1{--section-accent:#79cadc}
+.sub-cards-row-right>.card:first-child{--section-accent:#91cce9}
+.sub-cards-row-right>.card:last-child{--section-accent:#edb6a6}
+.card-system-setting,.card-led-setting,.card-position-setting,.card-control-setting,.projector-merged-square-card1,
+.sub-cards-row-right>.card{border-top:2px solid color-mix(in srgb,var(--section-accent,#69d5df) 55%,#23394d)}
+.card-system-setting>.card-title,.card-led-setting>.card-title,.card-position-setting .card-title,
+.card-control-setting .card-title,.projector-merged-square-card1>.card-title,.sub-cards-row-right>.card .card-title{
+ color:var(--section-accent,#b9d6e7)!important;
+}
+.card-system-setting>.card-title::before,.card-system-setting>.card-title::after,
+.card-led-setting>.card-title::before,.card-led-setting>.card-title::after,
+.card-position-setting .card-title::before,.card-position-setting .card-title::after,
+.card-control-setting .card-title::before,.card-control-setting .card-title::after,
+.sub-cards-row-right>.card .card-title::before,.sub-cards-row-right>.card .card-title::after{
+ background:var(--section-accent,#456b7d);opacity:.38;
+}
+.card-system-setting .battery-board-title{color:#dfc18f}
+.card-system-setting .time-setting-box>div:first-child{color:#b9dff0!important}
+.card-system-setting .sub-block{border-color:#344658;background:#0c1725}
+.card-led-setting .led-radio-label{border-radius:7px}
+.card-led-setting .led-radio-label:not(.is-running):hover{background:#172c35;border-color:#47727d}
+
+/* Settings on the left, non-destructive diagnostics access on the right. */
+.card-system-setting .system-setting-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;min-height:0;flex:1}
+.card-system-setting .system-setting-main{min-width:0;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 7px 3px 1px;scrollbar-gutter:stable}
+.card-system-setting .system-diagnostic-side{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:18px 11px;text-align:center;border:1px solid #355068;border-radius:10px;background:linear-gradient(155deg,#142d3c,#101a2a 75%)}
+.system-diagnostic-side .diagnostic-accent{display:grid;place-items:center;width:46px;height:46px;border-radius:13px;background:#1b4051;color:#8de4e8;font-size:28px}
+.system-diagnostic-side strong{font-size:17px;color:#c5e7ed}
+.system-diagnostic-side span{color:#a9c2d2;font-size:12px;line-height:1.45}
+.system-diagnostic-side small{font-size:11px;color:#8ca6b9;line-height:1.55;word-break:keep-all}
+.system-diagnostic-button{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 6px;border-radius:8px;background:#185267;border:1px solid #4599a7;color:#e4fbfc!important;font-size:13px;font-weight:800;text-decoration:none;transition:background .15s,border-color .15s}
+.system-diagnostic-button:hover{background:#236c7b;border-color:#79d4de}
+.system-diagnostic-button:focus-visible{outline:2px solid #8be5ed;outline-offset:3px}
+.card-system-setting .system-setting-main .mode-select-group-box{grid-template-columns:minmax(0,1fr);gap:8px;padding-bottom:8px}
+.card-system-setting .system-setting-main .mode-select-group-box>div:empty{display:none}
+.card-system-setting .system-setting-main .mode-select-group{gap:4px;margin-bottom:0}
+.card-system-setting .system-setting-main .mode-radio-label{font-size:12px;padding:3px 1px;gap:5px}
+.card-system-setting .system-setting-main .sys-pwr-btn-group{width:100%;min-width:0}
+.card-system-setting .system-setting-main .pwr-state-btn{font-size:12px;min-width:0}
+.card-system-setting .system-setting-main .time-action-layout{grid-template-columns:1fr;gap:9px}
+.card-system-setting .system-setting-main .time-row{justify-content:space-between;gap:3px;font-size:11px}
+.card-system-setting .system-setting-main .time-row span{width:auto;font-size:11px}
+.card-system-setting .system-setting-main .custom-time-input{min-width:0;max-width:118px;font-size:11px;padding:3px}
+.card-system-setting .system-setting-main .btn-reset-setting{min-height:52px;width:100%}
+.card-system-setting .system-setting-main .battery-grid{grid-template-columns:minmax(0,1fr);gap:6px}
+.card-system-setting .system-setting-main .sub-block{height:auto;min-height:105px;padding:8px}
+.card-system-setting .system-setting-main .sub-block-title{font-size:12px}
+.card-system-setting .system-setting-main .sub-block-data{font-size:12px}
+.card-system-setting .system-setting-main .bat-single-percent{font-size:22px!important}
+.card-system-setting .system-setting-main .battery-board-title{font-size:13px}
+@media(max-width:1200px){.card-system-setting .system-setting-split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+@media(max-width:700px){.card-system-setting .system-setting-split{grid-template-columns:1fr}.card-system-setting .system-setting-main{max-height:450px}.card-system-setting .system-diagnostic-side{min-height:170px}}
+@media(prefers-reduced-motion:reduce){.system-diagnostic-button{transition:none}}

@@ -567,6 +567,8 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     <!-- 시스템 설정 -->
     <div class="card-system-setting" style="grid-column: 1 / span 2; grid-row: 1 / span 2; ">
         <div class="card-title">시스템 설정</div>
+        <div class="system-setting-split">
+          <div class="system-setting-main">
         <div class="mode-select-group-box">
             <div class="mode-select-group">
                 <label class="mode-radio-label"><input type="radio" name="pwrSupplyMode" value="0" disabled title="현재 P4 명령 미지원"> 🤖 자동 모드 (미지원)</label>
@@ -620,6 +622,15 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                     <small>전압 기반 추정 · 충전/부하에 따라 오차 있음</small>
                 </div><div style="height:13px;"></div>
             </div>
+        </div>
+          </div>
+          <aside class="system-diagnostic-side" aria-label="시스템 점검 바로가기">
+            <div class="diagnostic-accent" aria-hidden="true">✦</div>
+            <strong>시스템 점검</strong>
+            <span>장치 상태 및 기능 테스트</span>
+            <a class="system-diagnostic-button" href="/function-test.html" target="_blank" rel="noopener noreferrer">시스템 점검 열기 <span aria-hidden="true">↗</span></a>
+            <small>새 창에서 점검 화면을 엽니다. 열기만으로 장치 명령은 실행되지 않습니다.</small>
+          </aside>
         </div>
     </div>
 
