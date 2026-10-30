@@ -17,6 +17,9 @@ int xSemaphoreGive(SemaphoreHandle_t s){(void)s;return 1;}
 int main(void){
  detection_summary_t s;
  detection_manager_init();
+ assert(detection_manager_get_source()==DETECTION_SOURCE_CCTV);
+ assert(!detection_manager_radar_new_person(99));
+ detection_manager_set_source(DETECTION_SOURCE_RADAR);
  assert(detection_manager_radar_new_person(1));
  assert(!detection_manager_cctv_new_person(2));
  detection_manager_set_source(DETECTION_SOURCE_CCTV);
