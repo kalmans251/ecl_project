@@ -422,3 +422,30 @@ body :is(.card-title,.dashboard-section .section-heading)::after{
  .card-system-setting .reservation-target-layout .custom-time-input{font-size:12px;padding:3px}
  .card-system-setting .reservation-target-layout .selected-rail-summary{padding:10px}
 }
+
+/* Top-attached application drawer: overlay only, never resize the dashboard. */
+body #pendingSettingsBar{position:fixed;top:0;left:50%;transform:translateX(-50%);translate:none;z-index:2000;display:flex;flex-direction:column;align-items:stretch;gap:0;width:min(1060px,calc(100vw - 32px));min-width:0;max-width:calc(100vw - 32px);max-height:65vh;overflow:auto;box-sizing:border-box;padding:22px 26px 18px;background:linear-gradient(180deg,#173645,#102533);border:1px solid #50cad5;border-top:0;border-radius:0 0 16px 16px;box-shadow:0 16px 45px #0008,inset 0 3px 0 #63dce3;animation:pendingDrawerOpen .3s ease-out}
+body #pendingSettingsBar[hidden]{display:none}
+.pending-panel-heading{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #375465}
+.pending-panel-heading>span{font-size:20px;font-weight:800;color:#dcfbff}
+body #pendingSettingsMessage{font-size:14px;color:#b0d6e3}
+.pending-panel-content{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;padding:16px 0}
+.pending-panel-content h2{font-size:13px;color:#8de0e9;margin:0 0 9px}
+.pending-target-rails{display:flex;flex-wrap:wrap;gap:8px;max-height:200px;overflow:auto}
+.pending-target-item{flex:1 1 190px;min-width:0;padding:10px 12px;background:#0e1e2c;border:1px solid #3c6375;border-radius:7px}
+.pending-target-item strong{display:block;font-size:17px;color:#fff;overflow-wrap:anywhere}
+.pending-target-item small{display:block;font-size:12px;color:#adc6d7;margin-top:5px;overflow-wrap:anywhere}
+#pendingChangesList{display:flex;flex-wrap:wrap;gap:7px;padding:0;margin:0;list-style:none;max-height:200px;overflow:auto}
+#pendingChangesList li{padding:6px 10px;background:#223b46;border:1px solid #4f6872;border-radius:6px;color:#f0e1a8;font-size:13px;overflow-wrap:anywhere}
+.pending-panel-footer{display:flex;align-items:center;justify-content:space-between;gap:18px;border-top:1px solid #375465;padding-top:13px}
+body #pendingSettingsResult{font-size:13px;line-height:1.6;margin:0;color:#bed6e1}
+body #pendingSettingsBar button{font-size:15px;padding:11px 24px;min-height:42px;flex-shrink:0}
+@keyframes pendingDrawerOpen{from{opacity:0;transform:translate(-50%,-100%)}to{opacity:1;transform:translate(-50%,0)}}
+@media(max-width:700px){
+ body #pendingSettingsBar{width:calc(100vw - 16px);max-width:calc(100vw - 16px);padding:18px 14px 14px;max-height:75vh}
+ .pending-panel-content{grid-template-columns:1fr;gap:14px}
+ .pending-target-rails,#pendingChangesList{max-height:130px}
+ .pending-panel-footer{align-items:flex-start;gap:10px}
+ body #pendingSettingsBar button{font-size:13px;padding:10px 15px}
+}
+@media(prefers-reduced-motion:reduce){body #pendingSettingsBar{animation:none}}
