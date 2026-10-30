@@ -347,3 +347,33 @@ body :is(.card-title,.dashboard-section .section-heading)::after{
  .card-system-setting .solar-metric-value,.card-system-setting .energy-cell .bat-single-percent{font-size:24px!important}
  .card-system-setting .solar-current{font-size:10px}
 }
+
+/* Selected control target and naturally sized system controls. */
+.card-system-setting .selected-rail-summary{flex-shrink:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:11px 13px;border:1px solid #365b6c;border-radius:8px;background:linear-gradient(115deg,#163240,#142331)}
+.selected-rail-eyebrow{grid-column:1/-1;font-size:11px;color:#93baca;letter-spacing:.3px}
+#systemSelectedRailName{font-size:17px;line-height:1.5;color:#e0faff;overflow-wrap:anywhere}
+.selected-rail-connection{align-self:center;font-size:12px;color:#a9b9c8}
+.selected-rail-connection[data-state=online]{color:#58dfb0}
+.selected-rail-connection[data-state=offline]{color:#efa1ab}
+.selected-rail-connection[data-state=mixed]{color:#edcf83}
+#systemSelectedRailDetail{grid-column:1/-1;font-size:12px;color:#9eb9cb;line-height:1.5;max-height:3em;overflow:auto;overflow-wrap:anywhere}
+.card-system-setting .system-settings-top{flex:0 0 auto;align-items:start;grid-template-columns:minmax(0,1fr) auto}
+.card-system-setting .system-controls-compact{gap:9px}
+.card-system-setting .system-controls-compact .sys-pwr-btn-group{width:220px;max-width:100%;gap:3px;padding:3px;background:#0b1522;border:1px solid #34495c;border-radius:7px}
+.card-system-setting .system-controls-compact .pwr-state-btn{height:32px;font-size:13px;padding:4px 8px}
+.card-system-setting .system-check-compact{padding:9px 10px;gap:5px;min-width:105px;align-self:start}
+.card-system-setting .system-check-compact strong{font-size:13px}
+.card-system-setting .system-check-compact small{font-size:10px}
+.card-system-setting .system-check-compact .system-diagnostic-button{font-size:12px;min-height:30px;padding:5px 10px}
+.card-system-setting .reservation-compact .time-action-layout{display:flex;flex-wrap:wrap;align-items:end;gap:9px}
+.card-system-setting .reservation-compact .time-inputs-col{display:flex;flex-wrap:wrap;align-items:end;flex:0 1 auto;gap:9px}
+.card-system-setting .reservation-compact .time-row{flex:0 0 130px;width:130px;max-width:100%}
+.card-system-setting .reservation-compact .custom-time-input{flex:none;width:130px;max-width:100%;font-size:13px}
+.card-system-setting .reservation-compact .time-apply-btn-block{flex:none;align-self:end;width:60px;min-width:60px;height:34px}
+.card-system-setting .reservation-compact .btn-reset-setting{flex:none;width:auto;height:30px;margin:0 0 2px auto}
+.card-system-setting .energy-summary{flex:0 0 auto;justify-content:flex-start}
+@media(max-width:700px){
+ .card-system-setting .selected-rail-summary{grid-template-columns:1fr}
+ .selected-rail-connection{grid-column:1}
+ .card-system-setting .system-settings-top{grid-template-columns:minmax(0,1fr) auto}
+}
