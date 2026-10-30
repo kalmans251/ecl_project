@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ECO LUMINOUS SYSTEM MONITORING</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -518,6 +518,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 .top-info-group{gap:8px; flex-wrap:wrap;justify-content:flex-end}.top-info-group button,.top-info-group select{background:#121929;border:1px solid #294956;color:#b0e8ed;border-radius:7px;padding:7px;cursor:pointer}.clock-display{font-size:12px!important}button:disabled,input:disabled,select:disabled{opacity:.38;cursor:not-allowed!important}.portal-toast{position:fixed;bottom:18px;right:18px;max-width:520px;z-index:10000;background:#122336;border:1px solid #4facfe;padding:14px;border-radius:10px;box-shadow:0 6px 30px #000;color:#fff;font-size:14px}.portal-dialog{color:#dce9f5;background:#0e1726;border:1px solid #28516c;border-radius:14px;width:min(900px,90vw);max-height:85vh;overflow:auto}.portal-dialog::backdrop{background:#000a}.portal-dialog table{width:100%;border-collapse:collapse;font-size:13px}.portal-dialog td,.portal-dialog th{border-bottom:1px solid #263646;padding:10px;text-align:left}.portal-dialog h2{font-size:20px}.portal-dialog button,.portal-dialog input,.portal-dialog select{padding:10px;background:#192d40;color:#fff;border:1px solid #3c6278;border-radius:6px}.portal-dialog label{display:grid;grid-template-columns:150px 1fr;gap:10px;margin:12px 0}.portal-dialog .close{float:right}#siteSelect{max-width:160px}#userName{font-size:12px}.id-badge-container button{background:#142338;color:#dce9f5;border:1px solid #385471;border-radius:8px;padding:9px;margin:3px;cursor:pointer}.id-badge-container button.selected{border-color:#00f2fe;box-shadow:0 0 8px #00f2fe66}.id-badge-container button.offline{opacity:.5}#mapViewport .map-empty{padding:24px;color:#829caf}.portal-readonly{color:#ffb300}.request-status{color:#ffb300}.main-header h1{white-space:nowrap}
 @media(max-width:1100px){body{overflow:auto!important;height:auto!important}.grid-row-3{min-width:1000px;min-height:850px}.main-header{min-width:1000px}.main-header h1{font-size:20px!important}}
 </style><link rel="stylesheet" href="/portal-polish.css">
+<link rel="stylesheet" href="/dashboard-layout.css">
 <style>#tabContentBasic{overflow-y:auto;min-height:0}.led-sequence-interval{display:flex;gap:8px;align-items:center;font-size:12px;color:#c5d7e4;padding:8px}.led-sequence-interval input{width:64px;background:#152c3b;color:#fff;border:1px solid #4b718a;border-radius:5px;padding:5px}</style></head>
 <body>
 
@@ -540,12 +541,12 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     </div>
 </div>
 
-<div style="padding:8px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+<div class="emergency-audio-toolbar">
  <button onclick="enableEmergencyAudio()">비상 알림음 활성화</button>
  <button onclick="muteEmergencyAudio()">현재 호출 알림음 끄기</button>
  <span id="emergencyAudioState" role="status">비상 알림음 비활성 · 활성화 필요</span>
 </div>
-<section aria-label="비상 호출 목록" style="flex-shrink:0;margin:0 16px 10px;padding:10px;border:1px solid #b45353;border-radius:8px">
+<section class="emergency-queue-panel" aria-label="비상 호출 목록">
  <strong id="emergencyQueueTitle">비상 호출 목록</strong> <button onclick="showEmergencyHistory()">처리 이력</button>
  <div id="emergencyQueue" style="max-height:180px;overflow:auto"></div>
 </section>
