@@ -580,9 +580,9 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
      <button class="pwr-state-btn" id="btnModeSleep" onclick="toggleSleepStateUI(true)">🌙 슬립 모드</button>
     </div>
    </div>
-   <aside class="system-check-compact" aria-label="시스템 자체진단 바로가기">
+   <aside class="system-check-compact" aria-label="시스템 자체진단">
     <strong>시스템 자체진단</strong>
-    <a class="system-diagnostic-button" href="/function-test.html" target="_blank" rel="noopener noreferrer" title="새 창으로 자체진단 화면을 엽니다. 열기만으로 장치 명령은 실행되지 않습니다.">진단 열기 ↗</a>
+    <button type="button" class="system-diagnostic-button" onclick="startSystemDiagnosis()">진단 시작</button>
     <small>장치 상태·기능 확인</small>
    </aside>
   </div>
@@ -866,6 +866,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 <script src="/music-status.js"></script>
 <script src="/web-voice.js"></script>
 <script src="/detection-count.js"></script><script src="/radar-view.js"></script><script src="/emergency-queue.js"></script><script src="/emergency-audio.js"></script><script src="/environment-weather.js"></script><script src="/portal.js"></script>
+<script src="/system-diagnosis.js"></script>
 <aside id="pendingSettingsBar" aria-label="변경 설정 적용" hidden>
  <div class="pending-panel-heading"><span>설정 변경 확인</span><strong id="pendingSettingsMessage"></strong></div>
  <div class="pending-panel-content">
@@ -897,5 +898,31 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 .settings-busy-spinner{width:36px;height:36px;margin:auto;border:3px solid #365265;border-top-color:#35dbe6;border-radius:50%;animation:settingsBusySpin .9s linear infinite}
 @keyframes settingsBusySpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.settings-busy-spinner{animation:none;border-color:#35dbe6}}
+</style>
+<dialog id="systemDiagnosisDialog" aria-labelledby="systemDiagnosisTitle" oncancel="if(systemDiagnosisRunning){event.preventDefault();stopSystemDiagnosis();}">
+ <header><h2 id="systemDiagnosisTitle">시스템 자체진단</h2><p id="systemDiagnosisTarget"></p></header>
+ <p class="diagnosis-note">통신 조회만 수행합니다. 전원·LED·음악 설정은 변경하지 않습니다. Pi 연결 확인은 장치 응답 확인과 별개입니다.</p>
+ <ol id="systemDiagnosisResults" aria-label="단계별 진단 결과"></ol>
+ <p id="systemDiagnosisSummary" role="status" aria-live="polite"></p>
+ <footer><button type="button" id="systemDiagnosisStop" onclick="stopSystemDiagnosis()">진단 중단</button><button type="button" id="systemDiagnosisClose" onclick="document.getElementById('systemDiagnosisDialog').close()">닫기</button></footer>
+</dialog>
+<style>
+#systemDiagnosisDialog{width:min(780px,calc(100vw - 32px));max-height:85vh;overflow:auto;padding:24px;background:#101e2d;color:#e2eff9;border:1px solid #4aabbc;border-radius:12px;box-shadow:0 20px 70px #0009}
+#systemDiagnosisDialog::backdrop{background:#020812aa}
+#systemDiagnosisDialog h2{margin:0 0 8px;font-size:22px;color:#9aeaf0}
+#systemDiagnosisTarget{overflow-wrap:anywhere;color:#c0deeb}
+#systemDiagnosisDialog .diagnosis-note{font-size:12px;color:#a4bacc;line-height:1.6}
+#systemDiagnosisResults{padding:0;list-style:none;display:grid;gap:8px}
+#systemDiagnosisResults li{padding:12px;border:1px solid #355065;border-left-width:4px;border-radius:7px;background:#142737}
+#systemDiagnosisResults strong,#systemDiagnosisResults span{display:block;overflow-wrap:anywhere}
+#systemDiagnosisResults span{margin-top:5px;font-size:13px;color:#c0d4e3}
+#systemDiagnosisResults [data-state=pass]{border-left-color:#4bdaab}
+#systemDiagnosisResults [data-state=fail]{border-left-color:#fa8996}
+#systemDiagnosisResults [data-state=running]{border-left-color:#61dcec}
+#systemDiagnosisResults [data-state=skip]{border-left-color:#e3c576}
+#systemDiagnosisSummary{line-height:1.6;font-size:14px}
+#systemDiagnosisDialog footer{display:flex;justify-content:flex-end;gap:8px}
+#systemDiagnosisDialog button{padding:8px 16px;background:#1a3c50;color:#dcf5ff;border:1px solid #4a8198;border-radius:6px;cursor:pointer}
+#systemDiagnosisDialog button:disabled{opacity:.45;cursor:default}
 </style>
 </body></html>
