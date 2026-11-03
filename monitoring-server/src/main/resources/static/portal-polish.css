@@ -463,3 +463,31 @@ body .card:not(#sosCardContainer):focus-within{border-color:#9b7e5f;box-shadow:0
  body .card:not(#sosCardContainer):hover{border-color:#9b7e5f;box-shadow:0 0 12px #d3ac7922,inset 0 0 0 1px #d3ac7909}
  body :is(.sub-block,.env-item,.ctrl-item):hover{border-color:#9b7e5f}
 }
+
+/* High-contrast amber headings; keep emergency red and existing title geometry. */
+body .grid-row-3 .card-title,
+body .grid-row-3 .dashboard-section .section-heading{
+ --section-accent:#ffb454;color:#ffb454!important;font-size:18px!important;font-weight:800!important;
+ text-align:center;justify-content:center;text-shadow:0 1px 2px #0008!important;
+}
+body .grid-row-3 :is(.card-title,.dashboard-section .section-heading)::before{
+ background-image:linear-gradient(270deg,#ffb454,rgba(255,180,84,.035));opacity:.55;
+}
+body .grid-row-3 :is(.card-title,.dashboard-section .section-heading)::after{
+ background-image:linear-gradient(90deg,#ffb454,rgba(255,180,84,.035));opacity:.55;
+}
+body #sosCardContainer .card-title{--section-accent:#ff7582;color:#ff7582!important}
+body #sosCardContainer .card-title::before{background-image:linear-gradient(270deg,#ff7582,rgba(255,117,130,.035))}
+body #sosCardContainer .card-title::after{background-image:linear-gradient(90deg,#ff7582,rgba(255,117,130,.035))}
+@media(hover:hover) and (pointer:fine){
+ body .grid-row-3 :is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):hover .card-title{
+  color:#ffd295!important;text-shadow:0 0 10px #ffb45455!important;
+ }
+ body .grid-row-3 :is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):hover .card-title::before,
+ body .grid-row-3 :is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):hover .card-title::after{
+  opacity:1;background-image:linear-gradient(100deg,transparent 5%,var(--section-accent) 35%,#fff1d8 50%,var(--section-accent) 65%,transparent 95%);
+ }
+ body #sosCardContainer:hover .card-title{color:#ff9aa4!important;text-shadow:0 0 10px #ff647866!important}
+}
+body .grid-row-3 :is(.card,.card-system-setting,.card-led-setting,.card-control-setting,.card-position-setting):focus-within .card-title{color:#ffd295!important}
+body #sosCardContainer:focus-within .card-title{color:#ff9aa4!important}
