@@ -115,10 +115,10 @@ function renderSelectedRailSummary(){
  const online=items.filter(r=>r.online).length;
  connection.dataset.state=stateFetchFailed?'unknown':!items.length?'unknown':online===items.length?'online':online?'mixed':'offline';
  text('systemSelectedRailConnection',stateFetchFailed?'서버 연결 실패 · 마지막 확인 정보':!items.length?'연결 상태 미확인':items.length===1?(online?'● Pi 연결됨':'○ Pi 연결 끊김'):`Pi 연결됨 ${online}개 · 연결 끊김 ${items.length-online}개`);
- text('systemSelectedRailDetail',items.length===1?`${items[0].gateway_id} / 난간 ${items[0].number}`:items.length?items.map(r=>r.name).join(' · '):'제어할 난간을 선택하면 정보가 표시됩니다.');
+ text('systemSelectedRailDetail',items.length===1?'선택한 난간에 설정을 적용합니다.':items.length?items.map(r=>r.name).join(' · '):'제어할 난간을 선택하면 정보가 표시됩니다.');
 }
 function renderSelection(){
- const grid=$('idBadgeGrid');grid.replaceChildren();for(const r of view.rails){const b=document.createElement('button');b.type='button';b.className=(selected.has(r.id)?'selected ':'')+(r.online?'':'offline');b.textContent=`${r.name} · ${r.gateway_id}/${r.number}`;b.title=r.online?'게이트웨이 연결됨':'게이트웨이 오프라인';b.onclick=()=>choose(r.id);grid.append(b);}
+ const grid=$('idBadgeGrid');grid.replaceChildren();for(const r of view.rails){const b=document.createElement('button');b.type='button';b.className=(selected.has(r.id)?'selected ':'')+(r.online?'':'offline');b.textContent=r.name;b.title=r.online?'게이트웨이 연결됨':'게이트웨이 오프라인';b.onclick=()=>choose(r.id);grid.append(b);}
  text('selectedDeviceTag',rails().length?rails().map(r=>r.name).join(', '):'난간 선택');$('inputTotalDevices').value=view.rails.length;
  {const r=rails().length===1?rails()[0]:null;const empty=rails().length>1?'여러 난간 선택됨':'난간을 선택하세요';text('installedLat',r?(r.latitude??'미등록'):empty);text('installedLng',r?(r.longitude??'미등록'):empty);text('installedAddress',r?(r.address||'미등록'):empty);}
  renderLive();renderMap();
@@ -158,7 +158,7 @@ function syncPendingSettings(){
  if(!targets.length){const empty=document.createElement('span');empty.textContent='선택된 난간 없음';root.append(empty);}
  for(const r of targets){const item=document.createElement('div');item.className='pending-target-item';
   const name=document.createElement('strong');name.textContent=r.name;
-  const detail=document.createElement('small');detail.textContent=`${r.gateway_id} / 난간 ${r.number} · ${stateFetchFailed?'연결 확인 불가':r.online?'Pi 연결됨':'Pi 연결 끊김'}`;
+  const detail=document.createElement('small');detail.textContent=`${stateFetchFailed?'연결 확인 불가':r.online?'Pi 연결됨':'Pi 연결 끊김'}`;
   item.append(name,detail);root.append(item);
  }
  const labels={'power':'전원','sleep':'슬립 모드','led':'LED 모드','projector':'프로젝터','volume':'음량','music.mode':'음악 재생 모드','detection':'감지 방식','weather':'날씨 패턴','weather.auto':'현재 날씨 자동 연동','led.basic_pattern':'LED 기본 패턴','led.music_pattern':'음악 연동 패턴','led.sequence':'LED 순차 전환 간격'};
@@ -300,7 +300,7 @@ function renderMap(){
  for(const r of view.rails){
   if(r.latitude==null||r.longitude==null)continue;
   const pos=[r.latitude,r.longitude],m=L.marker(pos,{icon:railMapIcon(r),draggable:false,zIndexOffset:selected.has(r.id)?1000:0}).addTo(map);
-  const label=document.createElement('span');label.textContent=r.name+' · '+r.gateway_id+'/'+r.number;m.bindTooltip(label);m.on('click',()=>choose(r.id));markers.set(r.id,m);coords.push(pos);
+  const label=document.createElement('span');label.textContent=r.name;m.bindTooltip(label);m.on('click',()=>choose(r.id));markers.set(r.id,m);coords.push(pos);
   if(!groups.has(r.gateway_id))groups.set(r.gateway_id,[]);groups.get(r.gateway_id).push(r);
  }
  for(const group of groups.values()){
