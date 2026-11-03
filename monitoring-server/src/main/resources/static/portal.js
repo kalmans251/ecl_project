@@ -26,7 +26,24 @@ function statusCheck(r){
 }
 function displayedStatus(r,check){return r&&(check.fresh||check.waiting)?r.reported||{}:{};}
 let emergencyAudio;
-function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>text('emergencyAudioState',message));}
+function syncBrowserToggle(onId,offId,enabled){
+ for(const [id,value]of [[onId,enabled],[offId,!enabled]]){const el=$(id);if(el){el.classList.toggle('active',value);el.setAttribute('aria-pressed',String(value));}}
+}
+let weatherInfoEnabled=true;
+function setWeatherInfoEnabled(enabled){
+ weatherInfoEnabled=enabled;
+ EnvironmentWeather.setEnabled(enabled);
+ syncBrowserToggle('btnWeatherInfoOn','btnWeatherInfoOff',enabled);
+}
+function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>{
+ text('emergencyAudioState',message);
+ syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',emergencyAudio?.isEnabled()??false);
+});}
+function setEmergencyAudioEnabled(enabled){return guarded(async()=>{
+ const audio=alarmAudio();
+ if(enabled)await audio.enable();else audio.disable();
+ syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',audio.isEnabled());
+});}
 function enableEmergencyAudio(){return guarded(()=>alarmAudio().enable());}
 function muteEmergencyAudio(){alarmAudio().mute();}
 let emergencyQueue;
