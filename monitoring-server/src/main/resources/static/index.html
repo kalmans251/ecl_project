@@ -540,15 +540,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     </div>
 </div>
 
-<div style="padding:8px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
- <button onclick="enableEmergencyAudio()">비상 알림음 활성화</button>
- <button onclick="muteEmergencyAudio()">현재 호출 알림음 끄기</button>
- <span id="emergencyAudioState" role="status">비상 알림음 비활성 · 활성화 필요</span>
-</div>
-<section aria-label="비상 호출 목록" style="flex-shrink:0;margin:0 16px 10px;padding:10px;border:1px solid #b45353;border-radius:8px">
- <strong id="emergencyQueueTitle">비상 호출 목록</strong> <button onclick="showEmergencyHistory()">처리 이력</button>
- <div id="emergencyQueue" style="max-height:180px;overflow:auto"></div>
-</section>
+
 <div class="main-header">
     <div class="top-left-menu-group">
         <button class="menu-dropdown-btn" id="btnStatsMenu" onclick="toggleStatsMenu(event)">📊 통계 데이터 ▾</button>
@@ -734,7 +726,12 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
         </div>
         <div class="card sos-card" id="sosCardContainer" style="border-color: var(--neon-red);">
             <div class="card-title" style="color: var(--neon-red); text-shadow: 0 0 10px var(--neon-red); font-size: 27px; margin-bottom: 0px; height: 60px;">SOS &amp; CALL</div>
-            <div class="sos-card-flex">
+            <section class="sos-emergency-queue" aria-label="비상 호출 목록">
+ <div class="sos-queue-heading"><strong id="emergencyQueueTitle">비상 호출 목록</strong><button type="button" onclick="showEmergencyHistory()">처리 이력</button></div>
+ <div id="emergencyQueue"></div>
+ <div class="sos-audio-status"><span id="emergencyAudioState" role="status">비상 알림음 비활성 · 활성화 필요</span><button type="button" onclick="muteEmergencyAudio()">현재 호출 음소거</button></div>
+</section>
+<div class="sos-card-flex">
                 <div class="sos-display-box" onclick="triggerMp3Alarm()">
                     <div class="sos-big-text" id="sosBigText">🟢 수신대기</div>
                     <div class="sos-sub-desc" id="sosSubDesc">장치 상태 미수신</div>
@@ -824,7 +821,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     <div class="card-control-setting dashboard-section section-controls" style="grid-column: 3 / span 1; grid-row: 3 / span 2; ">
 	    <div class="card-control-innerbox-1">
 	        <div class="card-title section-heading" style="font-size:16px;margin-bottom:10px;">기능 ON/OFF 설정</div>
-	        <div class="device-ctrl-grid">
+	        <div class="device-ctrl-grid feature-toggle-grid">
 	            <!-- 기존 음성인식 토글을 레이더/CCTV 전환 스위치로 변경 -->
 	            <div class="ctrl-item" style="margin-bottom:5px;">
 	                <span class="ctrl-label">📹 모니터링 전환</span>
@@ -845,6 +842,14 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 	                <span class="ctrl-label">📡 센서 수신</span>
 	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on active" disabled title="현재 펌웨어 ON/OFF 제어 미지원" onclick="toggleDeviceState('radar', true)">ON</button><button type="button" class="btn-toggle off" disabled title="현재 펌웨어 ON/OFF 제어 미지원" onclick="toggleDeviceState('radar', false)">OFF</button></div>
 	            </div>
+            <div class="ctrl-item browser-feature-toggle">
+             <span class="ctrl-label" title="이 브라우저의 날씨 조회와 표시만 변경합니다. 난간 LED 설정은 유지됩니다.">☀️ 날씨정보</span>
+             <div class="ctrl-btn-group"><button type="button" id="btnWeatherInfoOn" class="btn-toggle on active" aria-pressed="true" onclick="setWeatherInfoEnabled(true)">ON</button><button type="button" id="btnWeatherInfoOff" class="btn-toggle off" aria-pressed="false" onclick="setWeatherInfoEnabled(false)">OFF</button></div>
+            </div>
+            <div class="ctrl-item browser-feature-toggle">
+             <span class="ctrl-label" title="현재 모니터링 컴퓨터의 알림음만 변경합니다. 난간 비상벨과 호출 수신은 유지됩니다.">🔊 비상 알림음</span>
+             <div class="ctrl-btn-group"><button type="button" id="btnEmergencyAudioOn" class="btn-toggle on" aria-pressed="false" onclick="setEmergencyAudioEnabled(true)">ON</button><button type="button" id="btnEmergencyAudioOff" class="btn-toggle off active" aria-pressed="true" onclick="setEmergencyAudioEnabled(false)">OFF</button></div>
+            </div>
 	        </div>
 	    </div>
 
@@ -929,5 +934,30 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 #systemDiagnosisResults [data-state=running] strong::before{content:'';display:inline-block;width:12px;height:12px;margin-right:8px;vertical-align:-1px;border:2px solid #38556a;border-top-color:#73edf3;border-radius:50%;animation:diagnosisLoadingSpin .8s linear infinite}
 @keyframes diagnosisLoadingSpin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#systemDiagnosisResults [data-state=running] strong::before{animation:none;border-color:#73edf3}}
+</style>
+<style>
+.card-control-setting .card-control-innerbox-1{padding-right:0;border-right:0;min-width:0}
+.card-control-setting .feature-toggle-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(2,auto);gap:8px}
+.feature-toggle-grid>.ctrl-item:nth-child(1){grid-column:1;grid-row:1}
+.feature-toggle-grid>.ctrl-item:nth-child(2){grid-column:2;grid-row:1}
+.feature-toggle-grid>.ctrl-item:nth-child(3){grid-column:1;grid-row:2}
+.feature-toggle-grid>.ctrl-item:nth-child(4){grid-column:2;grid-row:2}
+.feature-toggle-grid>.ctrl-item:nth-child(5){grid-column:3;grid-row:1}
+.feature-toggle-grid>.ctrl-item:nth-child(6){grid-column:3;grid-row:2}
+.feature-toggle-grid .ctrl-item{min-width:0;flex-wrap:wrap;gap:6px;padding:7px 8px;margin-bottom:0!important}
+.feature-toggle-grid .ctrl-label{font-size:12px}
+.feature-toggle-grid .ctrl-btn-group{margin-left:auto}
+.sos-emergency-queue{flex-shrink:0;border:1px solid #65434b;border-radius:7px;padding:8px;margin-bottom:8px;background:#1d202c;font-size:11px}
+.sos-queue-heading,.sos-audio-status{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.sos-queue-heading strong{color:#ffb5bc}
+#sosCardContainer #emergencyQueue{max-height:110px;overflow:auto;margin:6px 0;overflow-wrap:anywhere}
+.sos-emergency-queue button{font-size:11px;padding:3px 6px;background:#202f40;border:1px solid #5f5760;border-radius:5px;color:#e9e1e5;cursor:pointer}
+.sos-audio-status{color:#b6c5d1;border-top:1px solid #42404a;padding-top:5px}
+#sosCardContainer{overflow-y:auto}
+#sosCardContainer .sos-card-flex{overflow:visible;min-height:170px;flex:0 0 auto}
+@media(max-width:700px){
+ .card-control-setting .feature-toggle-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none}
+ .feature-toggle-grid>.ctrl-item:nth-child(n){grid-column:auto;grid-row:auto}
+}
 </style>
 </body></html>
