@@ -32,7 +32,7 @@ async function startSystemDiagnosis(){
   text('systemDiagnosisSummary','서버 연결과 장치 응답을 순서대로 확인합니다.');
   $('systemDiagnosisClose').disabled=true;$('systemDiagnosisStop').disabled=false;dialog.showModal();
   let passed=0,failed=0,skipped=0;
-  const server=diagnosisRow('서버 · Pi 연결 상태');server('running','최신 상태 조회 중…');
+  const server=diagnosisRow('모니터링 서버 연결');server('running','최신 상태 조회 중…');
   let snapshot;const serverStarted=performance.now();
   try{snapshot=await diagnosisRequest('/api/portal/sites/'+encodeURIComponent(targetSite)+'/state');
    if(!await diagnosisLoading(serverStarted,800)){server('skip','진단 중단');return;}
@@ -40,7 +40,10 @@ async function startSystemDiagnosis(){
   catch(e){server('fail',e.message);throw Error('서버 상태를 조회하지 못해 장치 진단을 중단했습니다. 로그인·서버·네트워크를 확인하세요.');}
   for(const target of targets){
    if(systemDiagnosisStop)break;
-   const rail=snapshot.rails.find(r=>r.id===target.id),gateway=diagnosisRow(target.name+' · Pi');
+   const gateway=diagnosisRow(target.name+' · Pi'),gatewayStarted=performance.now();
+   gateway('running','게이트웨이 연결 상태 확인 중…');
+   if(!await diagnosisLoading(gatewayStarted,1000)){gateway('skip','진단 중단');break;}
+   const rail=snapshot.rails.find(r=>r.id===target.id);
    if(!rail?.online){gateway('fail','Pi 오프라인 또는 접근 대상 없음 · Pi 실행/인터넷/게이트웨이 연결을 확인하세요.');failed++;skipped+=3;continue;}
    gateway('pass','서버와 Pi 연결 확인');passed++;
    if(snapshot.calls.some(c=>c.GATEWAY_ID===target.gateway_id||snapshot.rails.some(r=>r.id===c.RAIL_ID&&r.gateway_id===target.gateway_id))||rail.reported?.emergency){gateway('skip','통화 또는 비상 처리 중 · 장치 조회 생략');skipped+=3;continue;}
