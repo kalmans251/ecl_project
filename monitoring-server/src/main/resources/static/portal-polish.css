@@ -449,3 +449,17 @@ body #pendingSettingsBar button{font-size:15px;padding:11px 24px;min-height:42px
  body #pendingSettingsBar button{font-size:13px;padding:10px 15px}
 }
 @media(prefers-reduced-motion:reduce){body #pendingSettingsBar{animation:none}}
+
+/* Consistent thin warm borders, matching the function control boxes. */
+:root{--card-border:#4b4540;--card-border-hover:#9b7e5f}
+body :is(.dashboard-section,.center-control-panel),
+body .card:not(#sosCardContainer){border:1px solid #4b4540}
+body :is(.sub-block,.env-item,.ctrl-item,.system-check-compact,.selected-rail-summary,.id-badge-container,.map-viewport,.single-terminal-screen-merged,.media-display-container,.radar-container,.audio-ctrl-box,.contact-row){border-color:#4b4540}
+body .card-system-setting .reservation-target-layout .selected-rail-summary{border-color:#4b4540}
+body :is(.dashboard-section,.center-control-panel):focus-within,
+body .card:not(#sosCardContainer):focus-within{border-color:#9b7e5f;box-shadow:0 0 12px #d3ac7922}
+@media(hover:hover) and (pointer:fine){
+ body :is(.dashboard-section,.center-control-panel):hover,
+ body .card:not(#sosCardContainer):hover{border-color:#9b7e5f;box-shadow:0 0 12px #d3ac7922,inset 0 0 0 1px #d3ac7909}
+ body :is(.sub-block,.env-item,.ctrl-item):hover{border-color:#9b7e5f}
+}
