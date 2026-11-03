@@ -305,9 +305,12 @@ function renderMap(){
  }
  for(const group of groups.values()){
   const points=group.sort((a,b)=>a.number-b.number).map(r=>[r.latitude,r.longitude]);
-  if(points.length>1)railRouteLayers.push(L.polyline(points,{color:'#19bfd0',weight:3,opacity:.65,dashArray:'7 7',interactive:false}).addTo(map));
+  if(points.length>1){
+   railRouteLayers.push(L.polyline(points,{color:'#47232b',weight:7,opacity:.8,interactive:false}).addTo(map));
+   railRouteLayers.push(L.polyline(points,{color:'#ff4d58',weight:4,opacity:1,interactive:false}).addTo(map));
+  }
  }
- let legend=$('railMapLegend');if(!legend){legend=document.createElement('div');legend.id='railMapLegend';legend.className='rail-map-legend';legend.textContent='숫자: 난간 번호 · 청록 테두리: 선택 · 점선: 같은 Pi의 번호 순서';$('mapViewport').append(legend);}
+ let legend=$('railMapLegend');if(!legend){legend=document.createElement('div');legend.id='railMapLegend';legend.className='rail-map-legend';legend.textContent='숫자: 난간 번호 · 청록 테두리: 선택 · 빨간 연결선: 같은 Pi의 난간 번호 순서';$('mapViewport').append(legend);}
  if(coords.length&&!map._portalFitted){map.fitBounds(coords,{padding:[40,40],maxZoom:18});map._portalFitted=true;}map.invalidateSize();
 }
 function musicTime(ms){if(ms===null||ms===undefined)return '--:--';const sec=Math.floor(ms/1000);return `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}`;}
