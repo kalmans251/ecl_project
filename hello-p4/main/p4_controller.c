@@ -12,6 +12,7 @@
 
 #include "system_state.h"
 #include "status_snapshot.h"
+#include "radar_cache.h"
 
 #include "power_control.h"
 
@@ -571,7 +572,7 @@ static void handle_general_apply(const protocol_frame_t *request)
     protocol_frame_t f=*request;
     f.command=request->payload[4];f.length=request->length-5;
     memmove(f.payload,request->payload+5,f.length);
-    uint8_t response[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE+3]={0};memcpy(response,request->payload,5);
+    uint8_t response[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE+5]={0};memcpy(response,request->payload,5);
     uint8_t response_length=7;
     response[5]=1;
     bool active=call_manager_is_active() || emergency_manager_is_active();
@@ -582,7 +583,7 @@ static void handle_general_apply(const protocol_frame_t *request)
         case SERVICE_SYSTEM:
             if(f.length==0 && (f.command==CMD_PING || f.command==CMD_STATUS_REQUEST)) {
                 response[5]=0;response[6]=1;
-            } else if(f.command==CMD_STATUS_REQUEST && f.length==1 && (f.payload[0]==1 || f.payload[0]==2 || f.payload[0]==3 || f.payload[0]==4)) {
+            } else if(f.command==CMD_STATUS_REQUEST && f.length==1 && (f.payload[0]==1 || f.payload[0]==2 || f.payload[0]==3 || f.payload[0]==4 || f.payload[0]==5)) {
                 detection_summary_t detection;detection_manager_get_summary(&detection);
                 status_snapshot_encode(response+6,&state,power_control_get_ac() || power_control_get_battery(),
                     projector_control_get(),detection.source,music_manager_get_mode(),
@@ -592,8 +593,16 @@ static void handle_general_apply(const protocol_frame_t *request)
                     response[6]=2;energy_monitor_encode(response+6+STATUS_SNAPSHOT_SIZE);
                     response_length+=ENERGY_WIRE_SIZE;
                     if(f.payload[0]>=3){response[6]=f.payload[0];response[response_length++]=state.led_basic_pattern;response[response_length++]=state.led_music_pattern;}
-                    if(f.payload[0]==4)response[response_length++]=state.led_sequence_seconds?state.led_sequence_seconds:10;
+                    if(f.payload[0]>=4)response[response_length++]=state.led_sequence_seconds?state.led_sequence_seconds:10;
+                    if(f.payload[0]>=5){response[response_length++]=state.emergency_enabled;response[response_length++]=state.sensor_enabled;}
                 }
+            }
+            break;
+        case SERVICE_EMERGENCY:
+            if(f.length==0 && (f.command==CMD_START || f.command==CMD_STOP)) {
+                bool enabled=f.command==CMD_START;
+                system_state_set_emergency_enabled(enabled);
+                response[5]=0;response[6]=enabled;
             }
             break;
         case SERVICE_LED:
@@ -627,7 +636,12 @@ static void handle_general_apply(const protocol_frame_t *request)
             }
             break;
         case SERVICE_DETECTION:
-            if(f.length==0 && (f.command==CMD_STATUS_REQUEST || f.command==CMD_DETECTION_RESET)) {
+            if(f.length==0 && (f.command==CMD_START || f.command==CMD_STOP)) {
+                bool enabled=f.command==CMD_START;
+                system_state_set_sensor_enabled(enabled);radar_cache_set_enabled(enabled);
+                if(enabled)sleep_manager_reset_activity();
+                response[5]=0;response[6]=enabled;
+            } else if(f.length==0 && (f.command==CMD_STATUS_REQUEST || f.command==CMD_DETECTION_RESET)) {
                 if(f.command==CMD_DETECTION_RESET && reset_cached && reset_rail==request->railing_id && !memcmp(reset_token,request->payload,4)) {
                     response[5]=0;memcpy(response+6,reset_detail,6);response_length=12;
                     break; /* Repeated transaction must not erase later detections. */
@@ -1280,6 +1294,9 @@ static void handle_detection(
         return;
     }
 
+
+    p4_system_state_t receive_state;system_state_get(&receive_state);
+    if(!receive_state.sensor_enabled){s_apply_accepted=true;return;}
 
     uint8_t event =
         frame->payload[0];
@@ -2049,6 +2066,12 @@ static void handle_emergency(
             CMD_START
         )
         {
+            p4_system_state_t state;system_state_get(&state);
+            if(!state.emergency_enabled) {
+                uint8_t ended[5];memcpy(ended,frame->payload,5);ended[0]=0x82;
+                send_response(frame,SERVICE_EMERGENCY,CMD_DATA,ended,5);
+                return;
+            }
             emergency_manager_start(
                 source,
                 seq

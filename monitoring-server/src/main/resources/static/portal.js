@@ -142,6 +142,15 @@ function renderSelection(){
 }
 // Keep unsent edits separate from confirmed device observations.
 function syncReportedControls(s){
+ for(const [type,op,key]of [['alarmBell','alarm','alarm_enabled'],['radar','sensor','sensor_enabled']]){
+  document.querySelectorAll('[data-device-toggle="'+type+'"]').forEach(b=>{
+   const value=dirty.has(op)?dirty.get(op)==='on':s[key];
+   const active=typeof value==='boolean'&&b.dataset.enabled===String(value);
+   b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+   b.title=typeof value==='boolean'?'':'설정 상태 미확인 · Pi와 P4 업데이트가 필요합니다.';
+  });
+ }
+
  if(!dirty.has('volume')&&s.volume!==undefined){$('piVolume').value=s.volume;updateVolUI(s.volume,false);}
  if(!dirty.has('power'))document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.checked=i.value===({ac:'2',battery:'1'}[s.power]));
  if(!dirty.has('sleep')){
@@ -178,7 +187,7 @@ function syncPendingSettings(){
   const detail=document.createElement('small');detail.textContent=`${stateFetchFailed?'연결 확인 불가':r.online?'Pi 연결됨':'Pi 연결 끊김'}`;
   item.append(name,detail);root.append(item);
  }
- const labels={'power':'전원','sleep':'슬립 모드','led':'LED 모드','projector':'프로젝터','volume':'음량','music.mode':'음악 재생 모드','detection':'감지 방식','weather':'날씨 패턴','weather.auto':'현재 날씨 자동 연동','led.basic_pattern':'LED 기본 패턴','led.music_pattern':'음악 연동 패턴','led.sequence':'LED 순차 전환 간격'};
+ const labels={'alarm':'비상벨','sensor':'센서 수신','power':'전원','sleep':'슬립 모드','led':'LED 모드','projector':'프로젝터','volume':'음량','music.mode':'음악 재생 모드','detection':'감지 방식','weather':'날씨 패턴','weather.auto':'현재 날씨 자동 연동','led.basic_pattern':'LED 기본 패턴','led.music_pattern':'음악 연동 패턴','led.sequence':'LED 순차 전환 간격'};
  const values={ac:'상전',battery:'배터리',on:'켜기',off:'끄기',basic:'기본',music:'음악 연동',weather:'날씨 연동',radar:'레이더',cctv:'CCTV',clear:'맑음',rain:'비/흐림',snow:'눈',sequential:'순차',shuffle:'무작위',age:'연령 연동'};
  const list=$('pendingChangesList');list.replaceChildren();
  for(const [op,value] of dirty){const li=document.createElement('li');let display=values[value]??String(value);
@@ -276,7 +285,13 @@ async function playSelectedMusic(){
  catch(e){musicPage=null;fillMusicTracks();throw e;}
  finally {musicBusy=false;renderMusicCatalog();}
 }
-function toggleDeviceState(type,value){if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');mark('projector',value?'on':'off');document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(String(value))));}
+function toggleDeviceState(type,value){
+ const operation={projector:'projector',alarmBell:'alarm',radar:'sensor'}[type];
+ if(!operation)return;
+ mark(operation,value?'on':'off');
+ if(type==='projector')document.querySelectorAll('[onclick]').forEach(b=>{if(b.getAttribute('onclick').startsWith("toggleDeviceState('projector'"))b.classList.toggle('active',b.getAttribute('onclick').includes(String(value)));});
+ document.querySelectorAll('[data-device-toggle="'+type+'"]').forEach(b=>{const active=b.dataset.enabled===String(value);b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+}
 function switchDisplayView(mode,edit=true){$('mediaDisplayCard').classList.toggle('cctv-only',mode==='cctv');$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);radarView.select(mode==='radar'&&rails().length===1?rails()[0].id:null);}
 async function waitAppliedSnapshot(targets,targetSite){
  const baseline=new Map(targets.map(id=>[id,statusBaselines.get(id)?.seen??view?.rails.find(r=>r.id===id)?.seen_at??0]));

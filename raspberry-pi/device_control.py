@@ -23,7 +23,7 @@ HELP = '''  power <id> ac|battery|on|off    select+start power, or start/stop cu
   music <id> start|stop|pause|resume|next
   music <id> mode sequential|shuffle|age
   volume <id> <0..100>           shared WROOM music/voice volume (outside calls)
-  sleep <id> on|off              enable/disable existing sleep policy
+  alarm <id> on|off             enable/disable new field emergency calls\n  sensor <id> on|off            enable/disable P4 detection reception\n  sleep <id> on|off              enable/disable existing sleep policy
   detection <id> radar|cctv      choose detection source (CCTV input needs server)
   detection <id> count|reset    read/reset P4 cumulative detection count
   cctv <id> enter <seq>          inject a new-person event (CCTV mode)\n  cctv <id> age <seq> 10|20|30|40|keep\n                                inject matching age result; keep preserves group\n  query <id> p4|wroom|s3         request live SYSTEM status
@@ -43,7 +43,7 @@ class DeviceControls:
 
     def execute(self, parts, *, guard=None, structured=False):
         if not parts or parts[0].lower() not in (
-                'power', 'projector', 'led', 'music', 'volume', 'sleep', 'detection', 'query', 'ping', 'cctv'):
+                'power', 'projector', 'led', 'music', 'volume', 'sleep', 'detection', 'query', 'ping', 'cctv', 'alarm', 'sensor'):
             return None
         name = parts[0].lower()
         if len(parts) < 3 and not (name == 'ping' and len(parts) == 2):
@@ -84,6 +84,9 @@ class DeviceControls:
                 add(Service.POWER, Command.START)
             else:
                 add(Service.POWER, action)
+        elif name in ('alarm', 'sensor'):
+            add(Service.EMERGENCY if name == 'alarm' else Service.DETECTION,
+                one({'on': Command.START, 'off': Command.STOP}))
         elif name == 'projector':
             add(Service.PROJECTOR, one({'on': Command.START, 'off': Command.STOP}))
         elif name == 'led':
@@ -169,7 +172,8 @@ class DeviceControls:
                 token = self.request_id.to_bytes(4, 'big')
                 wroom_apply = name == 'volume' or (name == 'music' and args == ['stop'])
                 expected = Node.WROOM if original.service == Service.MUSIC else original.dst
-                detail = original.payload[-1] if name == 'volume' else (0 if wroom_apply else None)
+                detail = (int(args[0]=='on') if name in ('alarm','sensor') else
+                          original.payload[-1] if name == 'volume' else (0 if wroom_apply else None))
                 with self.condition:
                     self.pending = (rail, token, original.command, original.service, expected, detail)
                     self.result = None

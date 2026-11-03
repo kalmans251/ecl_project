@@ -24,7 +24,7 @@ class StatusTests(unittest.TestCase):
   self.sync.demand(dict(version=1,rails=[1]))
   def send(f):
    self.bus.sent.append(f)
-   self.assertEqual((Service.SYSTEM,Command.APPLY,b'\x04'),(f.service,f.command,f.payload[5:]))
+   self.assertEqual((Service.SYSTEM,Command.APPLY,b'\x05'),(f.service,f.command,f.payload[5:]))
    for rail,token in [(2,f.payload[:4]),(1,bytes(4))]:
     self.controls.handle_frame(Frame(rail,Node.P4,Node.PI,Service.SYSTEM,Command.APPLY_RESULT,token+f.payload[4:5]+b'\x00'+DATA))
     self.assertIsNone(self.controls.result)
@@ -43,9 +43,9 @@ class StatusTests(unittest.TestCase):
    self.controls.handle_frame(Frame(1,Node.P4,Node.PI,Service.SYSTEM,Command.APPLY_RESULT,f.payload[:5]+status+data))
   self.bus.send_frame=send
   self.assertTrue(self.sync.sample(1));self.assertTrue(self.sync.sample(1))
-  self.assertEqual([4,3,2,1,1],versions)
+  self.assertEqual([5,4,3,2,1,1],versions)
   self.sync.disconnect();self.sync.demand(dict(version=1,rails=[1]))
-  self.assertTrue(self.sync.sample(1));self.assertEqual([4,3,2,1],versions[-4:])
+  self.assertTrue(self.sync.sample(1));self.assertEqual([5,4,3,2,1],versions[-5:])
  def test_no_network_or_busy_control_or_call_does_not_poll(self):
   self.connected.clear();self.assertFalse(self.sync.sample(1));self.connected.set()
   with self.audio._control_lock:self.assertFalse(self.sync.sample(1))
@@ -103,3 +103,13 @@ class LedStatusTests(unittest.TestCase):
   for index,value in ((31,10),(32,3),(33,0),(33,121)):
    sample=bytearray(base);sample[index]=value
    with self.assertRaises(ValueError):decode(sample)
+
+class ReceptionStatusTests(unittest.TestCase):
+ def test_v5_flags_and_older_unknown(self):
+  base=bytes([5])+DATA[1:]+bytes(15)+bytes([0,0,10,1,0])
+  s=decode(base)
+  self.assertTrue(s['alarm_enabled']);self.assertFalse(s['sensor_enabled'])
+  self.assertNotIn('alarm_enabled',decode(DATA))
+  for i in (34,35):
+   bad=bytearray(base);bad[i]=2
+   with self.assertRaises(ValueError):decode(bad)

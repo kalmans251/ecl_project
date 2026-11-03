@@ -1,6 +1,13 @@
 #include "radar_cache.h"
 #include "esp_timer.h"
 #include <string.h>
+#include <stdatomic.h>
+static atomic_bool receive_enabled=true;
+static atomic_uint receive_since_ms;
+void radar_cache_set_enabled(bool enabled) {
+    if(enabled)atomic_store(&receive_since_ms,(uint32_t)(esp_timer_get_time()/1000));
+    atomic_store(&receive_enabled,enabled);
+}
 
 static uint8_t source, count, points[12];
 static uint32_t sequence;
@@ -11,6 +18,7 @@ static unsigned zero_streak;
 bool radar_cache_capture(const protocol_frame_t *f)
 {
     if(f->src != NODE_S3 || f->dst != NODE_P4 || f->service != SERVICE_RADAR || f->command != CMD_DATA) return false;
+    if(!atomic_load(&receive_enabled))return true;
     /* Version 1 local sample: type, selected sensor, count, three 8-byte slots. */
     if(f->length != 27 || f->payload[0] != 1 || f->payload[1] < 1 || f->payload[1] > 2 || f->payload[2] > 3) return true;
     uint8_t compact[12] = {0}, n = 0;
@@ -40,7 +48,7 @@ bool radar_cache_reply(const protocol_frame_t *q, protocol_frame_t *r)
     *r=(protocol_frame_t){0};r->railing_id=q->railing_id;r->src=NODE_P4;r->dst=NODE_PI;
     r->service=SERVICE_RADAR;r->command=CMD_STATUS_RESPONSE;
     int64_t elapsed=sampled?(esp_timer_get_time()-sampled_us)/1000:65535;
-    bool valid=sampled && elapsed>=0 && elapsed<=1500;
+    bool valid=atomic_load(&receive_enabled) && sampled && (int32_t)((uint32_t)(sampled_us/1000)-atomic_load(&receive_since_ms))>=0 && elapsed>=0 && elapsed<=1500;
     unsigned age=elapsed<0?65535:(elapsed>65535?65535:(unsigned)elapsed);
     /* token4, version, sensor, valid, count, sequence4, age2, detail flag, xy pairs */
     memcpy(r->payload,q->payload,4);r->payload[4]=1;r->payload[5]=source;

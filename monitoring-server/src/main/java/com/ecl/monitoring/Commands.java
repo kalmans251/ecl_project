@@ -15,6 +15,7 @@ public class Commands {
     private final JsonMapper json=JsonMapper.builder().build();
     private static final Set<String> CONFIRMABLE=Set.of("volume","music.stop","call.start","call.accept","call.end","ptt.on","ptt.off");
     private static final Map<String,Set<String>> VALUES=Map.ofEntries(
+        Map.entry("alarm",Set.of("on","off")),Map.entry("sensor",Set.of("on","off")),
         Map.entry("power",Set.of("ac","battery","on","off")),Map.entry("projector",Set.of("on","off")),
         Map.entry("led",Set.of("on","off","basic","music")),Map.entry("weather",Set.of("clear","cloudy","rain","snow")),
         Map.entry("music.mode",Set.of("sequential","shuffle","age")),Map.entry("sleep",Set.of("on","off")),

@@ -9,7 +9,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class Telemetry {
     private final JdbcTemplate db; private final Registry registry; private final JsonMapper json=JsonMapper.builder().build();
     private static final Set<String> NUMERIC=Set.of("left_watt","right_watt","battery_percent","battery_voltage","left_voltage","right_voltage","left_current","right_current","volume","wind","pm10","led_basic_pattern","led_music_pattern","led_sequence_seconds");
-    private static final Set<String> FLAGS=Set.of("battery_estimated","emergency","projector","led_enabled","sleep","sleep_active","power_on");
+    private static final Set<String> FLAGS=Set.of("alarm_enabled","sensor_enabled","battery_estimated","emergency","projector","led_enabled","sleep","sleep_active","power_on");
     private static final Map<String,Set<String>> ENUMS=Map.of("power",Set.of("ac","battery"),"led",Set.of("basic","music","weather"),"weather",Set.of("clear","cloudy","rain","snow"),"music",Set.of("playing","paused","stopped"),"music_mode",Set.of("sequential","shuffle","age"),"detection",Set.of("radar","cctv"));
     public Telemetry(JdbcTemplate db,Registry registry){this.db=db;this.registry=registry;}
     public synchronized void accept(String gateway,JsonNode node) {
@@ -18,7 +18,7 @@ public class Telemetry {
         long now=System.currentTimeMillis();if(observed>now+2000 || observed<now-60000)throw Accounts.bad("Stale telemetry");
         var rail=registry.deviceRail(gateway,node.path("railing_id").intValue());String id=(String)rail.get("ID");
         if(rail.get("SEEN_AT")!=null && ((Number)rail.get("SEEN_AT")).longValue()>=observed)return;
-        JsonNode state=node.path("state");if(state.size()>30)throw Accounts.bad("Too many state fields");
+        JsonNode state=node.path("state");if(state.size()>32)throw Accounts.bad("Too many state fields");
         for(String key:state.propertyNames()) {
             JsonNode value=state.get(key);
             if(NUMERIC.contains(key)) {

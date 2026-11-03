@@ -14,7 +14,7 @@ class Bus:
             status = 3 if frame.service == Service.MUSIC and not wroom else 0
             self.controls.handle_frame(Frame(frame.railing_id, Node.WROOM if wroom else frame.dst,
                 Node.PI, frame.service, Command.APPLY_RESULT,
-                frame.payload[:5] + bytes([status, frame.payload[-1] if wroom and len(frame.payload)==7 else 0])))
+                frame.payload[:5] + bytes([status, frame.payload[-1] if wroom and len(frame.payload)==7 else (1 if frame.service in (Service.EMERGENCY,Service.DETECTION) and frame.payload[4]==Command.START else 0)])))
 
 class ControlsTests(unittest.TestCase):
     def setUp(self):
@@ -26,6 +26,10 @@ class ControlsTests(unittest.TestCase):
 
     def test_exact_wire_contracts(self):
         cases = [
+            ('alarm 1 on', Service.EMERGENCY, Command.START, b'', Node.P4),
+            ('alarm 1 off', Service.EMERGENCY, Command.STOP, b'', Node.P4),
+            ('sensor 1 on', Service.DETECTION, Command.START, b'', Node.P4),
+            ('sensor 1 off', Service.DETECTION, Command.STOP, b'', Node.P4),
             ('projector 1 on', Service.PROJECTOR, Command.START, b'', Node.P4),
             ('projector 1 off', Service.PROJECTOR, Command.STOP, b'', Node.P4),
             ('led 1 on', Service.LED, Command.START, b'', Node.P4),

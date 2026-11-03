@@ -8,7 +8,7 @@ from protocol import Service, Node, Command
 LOG=logging.getLogger('status.sync')
 
 def decode(data):
-    if (not data or (data[0],len(data)) not in ((1,16),(2,31),(3,33),(4,34)) or data[1] not in (0,1,2) or
+    if (not data or (data[0],len(data)) not in ((1,16),(2,31),(3,33),(4,34),(5,36)) or data[1] not in (0,1,2) or
         any(data[i] not in (0,1) for i in (2,3,6,7,8,9,15)) or
         data[4] not in (1,2,3) or data[5]>3 or data[10] not in (1,2,3)):
         raise ValueError('Invalid P4 status snapshot; update P4 firmware')
@@ -44,9 +44,12 @@ def decode(data):
         if data[31]>9 or data[32]>2: raise ValueError('Invalid LED pattern')
         state['led_basic_pattern']=data[31]
         state['led_music_pattern']=data[32]
-    if data[0]==4:
+    if data[0]>=4:
         if not 1<=data[33]<=120: raise ValueError('Invalid LED sequence interval')
         state['led_sequence_seconds']=data[33]
+    if data[0]>=5:
+        if data[34] not in (0,1) or data[35] not in (0,1): raise ValueError('Invalid reception flags')
+        state['alarm_enabled']=bool(data[34]);state['sensor_enabled']=bool(data[35])
     return state
 
 # Generic 4S LiFePO4 reference, not a manufacturer calibration or charge control.
@@ -93,7 +96,7 @@ class StatusSync:
             if self.audio._keepalive_due.is_set() or not self.publisher.connected.is_set() or not self.wanted_now(rail):
                 raise RuntimeError('Priority control or disconnected')
         try:
-            version=self.versions.get(rail,4)
+            version=self.versions.get(rail,5)
             def query(v):
                 return request(self.controls,rail,Command.STATUS_REQUEST,bytes([v]),
                     background=True,timeout=.6,service=Service.SYSTEM,expected=Node.P4,

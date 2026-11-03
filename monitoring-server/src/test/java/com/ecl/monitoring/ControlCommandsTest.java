@@ -4,6 +4,15 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 class ControlCommandsTest {
+ @Test void receptionTogglesRequireExactP4Application() {
+  for(String op:List.of("alarm","sensor")) {
+   Commands.validate(op,"on");Commands.validate(op,"off");
+   int service=op.equals("alarm")?6:9;
+   ControlCommands.validate(op,"on",1,"APPLIED",data(op,"on",true,List.of(step(2,service,32,0,"01"))));
+   ControlCommands.validate(op,"off",1,"APPLIED",data(op,"off",true,List.of(step(2,service,33,0,"00"))));
+   assertThrows(RuntimeException.class,()->ControlCommands.validate(op,"on",1,"APPLIED",data(op,"on",true,List.of(step(2,service,32,0,"00")))));
+  }
+ }
  final JsonMapper json=JsonMapper.builder().build();
  Map<String,Object> step(int node,int service,int command,int status,String data){return Map.of("node",node,"service",service,"command",command,"status",status,"data",data);}
  tools.jackson.databind.JsonNode data(String op,String value,boolean applied,List<?> steps){

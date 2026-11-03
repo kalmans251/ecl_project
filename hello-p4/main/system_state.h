@@ -74,6 +74,8 @@ typedef struct
      * LED
      * -------------------------------------------------------- */
 
+    bool emergency_enabled;
+    bool sensor_enabled;
     bool led_enabled;
 
     led_mode_t led_mode;
@@ -224,3 +226,6 @@ void system_state_set_call_active(
 /* Pattern selection does not change music/sleep policy. */
 void system_state_set_led_sequence_seconds(uint8_t seconds);
 void system_state_set_led_pattern(led_mode_t mode, uint8_t pattern);
+
+void system_state_set_emergency_enabled(bool enabled);
+void system_state_set_sensor_enabled(bool enabled);
