@@ -925,4 +925,9 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 #systemDiagnosisDialog button{padding:8px 16px;background:#1a3c50;color:#dcf5ff;border:1px solid #4a8198;border-radius:6px;cursor:pointer}
 #systemDiagnosisDialog button:disabled{opacity:.45;cursor:default}
 </style>
+<style>
+#systemDiagnosisResults [data-state=running] strong::before{content:'';display:inline-block;width:12px;height:12px;margin-right:8px;vertical-align:-1px;border:2px solid #38556a;border-top-color:#73edf3;border-radius:50%;animation:diagnosisLoadingSpin .8s linear infinite}
+@keyframes diagnosisLoadingSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#systemDiagnosisResults [data-state=running] strong::before{animation:none;border-color:#73edf3}}
+</style>
 </body></html>

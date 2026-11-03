@@ -6,6 +6,15 @@ async function diagnosisRequest(path,method='GET',data){
  if(!response.ok){let reason;try{reason=(await response.json()).message;}catch(_){}throw Error(reason||'서버 요청 실패 ('+response.status+')');}
  return response.json();
 }
+// Minimum presentation time only; device latency is measured before this wait.
+async function diagnosisLoading(started,minimumMs){
+ let remaining=Math.max(0,minimumMs-(performance.now()-started));
+ while(remaining>0&&!systemDiagnosisStop){
+  const slice=Math.min(100,remaining);
+  await new Promise(resolve=>setTimeout(resolve,slice));remaining-=slice;
+ }
+ return !systemDiagnosisStop;
+}
 function diagnosisRow(label){
  const row=document.createElement('li'),title=document.createElement('strong'),detail=document.createElement('span');
  title.textContent=label;detail.textContent='대기';row.dataset.state='waiting';row.append(title,detail);$('systemDiagnosisResults').append(row);
@@ -24,8 +33,10 @@ async function startSystemDiagnosis(){
   $('systemDiagnosisClose').disabled=true;$('systemDiagnosisStop').disabled=false;dialog.showModal();
   let passed=0,failed=0,skipped=0;
   const server=diagnosisRow('서버 · Pi 연결 상태');server('running','최신 상태 조회 중…');
-  let snapshot;
-  try{snapshot=await diagnosisRequest('/api/portal/sites/'+encodeURIComponent(targetSite)+'/state');server('pass','서버 응답 수신');passed++;}
+  let snapshot;const serverStarted=performance.now();
+  try{snapshot=await diagnosisRequest('/api/portal/sites/'+encodeURIComponent(targetSite)+'/state');
+   if(!await diagnosisLoading(serverStarted,800)){server('skip','진단 중단');return;}
+   server('pass','서버 응답 수신');passed++;}
   catch(e){server('fail',e.message);throw Error('서버 상태를 조회하지 못해 장치 진단을 중단했습니다. 로그인·서버·네트워크를 확인하세요.');}
   for(const target of targets){
    if(systemDiagnosisStop)break;
@@ -48,11 +59,14 @@ async function startSystemDiagnosis(){
       await new Promise(resolve=>setTimeout(resolve,400));
       result=await diagnosisRequest('/api/portal/commands/'+encodeURIComponent(result.id));
      }
+     const responseMs=Math.round(performance.now()-started);
      const step=result.result?.steps?.[0],expected={p4:2,wroom:3,s3:4}[node];
      if(!['COMPLETED','APPLIED'].includes(result.status)||step?.node!==expected||step?.status!==0){
       report('fail',(result.detail||result.status)+' · '+(node==='p4'?'Pi↔PLC↔P4 구간을 확인하세요.':'P4 조회 결과와 함께 '+node.toUpperCase()+' 전원·중계 링크를 확인하세요.'));failed++;continue;
      }
-     report('pass',Math.round(performance.now()-started)+' ms · 장치 응답 확인 · 데이터 '+step.data);passed++;
+     report('running','응답 수신 · 결과 확인 중…');
+     if(!await diagnosisLoading(started,1500)){report('skip','응답 수신 후 진단 중단');break;}
+     report('pass',responseMs+' ms · 장치 응답 확인 · 데이터 '+step.data);passed++;
     }catch(e){
      report('fail',e.message);failed++;
      // A lost HTTP response can leave a command pending; do not queue another test.
