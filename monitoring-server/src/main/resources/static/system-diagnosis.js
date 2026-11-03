@@ -28,7 +28,7 @@ async function startSystemDiagnosis(){
   if(settingsApplying||controlBusy||pttChanging||emergencyAccepting||musicBusy)throw Error('진행 중인 제어가 끝난 뒤 진단하세요.');
   systemDiagnosisRunning=true;systemDiagnosisStop=false;controlBusy=true;
   const dialog=$('systemDiagnosisDialog');$('systemDiagnosisResults').replaceChildren();
-  text('systemDiagnosisTarget',targets.map(r=>r.name+' · '+r.gateway_id+'/'+r.number).join(' / '));
+  text('systemDiagnosisTarget',targets.map(r=>r.name).join(' / '));
   text('systemDiagnosisSummary','서버 연결과 장치 응답을 순서대로 확인합니다.');
   $('systemDiagnosisClose').disabled=true;$('systemDiagnosisStop').disabled=false;dialog.showModal();
   let passed=0,failed=0,skipped=0;
