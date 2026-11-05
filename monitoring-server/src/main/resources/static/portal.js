@@ -232,6 +232,7 @@ function switchCategoryTabUI(name,code,edit=true){
  document.querySelectorAll('.category-tab-btn').forEach((b,i)=>{b.classList.toggle('active',i===code);b.setAttribute('aria-selected',String(i===code));});
  ['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');
  if(edit)stageLedPreference();
+ if(edit&&code===2)guarded(()=>loadMusicPage(0));
 }
 function stageLedPreference(){
  const pref=ledPreference(),group=currentCategory,value=pref.values[group],items=rails();
@@ -282,8 +283,11 @@ function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','a
 function resetMusicCatalog(){musicPage=null;fillMusicTracks();renderMusicCatalog();}
 function fillMusicTracks(){
  const select=$('piTrackSelect');select.replaceChildren();
- select.append(new Option(musicPage?.tracks.length?'곡을 선택하세요':'목록 미조회 또는 빈 폴더',''));
+ const current=musicPage?.settings?.filename;
+ select.append(new Option(current?'현재곡: '+current:(musicPage?.tracks.length?'곡을 선택하세요':'목록 미조회 또는 빈 폴더'),''));
+
  for(const track of musicPage?.tracks||[])select.append(new Option(`${track.index+1}. ${track.filename}`,String(track.index)));
+
 }
 function renderMusicCatalog(){
  const items=rails(),r=items.length===1?items[0]:null,key=r?.id||null;
@@ -307,12 +311,20 @@ async function musicRequest(r,operation,value){
  }
  throw Error('응답 대기 종료 · 처리 내역을 확인하세요. 자동 재시도하지 않습니다.');
 }
+function syncQueriedMusicSettings(settings){
+ if(!settings)return;
+ if(!dirty.has('volume')&&Number.isInteger(settings.volume)){
+  $('piVolume').value=settings.volume;updateVolUI(settings.volume,false);
+ }
+ if(!dirty.has('music.mode')&&settings.mode)
+  $('piPlayMode').value=({sequential:0,shuffle:1,age:2})[settings.mode];
+}
 async function loadMusicPage(offset=0){
- const r=requireSelection(true)[0],group=$('piMusicGroup').value;
+ const r=requireSelection(true)[0],group=$('piMusicGroup').value,targetSite=site;
  if(musicBusy)return;musicBusy=true;musicPage=null;fillMusicTracks();renderMusicCatalog();
  try {
   const result=await musicRequest(r,'music.list',`${group}:${offset}`);
-  if(rails().length===1 && rails()[0].id===r.id && $('piMusicGroup').value===group){musicPage=result;fillMusicTracks();}
+  if(site===targetSite && rails().length===1 && rails()[0].id===r.id && $('piMusicGroup').value===group){musicPage=result;fillMusicTracks();syncQueriedMusicSettings(result.settings);}
  } finally {musicBusy=false;renderMusicCatalog();}
 }
 async function playSelectedMusic(){
@@ -363,9 +375,9 @@ function setSettingsBusy(busy){
  if(busy){text('settingsBusyMessage','설정 전송 및 장치 응답을 확인하고 있습니다.');if(!loading.open)loading.showModal();}
  else if(loading.open)loading.close();
 }
-async function applyAllUpdates(){if(settingsApplying)return;settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
+async function applyAllUpdates(){if(musicBusy)return toast('음악 정보 조회가 끝난 뒤 적용해주세요.');if(settingsApplying)return;settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
-function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);rememberProjectorSwitch(false);syncProjectorSwitch();syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
+function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['detection','cctv'],['music.mode','age']]);rememberProjectorSwitch(false);syncProjectorSwitch();syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=2;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
 let railRouteLayers=[];
 function railMapIcon(r,highlight=selected.has(r.id)){
