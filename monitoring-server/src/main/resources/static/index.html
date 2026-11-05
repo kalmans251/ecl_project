@@ -953,7 +953,8 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 .sos-emergency-queue button{font-size:11px;padding:3px 6px;background:#202f40;border:1px solid #5f5760;border-radius:5px;color:#e9e1e5;cursor:pointer}
 .sos-audio-status{color:#b6c5d1;border-top:1px solid #42404a;padding-top:5px}
 #sosCardContainer{overflow-y:auto}
-#sosCardContainer .sos-card-flex{overflow:visible;min-height:170px;flex:0 0 auto}
+#sosCardContainer .sos-card-flex{overflow:visible;height:auto;min-height:0;flex:0 0 auto;justify-content:flex-start;gap:8px}
+#sosCardContainer .sos-display-box{margin-top:0}
 @media(max-width:700px){
  .card-control-setting .feature-toggle-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none}
  .feature-toggle-grid>.ctrl-item:nth-child(n){grid-column:auto;grid-row:auto}
