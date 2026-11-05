@@ -73,7 +73,7 @@ button{transition:background-color .15s,border-color .15s,color .15s}
 .rail-map-node.is-selected{border-color:#00e4ed;background:#005c70;color:#fff;box-shadow:0 0 0 4px #00dce533,0 4px 12px #0007}
 .rail-map-node.is-offline{color:#b1bdc8}
 .rail-map-legend{position:absolute;bottom:23px;left:10px;z-index:500;pointer-events:none;background:#0c1c2de8;border:1px solid #456175;border-radius:7px;padding:7px 10px;color:#d4e7ee;font-size:11px;max-width:calc(100% - 40px)}
-.id-badge-container button{min-width:125px;padding:10px 14px!important}
+.id-badge-container button{min-width:0;width:auto;padding:8px 12px!important;white-space:nowrap}
 .id-badge-container button.selected{background:#064c5d!important;border-color:#34e0eb!important;color:#fff!important}
 .rail-location-editor .location-map-preview{height:310px;min-height:240px;border:1px solid #3d657b;border-radius:10px;margin-top:16px;overflow:hidden}
 .rail-location-editor .location-map-help{color:#7dd9e4;font-size:13px}
