@@ -151,7 +151,7 @@ function renderSelection(){
 // Keep unsent edits separate from confirmed device observations.
 function syncReportedControls(s){
  if(!dirty.has('volume')&&s.volume!==undefined){$('piVolume').value=s.volume;updateVolUI(s.volume,false);}
- if(!dirty.has('power'))document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.checked=i.value===({ac:'2',battery:'1'}[s.power]));
+ if(!dirty.has('power'))document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.checked=i.value===({auto:'0',ac:'2',battery:'1'}[s.power]));
  if(!dirty.has('sleep')){
   if(typeof s.sleep==='boolean')toggleSleepStateUI(s.sleep,false);
   else { $('btnModeWakeup').className='pwr-state-btn';$('btnModeSleep').className='pwr-state-btn'; }
