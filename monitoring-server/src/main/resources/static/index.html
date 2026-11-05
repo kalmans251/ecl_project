@@ -729,7 +729,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <section class="sos-emergency-queue" aria-label="비상 호출 목록">
  <div class="sos-queue-heading"><strong id="emergencyQueueTitle">비상 호출 목록</strong><button type="button" onclick="showEmergencyHistory()">처리 이력</button></div>
  <div id="emergencyQueue"></div>
- <div class="sos-audio-status"><span id="emergencyAudioState" role="status">비상 알림음 비활성 · 활성화 필요</span><button type="button" onclick="muteEmergencyAudio()">현재 호출 음소거</button></div>
+ <div class="sos-audio-status"><button type="button" onclick="muteEmergencyAudio()">현재 호출 음소거</button></div>
 </section>
 <div class="sos-card-flex">
                 <div class="sos-display-box" onclick="triggerMp3Alarm()">
@@ -836,7 +836,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 	            </div>
 	            <div class="ctrl-item">
 	                <span class="ctrl-label">📽️ 프로젝터</span>
-	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on active" onclick="toggleDeviceState('projector', true)">ON</button><button type="button" class="btn-toggle off" onclick="toggleDeviceState('projector', false)">OFF</button></div>
+	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on" data-projector-choice="true" aria-pressed="false" onclick="toggleDeviceState('projector', true)">ON</button><button type="button" class="btn-toggle off" data-projector-choice="false" aria-pressed="false" onclick="toggleDeviceState('projector', false)">OFF</button></div>
 	            </div>
 	            <div class="ctrl-item">
 	                <span class="ctrl-label">📡 센서 수신</span>
@@ -848,7 +848,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             </div>
             <div class="ctrl-item browser-feature-toggle">
              <span class="ctrl-label" title="현재 모니터링 컴퓨터의 알림음만 변경합니다. 난간 비상벨과 호출 수신은 유지됩니다.">🔊 비상 알림음</span>
-             <div class="ctrl-btn-group"><button type="button" id="btnEmergencyAudioOn" class="btn-toggle on" aria-pressed="false" onclick="setEmergencyAudioEnabled(true)">ON</button><button type="button" id="btnEmergencyAudioOff" class="btn-toggle off active" aria-pressed="true" onclick="setEmergencyAudioEnabled(false)">OFF</button></div>
+             <div class="ctrl-btn-group"><button type="button" id="btnEmergencyAudioOn" class="btn-toggle on active" aria-pressed="true" onclick="setEmergencyAudioEnabled(true)">ON</button><button type="button" id="btnEmergencyAudioOff" class="btn-toggle off" aria-pressed="false" onclick="setEmergencyAudioEnabled(false)">OFF</button></div>
             </div>
 	        </div>
 	    </div>

@@ -35,16 +35,24 @@ function setWeatherInfoEnabled(enabled){
  EnvironmentWeather.setEnabled(enabled);
  syncBrowserToggle('btnWeatherInfoOn','btnWeatherInfoOff',enabled);
 }
-function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>{
- text('emergencyAudioState',message);
- syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',emergencyAudio?.isEnabled()??false);
+function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),()=>{
+ syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',emergencyAudio?.allowed??true);
 });}
 function setEmergencyAudioEnabled(enabled){return guarded(async()=>{
  const audio=alarmAudio();
- if(enabled)await audio.enable();else audio.disable();
- syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',audio.isEnabled());
+ if(enabled){const ready=audio.enable();syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',true);await ready;}
+ else audio.disable();
 });}
-function enableEmergencyAudio(){return guarded(()=>alarmAudio().enable());}
+let alarmUnlockPending=false;
+function unlockDefaultAlarm(event){
+ if(typeof EmergencyAudio==='undefined'||event.target?.closest?.('#btnEmergencyAudioOn,#btnEmergencyAudioOff'))return;
+ const audio=alarmAudio();
+ if(!audio.allowed||audio.isEnabled()||alarmUnlockPending)return;
+ alarmUnlockPending=true;
+ audio.enable().catch(()=>{}).finally(()=>{alarmUnlockPending=false;});
+}
+document.addEventListener('click',unlockDefaultAlarm);
+document.addEventListener('keydown',unlockDefaultAlarm);
 function muteEmergencyAudio(){alarmAudio().mute();}
 let emergencyQueue;
 function renderEmergencyQueue(){
@@ -152,7 +160,7 @@ function syncReportedControls(s){
  syncLedPatterns(s);
  if(!dirty.has('music.mode'))$('piPlayMode').value=({sequential:0,shuffle:1,age:2}[s.music_mode])??'';
  if(!dirty.has('detection')&&s.detection)switchDisplayView(s.detection,false);
- if(!dirty.has('projector'))document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',typeof s.projector==='boolean'&&b.getAttribute('onclick').includes(String(s.projector))));
+ syncProjectorSwitch();
 }
 function renderProjector(s,fresh=true){
  const known=typeof s.projector==='boolean',on=known&&s.projector;
@@ -316,7 +324,20 @@ async function playSelectedMusic(){
  catch(e){musicPage=null;fillMusicTracks();throw e;}
  finally {musicBusy=false;renderMusicCatalog();}
 }
-function toggleDeviceState(type,value){if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');mark('projector',value?'on':'off');document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(String(value))));}
+const projectorChoices=new Map();
+function rememberProjectorSwitch(value){for(const r of rails())projectorChoices.set(r.id,value);}
+function syncProjectorSwitch(){
+ const items=rails(),first=projectorChoices.get(items[0]?.id);
+ const value=dirty.has('projector')?dirty.get('projector')==='on':items.length&&items.every(r=>projectorChoices.get(r.id)===first)?first:undefined;
+ document.querySelectorAll('[data-projector-choice]').forEach(b=>{
+  const active=typeof value==='boolean'&&b.dataset.projectorChoice===String(value);
+  b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+ });
+}
+function toggleDeviceState(type,value){
+ if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');
+ rememberProjectorSwitch(value);mark('projector',value?'on':'off');syncProjectorSwitch();
+}
 function switchDisplayView(mode,edit=true){$('mediaDisplayCard').classList.toggle('cctv-only',mode==='cctv');$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);radarView.select(mode==='radar'&&rails().length===1?rails()[0].id:null);}
 async function waitAppliedSnapshot(targets,targetSite){
  const baseline=new Map(targets.map(id=>[id,statusBaselines.get(id)?.seen??view?.rails.find(r=>r.id===id)?.seen_at??0]));
@@ -338,7 +359,7 @@ function setSettingsBusy(busy){
 }
 async function applyAllUpdates(){if(settingsApplying)return;settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
-function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
+function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);rememberProjectorSwitch(false);syncProjectorSwitch();syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
 let railRouteLayers=[];
 function railMapIcon(r,highlight=selected.has(r.id)){
@@ -500,7 +521,11 @@ function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Err
  const infoLoad=async()=>{info.replaceChildren();const users=await api('/api/portal/admin/users'),gateways=await api('/api/portal/admin/gateways');const heading=document.createElement('h3');heading.textContent='등록 정보';info.append(heading);table(info,['사용자','ID'],users.map(u=>[u.NAME+' ('+u.USERNAME+')',u.ID]));table(info,['현장','ID'],me.sites.map(s=>[s.NAME,s.ID]));table(info,['Pi','현장 ID'],gateways.map(g=>[g.ID,g.SITE_ID]));table(info,['현재 현장 난간','ID'],(view?.rails||[]).map(r=>[r.name,r.id]));};await infoLoad();});}
 function loadContacts(){for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}
 function fillSites(){$('siteSelect').replaceChildren();for(const s of me.sites){const o=document.createElement('option');o.value=s.ID;o.textContent=s.NAME+' · '+s.ROLE;$('siteSelect').append(o);}if(me.sites.some(s=>s.ID===site))$('siteSelect').value=site;else site=$('siteSelect').value;}
-async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;$('railLocationButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!pttChanging)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
+function scheduleLivePoll(){
+ const watchingSleep=!document.hidden&&rails().some(r=>r.online&&r.reported?.sleep===true);
+ setTimeout(async()=>{try{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!pttChanging)await guarded(openVoice);}finally{scheduleLivePoll();}},watchingSleep?1000:2000);
+}
+async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;$('railLocationButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');scheduleLivePoll();}catch(e){toast(e.message);}}
 init();
 
 function detectionCountAction(reset){guarded(async()=>{const r=requireSelection(true)[0];if(reset&&!confirm(r.name+'의 누적 감지 횟수만 0으로 초기화할까요? 연령대 통계는 유지됩니다.'))return;await send(reset?'detection.reset':'detection.count',null,[r.id]);});}
