@@ -242,7 +242,8 @@ def main() -> int:
             frame.payload.hex(" "),
         )
 
-    event_poller = EventPoller(bus, railings, audio, args.event_railings, on_frame)
+    event_poller = EventPoller(bus, railings, audio, args.event_railings, on_frame,
+                               status_refresh=lambda rail: status_sync.refresh(rail) if status_sync else None)
 
     bus.set_frame_handler(
         on_frame
