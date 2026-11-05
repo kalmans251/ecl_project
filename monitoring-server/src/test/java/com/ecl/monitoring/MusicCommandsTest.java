@@ -22,6 +22,13 @@ class MusicCommandsTest {
   assertThrows(RuntimeException.class,()->MusicCommands.validateResult("music.list","default:8",1,"COMPLETED",page));
   assertThrows(RuntimeException.class,()->MusicCommands.validateResult("music.list","default:0",1,"APPLIED",page));
  }
+ @Test void validatesActualSettingsInCatalogPage(){
+  var page=json.valueToTree(Map.of("railing_id",1,"catalog_version",5,"group","default","offset",0,"total",0,"tracks",List.of(),
+    "settings",Map.of("filename","a.mp3","volume",20,"mode","age")));
+  MusicCommands.validateResult("music.list","default:0",1,"COMPLETED",page);
+  assertThrows(RuntimeException.class,()->MusicCommands.validateResult("music.list","default:0",1,"COMPLETED",json.readTree(page.toString().replace("\"volume\":20","\"volume\":101"))));
+  assertThrows(RuntimeException.class,()->MusicCommands.validateResult("music.list","default:0",1,"COMPLETED",json.readTree(page.toString().replace("\"age\"","\"invalid\""))));
+ }
  @Test void seekRequiresMatchingPlaybackAndAppliedResult(){
   for(String v:List.of("0:10","9:-1","9:4294967296","9:1:2"))assertThrows(RuntimeException.class,()->MusicCommands.validate("music.seek",v));
   MusicCommands.validate("music.seek","9:20000");
