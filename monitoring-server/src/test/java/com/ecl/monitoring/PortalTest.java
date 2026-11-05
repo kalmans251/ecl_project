@@ -288,6 +288,14 @@ class PortalTest {
   telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",2,"observed_at",Instant.ofEpochMilli(now+12).toString(),"state",Map.of("projector",false))));
   state=json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id));assertFalse(state.has("battery_voltage"));assertFalse(state.has("battery_percent"));
  }
+ @Test void telemetryPreservesAllReportedPowerModes(){
+  String id=rail();long now=System.currentTimeMillis();
+  for(String mode:List.of("auto","ac","battery")){
+   telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry",
+    "railing_id",1,"observed_at",Instant.ofEpochMilli(++now).toString(),"state",Map.of("power",mode))));
+   assertEquals(mode,json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id)).path("power").asText());
+  }
+ }
  @Test void telemetryIsBoundAndDoesNotInventState(){
   String id=rail();var data=Map.of("version",1,"type","telemetry","railing_id",1,"observed_at",Instant.now().toString(),"state",Map.of("volume",13,"left_watt",1.5,"right_watt",2.5,"battery_percent",70,"emergency",false,"radar",List.of(Map.of("x",.3,"y",2.0))));
   telemetry.accept("gateway-01",json.valueToTree(data));assertTrue(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id).contains("13"));

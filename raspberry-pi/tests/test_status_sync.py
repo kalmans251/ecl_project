@@ -30,6 +30,10 @@ class StatusTests(unittest.TestCase):
     self.assertIsNone(self.controls.result)
    self.controls.handle_frame(Frame(1,Node.P4,Node.PI,Service.SYSTEM,Command.APPLY_RESULT,f.payload[:5]+b'\x00'+DATA))
   self.bus.send_frame=send
+ def test_all_power_modes_are_reported_without_omitting_auto(self):
+  for code,mode in enumerate(('auto','ac','battery')):
+   data=bytearray(DATA);data[1]=code
+   self.assertEqual(mode,decode(bytes(data))['power'])
  def test_real_correlated_query_and_truthful_fields(self):
   self.assertTrue(self.sync.sample(1));s=self.messages[0]['state']
   self.assertEqual('weather',s['led']);self.assertTrue(s['sleep_active']);self.assertEqual(7,s['detection_count'])

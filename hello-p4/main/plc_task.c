@@ -11,6 +11,8 @@
 #include "router.h"
 #include "call_manager.h"
 #include "event_outbox.h"
+#include "system_state.h"
+#include "projector_control.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
@@ -93,6 +95,15 @@ static void handle_plc_frame(
         frame->service == SERVICE_SYSTEM && frame->command == CMD_EVENT_POLL) {
         if(frame->length != 8 || s_poll_pending)return;
         event_outbox_reply(frame, &s_poll_reply);
+        /* Coalesce output changes in the existing Pi-owned response slot.
+         * Emergency/call reports keep their priority and original encoding. */
+        if (s_poll_reply.length == 14) {
+            p4_system_state_t state;
+            system_state_get(&state);
+            s_poll_reply.payload[14] = state.sleep_active ? 1 : 0;
+            s_poll_reply.payload[15] = projector_control_get() ? 1 : 0;
+            s_poll_reply.length = 16;
+        }
         int64_t now=esp_timer_get_time();
         s_poll_reply_at=now+20000; s_poll_reply_deadline=now+80000;
         s_poll_pending=true;

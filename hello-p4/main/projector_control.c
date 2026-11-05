@@ -1,4 +1,5 @@
 #include "projector_control.h"
+#include "system_state.h"
 
 #include "driver/gpio.h"
 
@@ -18,12 +19,15 @@ static bool s_projector_enabled =
 /* ============================================================
  * INIT
  *
- * 부팅 시 OFF
- * GPIO11 LOW
+ * 부팅 시 사용 설정에 맞춰 출력 (기본 ON)
+ * GPIO11 HIGH = ON
  * ============================================================ */
 
 void projector_control_init(void)
 {
+    p4_system_state_t state;
+    system_state_get(&state);
+
     gpio_config_t config =
     {
         .pin_bit_mask =
@@ -53,19 +57,20 @@ void projector_control_init(void)
     ESP_ERROR_CHECK(
         gpio_set_level(
             PROJECTOR_GPIO,
-            0
+            state.projector_enabled ? 1 : 0
         )
     );
 
 
     s_projector_enabled =
-        false;
+        state.projector_enabled;
 
 
     ESP_LOGI(
         TAG,
-        "GPIO%d -> OFF",
-        PROJECTOR_GPIO
+        "GPIO%d -> %s",
+        PROJECTOR_GPIO,
+        s_projector_enabled ? "ON" : "OFF"
     );
 }
 

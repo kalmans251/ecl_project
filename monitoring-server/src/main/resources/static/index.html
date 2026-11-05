@@ -647,7 +647,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="6" onchange="setSubModeUI(6)"> 모드7 : 맑음 패턴</label>
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="7" onchange="setSubModeUI(7)"> 모드8 : 비/흐림 패턴</label>
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="8" onchange="setSubModeUI(8)"> 모드9 : 눈 패턴</label>
-            <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="9" onchange="setSubModeUI(9)"> 순차 재생 : 모드1 → 모드9 반복</label>
+            <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="9" onchange="setSubModeUI(9)"> 순차 재생: 모드1 → 모드9 반복</label>
             <label class="led-sequence-interval">전환 간격 <input id="ledSequenceSeconds" type="number" min="1" max="120" value="10" aria-label="LED 순차 재생 전환 간격(초)" onchange="if(document.querySelector('input[name=ledPattern][data-category=&quot;0&quot;][value=&quot;9&quot;]:checked'))setSubModeUI(9)"> 초 (1~120)</label>
 </div>
         <div id="tabContentWeather" class="led-select-group" style="display: none;">
@@ -683,7 +683,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                 <div class="audio-row">
                     <span class="audio-label">재생 모드</span>
                     <select class="neon-select" id="piPlayMode" onchange="updateAudioPlayMode(this.value)">
-                        <option value="0">▶ SEQUENTIAL</option><option value="1">🔄 SHUFFLE</option><option value="2">👥 AGE</option>
+                        <option value="0">순차재생</option><option value="1">랜덤재생</option><option value="2" selected>나이기반재생</option>
                     </select>
                 </div>
                 <div class="audio-row">
@@ -729,7 +729,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <section class="sos-emergency-queue" aria-label="비상 호출 목록">
  <div class="sos-queue-heading"><strong id="emergencyQueueTitle">비상 호출 목록</strong><button type="button" onclick="showEmergencyHistory()">처리 이력</button></div>
  <div id="emergencyQueue"></div>
- <div class="sos-audio-status"><span id="emergencyAudioState" role="status">비상 알림음 비활성 · 활성화 필요</span><button type="button" onclick="muteEmergencyAudio()">현재 호출 음소거</button></div>
+ <div class="sos-audio-status"><button type="button" onclick="muteEmergencyAudio()">현재 호출 음소거</button></div>
 </section>
 <div class="sos-card-flex">
                 <div class="sos-display-box" onclick="triggerMp3Alarm()">
@@ -836,7 +836,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 	            </div>
 	            <div class="ctrl-item">
 	                <span class="ctrl-label">📽️ 프로젝터</span>
-	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on active" onclick="toggleDeviceState('projector', true)">ON</button><button type="button" class="btn-toggle off" onclick="toggleDeviceState('projector', false)">OFF</button></div>
+	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on" data-projector-choice="true" aria-pressed="false" onclick="toggleDeviceState('projector', true)">ON</button><button type="button" class="btn-toggle off" data-projector-choice="false" aria-pressed="false" onclick="toggleDeviceState('projector', false)">OFF</button></div>
 	            </div>
 	            <div class="ctrl-item">
 	                <span class="ctrl-label">📡 센서 수신</span>
@@ -848,7 +848,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             </div>
             <div class="ctrl-item browser-feature-toggle">
              <span class="ctrl-label" title="현재 모니터링 컴퓨터의 알림음만 변경합니다. 난간 비상벨과 호출 수신은 유지됩니다.">🔊 비상 알림음</span>
-             <div class="ctrl-btn-group"><button type="button" id="btnEmergencyAudioOn" class="btn-toggle on" aria-pressed="false" onclick="setEmergencyAudioEnabled(true)">ON</button><button type="button" id="btnEmergencyAudioOff" class="btn-toggle off active" aria-pressed="true" onclick="setEmergencyAudioEnabled(false)">OFF</button></div>
+             <div class="ctrl-btn-group"><button type="button" id="btnEmergencyAudioOn" class="btn-toggle on active" aria-pressed="true" onclick="setEmergencyAudioEnabled(true)">ON</button><button type="button" id="btnEmergencyAudioOff" class="btn-toggle off" aria-pressed="false" onclick="setEmergencyAudioEnabled(false)">OFF</button></div>
             </div>
 	        </div>
 	    </div>
@@ -876,9 +876,8 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
  <div class="pending-panel-heading"><span>설정 변경 확인</span><strong id="pendingSettingsMessage"></strong></div>
  <div class="pending-panel-content">
   <section class="pending-target-section" aria-label="적용 대상 난간"><h2 id="pendingTargetTitle">적용 대상</h2><div id="pendingTargetRails" class="pending-target-rails"></div></section>
-  <section class="pending-changes-section" aria-label="변경할 설정"><h2>변경할 설정</h2><ul id="pendingChangesList"></ul></section>
  </div>
- <div class="pending-panel-footer"><div id="pendingSettingsResult" role="status" aria-live="polite">아래 난간과 변경 내용을 확인한 뒤 전체 적용을 눌러주세요.</div><button class="modern-action-btn apply-btn" id="btnApplyCommand" onclick="applyAllUpdates()">전체 적용</button></div>
+ <div class="pending-panel-footer"><div id="pendingSettingsResult" role="status" aria-live="polite">적용 대상 난간을 확인한 뒤 전체 적용을 눌러주세요.</div><button class="modern-action-btn apply-btn" id="btnApplyCommand" onclick="applyAllUpdates()">전체 적용</button></div>
 </aside>
 <style>
 #pendingSettingsBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:2000;display:flex;align-items:center;gap:24px;width:max-content;max-width:calc(100vw - 32px);box-sizing:border-box;padding:12px 18px;background:#132b3a;border:1px solid #35cbd4;border-radius:12px;box-shadow:0 6px 24px #0006;color:#e7eef5;animation:settingsSlide .2s ease-out}
@@ -954,7 +953,8 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 .sos-emergency-queue button{font-size:11px;padding:3px 6px;background:#202f40;border:1px solid #5f5760;border-radius:5px;color:#e9e1e5;cursor:pointer}
 .sos-audio-status{color:#b6c5d1;border-top:1px solid #42404a;padding-top:5px}
 #sosCardContainer{overflow-y:auto}
-#sosCardContainer .sos-card-flex{overflow:visible;min-height:170px;flex:0 0 auto}
+#sosCardContainer .sos-card-flex{overflow:visible;height:auto;min-height:0;flex:0 0 auto;justify-content:flex-start;gap:8px}
+#sosCardContainer .sos-display-box{margin-top:0}
 @media(max-width:700px){
  .card-control-setting .feature-toggle-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none}
  .feature-toggle-grid>.ctrl-item:nth-child(n){grid-column:auto;grid-row:auto}

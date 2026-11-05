@@ -71,7 +71,7 @@ void system_state_init(void)
     s_state.sensor_enabled = true;
 
     s_state.led_enabled =
-        false;
+        true;
 
     s_state.led_mode =
         LED_MODE_BASIC;
@@ -89,7 +89,7 @@ void system_state_init(void)
 
 
     s_state.projector_enabled =
-        false;
+        true;
 
 
     s_state.sleep_mode_enabled =
@@ -105,8 +105,9 @@ void system_state_init(void)
         esp_timer_get_time() / 1000;
 
 
+    /* Match power_control_init(): AC OFF / BATTERY ON. */
     s_state.power_mode =
-        POWER_MODE_AUTO;
+        POWER_MODE_BATTERY;
 
     s_state.power_source =
         POWER_SOURCE_BATTERY;

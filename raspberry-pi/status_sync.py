@@ -18,7 +18,7 @@ def decode(data):
         sleep=bool(data[7]),sleep_active=bool(data[8]),
         detection=('radar','cctv')[data[9]],music_mode=('sequential','shuffle','age')[data[10]-1],
         detection_count=int.from_bytes(data[11:15],'big'))
-    if data[1]: state['power']=('ac','battery')[data[1]-1]
+    state['power']=('auto','ac','battery')[data[1]]
     if data[0]>=2:
         flags=data[16]
         if flags & ~31: raise ValueError('Invalid energy flags')
@@ -113,6 +113,10 @@ class StatusSync:
             LOG.debug('Status not refreshed rail=%s: %s',rail,exc)
             return False
         if not self.publisher.connected.is_set() or not self.wanted_now(rail): return False
+        if state.get('sleep'):
+            # Only demanded rails use the faster cadence; preserve an explicit refresh.
+            with self.lock:
+                self.due[rail]=min(self.due.get(rail,time.monotonic()+1),time.monotonic()+1)
         self.publisher.publish(dict(version=1,type='telemetry',railing_id=rail,
             observed_at=datetime.now(timezone.utc).isoformat(),state=state))
         return True

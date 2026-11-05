@@ -73,7 +73,7 @@ button{transition:background-color .15s,border-color .15s,color .15s}
 .rail-map-node.is-selected{border-color:#00e4ed;background:#005c70;color:#fff;box-shadow:0 0 0 4px #00dce533,0 4px 12px #0007}
 .rail-map-node.is-offline{color:#b1bdc8}
 .rail-map-legend{position:absolute;bottom:23px;left:10px;z-index:500;pointer-events:none;background:#0c1c2de8;border:1px solid #456175;border-radius:7px;padding:7px 10px;color:#d4e7ee;font-size:11px;max-width:calc(100% - 40px)}
-.id-badge-container button{min-width:125px;padding:10px 14px!important}
+.id-badge-container button{min-width:0;width:auto;padding:8px 12px!important;white-space:nowrap}
 .id-badge-container button.selected{background:#064c5d!important;border-color:#34e0eb!important;color:#fff!important}
 .rail-location-editor .location-map-preview{height:310px;min-height:240px;border:1px solid #3d657b;border-radius:10px;margin-top:16px;overflow:hidden}
 .rail-location-editor .location-map-help{color:#7dd9e4;font-size:13px}
@@ -429,22 +429,19 @@ body #pendingSettingsBar[hidden]{display:none}
 .pending-panel-heading{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;padding-bottom:14px;border-bottom:1px solid #375465}
 .pending-panel-heading>span{font-size:20px;font-weight:800;color:#dcfbff}
 body #pendingSettingsMessage{font-size:14px;color:#b0d6e3}
-.pending-panel-content{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;padding:16px 0}
+.pending-panel-content{padding:16px 0}
 .pending-panel-content h2{font-size:13px;color:#8de0e9;margin:0 0 9px}
 .pending-target-rails{display:flex;flex-wrap:wrap;gap:8px;max-height:200px;overflow:auto}
 .pending-target-item{flex:1 1 190px;min-width:0;padding:10px 12px;background:#0e1e2c;border:1px solid #3c6375;border-radius:7px}
 .pending-target-item strong{display:block;font-size:17px;color:#fff;overflow-wrap:anywhere}
 .pending-target-item small{display:block;font-size:12px;color:#adc6d7;margin-top:5px;overflow-wrap:anywhere}
-#pendingChangesList{display:flex;flex-wrap:wrap;gap:7px;padding:0;margin:0;list-style:none;max-height:200px;overflow:auto}
-#pendingChangesList li{padding:6px 10px;background:#223b46;border:1px solid #4f6872;border-radius:6px;color:#f0e1a8;font-size:13px;overflow-wrap:anywhere}
 .pending-panel-footer{display:flex;align-items:center;justify-content:space-between;gap:18px;border-top:1px solid #375465;padding-top:13px}
 body #pendingSettingsResult{font-size:13px;line-height:1.6;margin:0;color:#bed6e1}
 body #pendingSettingsBar button{font-size:15px;padding:11px 24px;min-height:42px;flex-shrink:0}
 @keyframes pendingDrawerOpen{from{opacity:0;transform:translate(-50%,-100%)}to{opacity:1;transform:translate(-50%,0)}}
 @media(max-width:700px){
  body #pendingSettingsBar{width:calc(100vw - 16px);max-width:calc(100vw - 16px);padding:18px 14px 14px;max-height:75vh}
- .pending-panel-content{grid-template-columns:1fr;gap:14px}
- .pending-target-rails,#pendingChangesList{max-height:130px}
+ .pending-target-rails{max-height:130px}
  .pending-panel-footer{align-items:flex-start;gap:10px}
  body #pendingSettingsBar button{font-size:13px;padding:10px 15px}
 }

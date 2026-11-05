@@ -35,16 +35,24 @@ function setWeatherInfoEnabled(enabled){
  EnvironmentWeather.setEnabled(enabled);
  syncBrowserToggle('btnWeatherInfoOn','btnWeatherInfoOff',enabled);
 }
-function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),message=>{
- text('emergencyAudioState',message);
- syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',emergencyAudio?.isEnabled()??false);
+function alarmAudio(){return emergencyAudio??=new EmergencyAudio(()=>new (window.AudioContext||window.webkitAudioContext)(),()=>{
+ syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',emergencyAudio?.allowed??true);
 });}
 function setEmergencyAudioEnabled(enabled){return guarded(async()=>{
  const audio=alarmAudio();
- if(enabled)await audio.enable();else audio.disable();
- syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',audio.isEnabled());
+ if(enabled){const ready=audio.enable();syncBrowserToggle('btnEmergencyAudioOn','btnEmergencyAudioOff',true);await ready;}
+ else audio.disable();
 });}
-function enableEmergencyAudio(){return guarded(()=>alarmAudio().enable());}
+let alarmUnlockPending=false;
+function unlockDefaultAlarm(event){
+ if(typeof EmergencyAudio==='undefined'||event.target?.closest?.('#btnEmergencyAudioOn,#btnEmergencyAudioOff'))return;
+ const audio=alarmAudio();
+ if(!audio.allowed||audio.isEnabled()||alarmUnlockPending)return;
+ alarmUnlockPending=true;
+ audio.enable().catch(()=>{}).finally(()=>{alarmUnlockPending=false;});
+}
+document.addEventListener('click',unlockDefaultAlarm);
+document.addEventListener('keydown',unlockDefaultAlarm);
 function muteEmergencyAudio(){alarmAudio().mute();}
 let emergencyQueue;
 function renderEmergencyQueue(){
@@ -152,7 +160,7 @@ function syncReportedControls(s){
  }
 
  if(!dirty.has('volume')&&s.volume!==undefined){$('piVolume').value=s.volume;updateVolUI(s.volume,false);}
- if(!dirty.has('power'))document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.checked=i.value===({ac:'2',battery:'1'}[s.power]));
+ if(!dirty.has('power'))document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.checked=i.value===({auto:'0',ac:'2',battery:'1'}[s.power]));
  if(!dirty.has('sleep')){
   if(typeof s.sleep==='boolean')toggleSleepStateUI(s.sleep,false);
   else { $('btnModeWakeup').className='pwr-state-btn';$('btnModeSleep').className='pwr-state-btn'; }
@@ -161,7 +169,7 @@ function syncReportedControls(s){
  syncLedPatterns(s);
  if(!dirty.has('music.mode'))$('piPlayMode').value=({sequential:0,shuffle:1,age:2}[s.music_mode])??'';
  if(!dirty.has('detection')&&s.detection)switchDisplayView(s.detection,false);
- if(!dirty.has('projector'))document.querySelectorAll('[onclick^="toggleDeviceState(\'projector\'"]').forEach(b=>b.classList.toggle('active',typeof s.projector==='boolean'&&b.getAttribute('onclick').includes(String(s.projector))));
+ syncProjectorSwitch();
 }
 function renderProjector(s,fresh=true){
  const known=typeof s.projector==='boolean',on=known&&s.projector;
@@ -187,64 +195,108 @@ function syncPendingSettings(){
   const detail=document.createElement('small');detail.textContent=`${stateFetchFailed?'연결 확인 불가':r.online?'Pi 연결됨':'Pi 연결 끊김'}`;
   item.append(name,detail);root.append(item);
  }
- const labels={'alarm':'비상벨','sensor':'센서 수신','power':'전원','sleep':'슬립 모드','led':'LED 모드','projector':'프로젝터','volume':'음량','music.mode':'음악 재생 모드','detection':'감지 방식','weather':'날씨 패턴','weather.auto':'현재 날씨 자동 연동','led.basic_pattern':'LED 기본 패턴','led.music_pattern':'음악 연동 패턴','led.sequence':'LED 순차 전환 간격'};
- const values={ac:'상전',battery:'배터리',on:'켜기',off:'끄기',basic:'기본',music:'음악 연동',weather:'날씨 연동',radar:'레이더',cctv:'CCTV',clear:'맑음',rain:'비/흐림',snow:'눈',sequential:'순차',shuffle:'무작위',age:'연령 연동'};
- const list=$('pendingChangesList');list.replaceChildren();
- for(const [op,value] of dirty){const li=document.createElement('li');let display=values[value]??String(value);
-  if(op==='volume')display=value+'%';
-  if(op==='led.sequence')display=value+'초';
-  if(op==='led.basic_pattern'||op==='led.music_pattern')display='모드 '+(Number(value)+1);
-  li.textContent=`${labels[op]??op}: ${display}`;list.append(li);
- }
+
 }
 
 function mark(operation,value){dirty.set(operation,value);syncPendingSettings();toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
-let ledTabState={key:null,chosen:false};
-function ledSelectionKey(){return String(site)+'/'+rails().map(r=>r.id).join(',');}
-function syncLedCategory(s){
- const key=ledSelectionKey();if(ledTabState.key!==key)ledTabState={key,chosen:false};
- if(!ledTabState.chosen&&['basic','weather','music'].includes(s.led)){
-  switchCategoryTabUI(s.led,{basic:0,weather:1,music:2}[s.led],false);ledTabState.chosen=true;
- }
+const ledTabDefaults=[9,3,0];
+const ledDraftKeys=['led','weather','led.basic_pattern','led.music_pattern','led.sequence','weather.auto'];
+const ledPreferences=new Map();
+let displayedLedKey=null;
+function ledSelectionKey(){return JSON.stringify([site,rails().map(r=>r.id).sort()]);}
+function ledPreference(){
+ const key=ledSelectionKey();
+ if(!ledPreferences.has(key))ledPreferences.set(key,{values:[...ledTabDefaults],seconds:10,initialized:false,tab:0,lastObserved:null});
+ return ledPreferences.get(key);
 }
-function switchCategoryTabUI(name,code,edit=true){if(edit)ledTabState={key:ledSelectionKey(),chosen:true};currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>{b.classList.toggle('active',i===code);b.setAttribute('aria-selected',String(i===code));});['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');}
+function observedLed(s,auto){
+ const group={basic:0,weather:1,music:2}[s.led];
+ const value=group===0?s.led_basic_pattern:group===2?s.led_music_pattern:group===1?(auto?3:({clear:0,cloudy:1,rain:1,snow:2})[s.weather]):undefined;
+ return {group,value,seconds:s.led_sequence_seconds};
+}
+function rememberObservedLed(s){
+ const pref=ledPreference(),items=rails(),actual=observedLed(s,items.length===1&&items[0].weather_auto===true);
+ const signature=JSON.stringify(actual);
+ if(!ledDraftKeys.some(k=>dirty.has(k))&&pref.lastObserved!==signature&&Number.isInteger(actual.value)){
+  pref.values[actual.group]=actual.value;
+  if(actual.group===0&&actual.value===9&&Number.isInteger(actual.seconds))pref.seconds=actual.seconds;
+  pref.lastObserved=signature;
+ }
+ return actual;
+}
+function syncLedCategory(s){
+ const pref=ledPreference(),actual=rememberObservedLed(s);
+ const key=ledSelectionKey();
+ if(!pref.initialized&&Number.isInteger(actual.group)){
+  pref.initialized=true;pref.tab=actual.group;
+  switchCategoryTabUI(s.led,pref.tab,false);
+ }else if(displayedLedKey!==key)switchCategoryTabUI(null,pref.tab,false);
+ displayedLedKey=key;
+}
+function switchCategoryTabUI(name,code,edit=true){
+ const pref=ledPreference();
+ if(edit)pref.initialized=true;
+ pref.tab=code;currentCategory=code;
+ document.querySelectorAll('.category-tab-btn').forEach((b,i)=>{b.classList.toggle('active',i===code);b.setAttribute('aria-selected',String(i===code));});
+ ['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');
+ if(edit)stageLedPreference();
+ if(edit&&code===2)guarded(()=>loadMusicPage(0));
+}
+function stageLedPreference(){
+ const pref=ledPreference(),group=currentCategory,value=pref.values[group],items=rails();
+ for(const key of ledDraftKeys)dirty.delete(key);
+ const matches=r=>{
+  const s=displayedStatus(r,statusCheck(r)),actual=observedLed(s,r.weather_auto===true);
+  return actual.group===group&&actual.value===value&&
+   (group!==0||value!==9||actual.seconds===pref.seconds)&&
+   (group===1||r.weather_auto!==true);
+ };
+ if(items.length&&!items.every(matches)){
+  if(group===1&&value===3)dirty.set('weather.auto','on');
+  else if(group===1)dirty.set('weather',['clear','rain','snow'][value]);
+  else if(group===0&&value===9)dirty.set('led.sequence',String(pref.seconds));
+  else{
+   const mode=group===0?'basic':'music';
+   if(items.some(r=>displayedStatus(r,statusCheck(r)).led!==mode))dirty.set('led',mode);
+   dirty.set(group===0?'led.basic_pattern':'led.music_pattern',String(value));
+  }
+ }
+ syncPendingSettings();
+ const r=items.length===1?items[0]:null;
+ syncLedPatterns(displayedStatus(r,statusCheck(r)));
+}
 function setSubModeUI(value){
- for(const key of ['led','weather','led.basic_pattern','led.music_pattern','led.sequence','weather.auto'])dirty.delete(key);
- if(currentCategory===1&&value===3)mark('weather.auto','on');
- else if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);
- else if(currentCategory===0&&value===9)mark('led.sequence',String(Math.max(1,Math.min(120,Number($('ledSequenceSeconds').value)||10))));
- else{mark('led',currentCategory===0?'basic':'music');mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
- syncLedPatterns(rails().length===1?rails()[0].reported||{}:{});
+ const pref=ledPreference();
+ pref.values[currentCategory]=value;
+ if(currentCategory===0&&value===9)pref.seconds=Math.max(1,Math.min(120,Math.trunc(Number($('ledSequenceSeconds').value)||10)));
+ stageLedPreference();
 }
 function syncLedPatterns(s){
- if(!dirty.has('led.sequence')&&Number.isInteger(s.led_sequence_seconds)&&$('ledSequenceSeconds'))$('ledSequenceSeconds').value=s.led_sequence_seconds;
- const group={basic:0,weather:1,music:2}[s.led];
- const auto=rails().length===1&&rails()[0].weather_auto===true;
- const value=group===0?s.led_basic_pattern:group===2?s.led_music_pattern:auto?3:({clear:0,cloudy:1,rain:1,snow:2})[s.weather];
- const pendingGroup=dirty.has('weather.auto')||dirty.has('weather')?1:dirty.has('led.sequence')||dirty.get('led')==='basic'?0:dirty.get('led')==='music'?2:null;
- const pendingValue=dirty.has('weather.auto')?3:dirty.has('led.sequence')?9:pendingGroup===1?['clear','rain','snow'].indexOf(dirty.get('weather')):Number(dirty.get(pendingGroup===0?'led.basic_pattern':'led.music_pattern'));
+ const pref=ledPreference(),items=rails(),actual=observedLed(s,items.length===1&&items[0].weather_auto===true);
+ const sequence=$('ledSequenceSeconds');if(sequence&&document.activeElement!==sequence)sequence.value=pref.seconds;
+ const pending=ledDraftKeys.some(k=>dirty.has(k));
  const inputs=[...document.querySelectorAll('input[name="ledPattern"]')];
- // Set the entire radio group first; derive row styling only after exclusivity settles.
  inputs.forEach(i=>i.checked=false);
- const chosen=inputs.find(i=>Number(i.dataset.category)===pendingGroup&&Number(i.value)===pendingValue);
- const observed=inputs.find(i=>Number(i.dataset.category)===group&&Number(i.value)===value);
- if(chosen)chosen.checked=true;else if(pendingGroup===null&&observed)observed.checked=true;
+ const chosen=inputs.find(i=>Number(i.dataset.category)===currentCategory&&Number(i.value)===pref.values[currentCategory]);
+ if(chosen)chosen.checked=true;
  inputs.forEach(i=>{
-  const running=s.led_enabled===true&&s.power_on===true&&!s.sleep_active&&Number(i.dataset.category)===group&&Number(i.value)===value;
-  const row=i.closest('label');row.classList.toggle('is-running',running);
-  row.classList.toggle('is-pending',i===chosen);
-  row.title=running?(i===chosen?'실행 중인 패턴 · 적용 요청 대기':'장치 응답 기준 실행 중'):i===chosen?'변경 선택 · 전체 적용 대기':'';
+  const running=s.led_enabled===true&&s.power_on===true&&!s.sleep_active&&Number(i.dataset.category)===actual.group&&Number(i.value)===actual.value;
+  const staged=pending&&i===chosen;
+  const row=i.closest('label');row.classList.toggle('is-running',running);row.classList.toggle('is-pending',staged);
+  row.title=staged?'변경 선택 · 전체 적용 대기':running?'장치 응답 기준 실행 중':'';
  });
-
 }
 function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit){dirty.set('volume',String(value));syncPendingSettings();}}
 function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','age'][Number(value)]);}
 function resetMusicCatalog(){musicPage=null;fillMusicTracks();renderMusicCatalog();}
 function fillMusicTracks(){
  const select=$('piTrackSelect');select.replaceChildren();
- select.append(new Option(musicPage?.tracks.length?'곡을 선택하세요':'목록 미조회 또는 빈 폴더',''));
+ const current=musicPage?.settings?.filename;
+ select.append(new Option(current?'현재곡: '+current:(musicPage?.tracks.length?'곡을 선택하세요':'목록 미조회 또는 빈 폴더'),''));
+
  for(const track of musicPage?.tracks||[])select.append(new Option(`${track.index+1}. ${track.filename}`,String(track.index)));
+
 }
 function renderMusicCatalog(){
  const items=rails(),r=items.length===1?items[0]:null,key=r?.id||null;
@@ -268,12 +320,20 @@ async function musicRequest(r,operation,value){
  }
  throw Error('응답 대기 종료 · 처리 내역을 확인하세요. 자동 재시도하지 않습니다.');
 }
+function syncQueriedMusicSettings(settings){
+ if(!settings)return;
+ if(!dirty.has('volume')&&Number.isInteger(settings.volume)){
+  $('piVolume').value=settings.volume;updateVolUI(settings.volume,false);
+ }
+ if(!dirty.has('music.mode')&&settings.mode)
+  $('piPlayMode').value=({sequential:0,shuffle:1,age:2})[settings.mode];
+}
 async function loadMusicPage(offset=0){
- const r=requireSelection(true)[0],group=$('piMusicGroup').value;
+ const r=requireSelection(true)[0],group=$('piMusicGroup').value,targetSite=site;
  if(musicBusy)return;musicBusy=true;musicPage=null;fillMusicTracks();renderMusicCatalog();
  try {
   const result=await musicRequest(r,'music.list',`${group}:${offset}`);
-  if(rails().length===1 && rails()[0].id===r.id && $('piMusicGroup').value===group){musicPage=result;fillMusicTracks();}
+  if(site===targetSite && rails().length===1 && rails()[0].id===r.id && $('piMusicGroup').value===group){musicPage=result;fillMusicTracks();syncQueriedMusicSettings(result.settings);}
  } finally {musicBusy=false;renderMusicCatalog();}
 }
 async function playSelectedMusic(){
@@ -285,12 +345,25 @@ async function playSelectedMusic(){
  catch(e){musicPage=null;fillMusicTracks();throw e;}
  finally {musicBusy=false;renderMusicCatalog();}
 }
+const projectorChoices=new Map();
+function rememberProjectorSwitch(value){for(const r of rails())projectorChoices.set(r.id,value);}
+function syncProjectorSwitch(){
+ const items=rails();
+ // Seed once from the first known observation; later sleep/relay changes must not move the switch.
+ for(const r of items){
+  if(!projectorChoices.has(r.id)&&typeof r.reported?.projector==='boolean')
+   projectorChoices.set(r.id,r.reported.projector);
+ }
+ const first=projectorChoices.get(items[0]?.id);
+ const value=dirty.has('projector')?dirty.get('projector')==='on':items.length&&items.every(r=>projectorChoices.get(r.id)===first)?first:undefined;
+ document.querySelectorAll('[data-projector-choice]').forEach(b=>{
+  const active=typeof value==='boolean'&&b.dataset.projectorChoice===String(value);
+  b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+ });
+}
 function toggleDeviceState(type,value){
- const operation={projector:'projector',alarmBell:'alarm',radar:'sensor'}[type];
- if(!operation)return;
- mark(operation,value?'on':'off');
- if(type==='projector')document.querySelectorAll('[onclick]').forEach(b=>{if(b.getAttribute('onclick').startsWith("toggleDeviceState('projector'"))b.classList.toggle('active',b.getAttribute('onclick').includes(String(value)));});
- document.querySelectorAll('[data-device-toggle="'+type+'"]').forEach(b=>{const active=b.dataset.enabled===String(value);b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+ if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');
+ rememberProjectorSwitch(value);mark('projector',value?'on':'off');syncProjectorSwitch();
 }
 function switchDisplayView(mode,edit=true){$('mediaDisplayCard').classList.toggle('cctv-only',mode==='cctv');$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);radarView.select(mode==='radar'&&rails().length===1?rails()[0].id:null);}
 async function waitAppliedSnapshot(targets,targetSite){
@@ -311,9 +384,9 @@ function setSettingsBusy(busy){
  if(busy){text('settingsBusyMessage','설정 전송 및 장치 응답을 확인하고 있습니다.');if(!loading.open)loading.showModal();}
  else if(loading.open)loading.close();
 }
-async function applyAllUpdates(){if(settingsApplying)return;settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
+async function applyAllUpdates(){if(musicBusy)return toast('음악 정보 조회가 끝난 뒤 적용해주세요.');if(settingsApplying)return;settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
-function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
+function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['detection','cctv'],['music.mode','age']]);rememberProjectorSwitch(false);syncProjectorSwitch();syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=2;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
 let railRouteLayers=[];
 function railMapIcon(r,highlight=selected.has(r.id)){
@@ -475,7 +548,11 @@ function openAdmin(initial='user'){guarded(async()=>{if(!me.user.ADMIN)throw Err
  const infoLoad=async()=>{info.replaceChildren();const users=await api('/api/portal/admin/users'),gateways=await api('/api/portal/admin/gateways');const heading=document.createElement('h3');heading.textContent='등록 정보';info.append(heading);table(info,['사용자','ID'],users.map(u=>[u.NAME+' ('+u.USERNAME+')',u.ID]));table(info,['현장','ID'],me.sites.map(s=>[s.NAME,s.ID]));table(info,['Pi','현장 ID'],gateways.map(g=>[g.ID,g.SITE_ID]));table(info,['현재 현장 난간','ID'],(view?.rails||[]).map(r=>[r.name,r.id]));};await infoLoad();});}
 function loadContacts(){for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}
 function fillSites(){$('siteSelect').replaceChildren();for(const s of me.sites){const o=document.createElement('option');o.value=s.ID;o.textContent=s.NAME+' · '+s.ROLE;$('siteSelect').append(o);}if(me.sites.some(s=>s.ID===site))$('siteSelect').value=site;else site=$('siteSelect').value;}
-async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;$('railLocationButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');setInterval(async()=>{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!pttChanging)await guarded(openVoice);},2000);}catch(e){toast(e.message);}}
+function scheduleLivePoll(){
+ const watchingSleep=!document.hidden&&rails().some(r=>r.online&&r.reported?.sleep===true);
+ setTimeout(async()=>{try{await poll();if(activeCall?.OWNED&&activeCall.STATUS==='ACTIVE'&&audioContext&&!pttChanging)await guarded(openVoice);}finally{scheduleLivePoll();}},watchingSleep?1000:2000);
+}
+async function init(){try{csrf=await fetch('/api/auth/csrf').then(r=>r.json());me=await api('/api/portal/me');text('userName',me.user.NAME);$('adminButton').hidden=!me.user.ADMIN;$('railLocationButton').hidden=!me.user.ADMIN;fillSites();$('siteSelect').onchange=()=>guarded(changeSite);document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.addEventListener('change',()=>mark('power',i.value==='1'?'battery':'ac')));fillMusicTracks();const clock=()=>text('realtimeClock',new Date().toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}));clock();setInterval(clock,1000);setInterval(renderMusicStatus,1000);await poll();if(view){renderSelection();for(const [label,id]of [['주민센터','telGov'],['소방서','telFire'],['경찰서','telPolice']])$(id).value=view.contacts.find(c=>c.LABEL===label)?.PHONE||'';}else toast('할당된 현장이 없습니다. 관리자에게 현장 권한을 요청하세요.');scheduleLivePoll();}catch(e){toast(e.message);}}
 init();
 
 function detectionCountAction(reset){guarded(async()=>{const r=requireSelection(true)[0];if(reset&&!confirm(r.name+'의 누적 감지 횟수만 0으로 초기화할까요? 연령대 통계는 유지됩니다.'))return;await send(reset?'detection.reset':'detection.count',null,[r.id]);});}
