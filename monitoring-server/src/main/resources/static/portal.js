@@ -327,7 +327,13 @@ async function playSelectedMusic(){
 const projectorChoices=new Map();
 function rememberProjectorSwitch(value){for(const r of rails())projectorChoices.set(r.id,value);}
 function syncProjectorSwitch(){
- const items=rails(),first=projectorChoices.get(items[0]?.id);
+ const items=rails();
+ // Seed once from the first known observation; later sleep/relay changes must not move the switch.
+ for(const r of items){
+  if(!projectorChoices.has(r.id)&&typeof r.reported?.projector==='boolean')
+   projectorChoices.set(r.id,r.reported.projector);
+ }
+ const first=projectorChoices.get(items[0]?.id);
  const value=dirty.has('projector')?dirty.get('projector')==='on':items.length&&items.every(r=>projectorChoices.get(r.id)===first)?first:undefined;
  document.querySelectorAll('[data-projector-choice]').forEach(b=>{
   const active=typeof value==='boolean'&&b.dataset.projectorChoice===String(value);
