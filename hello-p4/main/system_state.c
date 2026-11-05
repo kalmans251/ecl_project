@@ -68,7 +68,7 @@ void system_state_init(void)
      */
 
     s_state.led_enabled =
-        false;
+        true;
 
     s_state.led_mode =
         LED_MODE_BASIC;
@@ -86,7 +86,7 @@ void system_state_init(void)
 
 
     s_state.projector_enabled =
-        false;
+        true;
 
 
     s_state.sleep_mode_enabled =
