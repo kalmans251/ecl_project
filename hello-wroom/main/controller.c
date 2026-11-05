@@ -286,7 +286,7 @@ static void handle_music_apply(const protocol_frame_t *frame)
     if (op == CMD_MUSIC_INFO && frame->payload_len == 5) {
         music_player_info_t info;
         music_player_get_info(&info);
-        uint8_t data[112] = {0};
+        uint8_t data[108] = {0};
         memcpy(data, response, 5);
         data[5] = 0;
         data[6] = (uint8_t)info.state;
@@ -295,10 +295,7 @@ static void handle_music_apply(const protocol_frame_t *frame)
         size_t n = strlen(info.filename);
         data[11] = n;
         memcpy(data + 12, info.filename, n);
-        /* Append actual controls; old INFO prefix remains unchanged. */
-        data[12+n] = audio_output_get_volume();
-        data[13+n] = (uint8_t)playlist_manager_get_mode();
-        send_reply(frame, CMD_APPLY_RESULT, data, 14 + n);
+        send_reply(frame, CMD_APPLY_RESULT, data, 12 + n);
         return;
     }
     if (op == CMD_MUSIC_CATALOG && frame->payload_len == 5 && sd_manager_is_ready()) {
