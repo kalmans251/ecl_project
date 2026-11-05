@@ -18,7 +18,7 @@ def decode(data):
         sleep=bool(data[7]),sleep_active=bool(data[8]),
         detection=('radar','cctv')[data[9]],music_mode=('sequential','shuffle','age')[data[10]-1],
         detection_count=int.from_bytes(data[11:15],'big'))
-    if data[1]: state['power']=('ac','battery')[data[1]-1]
+    state['power']=('auto','ac','battery')[data[1]]
     if data[0]>=2:
         flags=data[16]
         if flags & ~31: raise ValueError('Invalid energy flags')
