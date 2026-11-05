@@ -3,6 +3,7 @@ VALUES = {
     'power': ('ac','battery','on','off'), 'projector': ('on','off'),
     'led': ('on','off','basic','music'), 'weather': ('clear','cloudy','rain','snow'),
     'music.mode': ('sequential','shuffle','age'), 'sleep': ('on','off'),
+    'alarm': ('on','off'), 'sensor': ('on','off'),
     'detection': ('radar','cctv'), 'query': ('p4','wroom','s3'),
 }
 ACTIONS = frozenset('music.'+s for s in ('start','stop','pause','resume','next')) | {'detection.count','detection.reset'}

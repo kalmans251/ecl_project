@@ -150,6 +150,15 @@ function renderSelection(){
 }
 // Keep unsent edits separate from confirmed device observations.
 function syncReportedControls(s){
+ for(const [type,op,key]of [['alarmBell','alarm','alarm_enabled'],['radar','sensor','sensor_enabled']]){
+  document.querySelectorAll('[data-device-toggle="'+type+'"]').forEach(b=>{
+   const value=dirty.has(op)?dirty.get(op)==='on':s[key];
+   const active=typeof value==='boolean'&&b.dataset.enabled===String(value);
+   b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+   b.title=typeof value==='boolean'?'':'설정 상태 미확인 · Pi와 P4 업데이트가 필요합니다.';
+  });
+ }
+
  if(!dirty.has('volume')&&s.volume!==undefined){$('piVolume').value=s.volume;updateVolUI(s.volume,false);}
  if(!dirty.has('power'))document.querySelectorAll('input[name="pwrSupplyMode"]').forEach(i=>i.checked=i.value===({auto:'0',ac:'2',battery:'1'}[s.power]));
  if(!dirty.has('sleep')){

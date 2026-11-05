@@ -832,7 +832,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 	            </div>
 	            <div class="ctrl-item" style="margin-bottom:5px;">
 	                <span class="ctrl-label">🔔 비상벨</span>
-	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on active" disabled title="현재 펌웨어 ON/OFF 제어 미지원" onclick="toggleDeviceState('alarmBell', true)">ON</button><button type="button" class="btn-toggle off" disabled title="현재 펌웨어 ON/OFF 제어 미지원" onclick="toggleDeviceState('alarmBell', false)">OFF</button></div>
+	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on active" data-device-toggle="alarmBell" data-enabled="true" aria-pressed="false" onclick="toggleDeviceState('alarmBell', true)">ON</button><button type="button" class="btn-toggle off" data-device-toggle="alarmBell" data-enabled="false" aria-pressed="false" onclick="toggleDeviceState('alarmBell', false)">OFF</button></div>
 	            </div>
 	            <div class="ctrl-item">
 	                <span class="ctrl-label">📽️ 프로젝터</span>
@@ -840,7 +840,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 	            </div>
 	            <div class="ctrl-item">
 	                <span class="ctrl-label">📡 센서 수신</span>
-	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on active" disabled title="현재 펌웨어 ON/OFF 제어 미지원" onclick="toggleDeviceState('radar', true)">ON</button><button type="button" class="btn-toggle off" disabled title="현재 펌웨어 ON/OFF 제어 미지원" onclick="toggleDeviceState('radar', false)">OFF</button></div>
+	                <div class="ctrl-btn-group"><button type="button" class="btn-toggle on active" data-device-toggle="radar" data-enabled="true" aria-pressed="false" onclick="toggleDeviceState('radar', true)">ON</button><button type="button" class="btn-toggle off" data-device-toggle="radar" data-enabled="false" aria-pressed="false" onclick="toggleDeviceState('radar', false)">OFF</button></div>
 	            </div>
             <div class="ctrl-item browser-feature-toggle">
              <span class="ctrl-label" title="이 브라우저의 날씨 조회와 표시만 변경합니다. 난간 LED 설정은 유지됩니다.">☀️ 날씨정보</span>

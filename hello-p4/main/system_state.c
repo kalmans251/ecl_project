@@ -67,6 +67,9 @@ void system_state_init(void)
      * 기본값
      */
 
+    s_state.emergency_enabled = true;
+    s_state.sensor_enabled = true;
+
     s_state.led_enabled =
         true;
 
@@ -350,3 +353,10 @@ void system_state_set_led_pattern(led_mode_t mode,uint8_t pattern) {
 }
 
 void system_state_set_led_sequence_seconds(uint8_t seconds){lock_state();s_state.led_sequence_seconds=seconds>=1&&seconds<=120?seconds:10;unlock_state();}
+
+void system_state_set_emergency_enabled(bool enabled) {
+    lock_state();s_state.emergency_enabled=enabled;unlock_state();
+}
+void system_state_set_sensor_enabled(bool enabled) {
+    lock_state();s_state.sensor_enabled=enabled;unlock_state();
+}

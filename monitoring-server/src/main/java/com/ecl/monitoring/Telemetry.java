@@ -18,7 +18,7 @@ public class Telemetry {
         long now=System.currentTimeMillis();if(observed>now+2000 || observed<now-60000)throw Accounts.bad("Stale telemetry");
         var rail=registry.deviceRail(gateway,node.path("railing_id").intValue());String id=(String)rail.get("ID");
         if(rail.get("SEEN_AT")!=null && ((Number)rail.get("SEEN_AT")).longValue()>=observed)return;
-        JsonNode state=node.path("state");if(state.size()>30)throw Accounts.bad("Too many state fields");
+        JsonNode state=node.path("state");if(state.size()>32)throw Accounts.bad("Too many state fields");
         for(String key:state.propertyNames()) {
             JsonNode value=state.get(key);
             if(NUMERIC.contains(key)) {

@@ -5,7 +5,7 @@ import tools.jackson.databind.JsonNode;
 
 /** Results from Pi's token-correlated device controls, not transport acknowledgments. */
 final class ControlCommands {
-    static final Set<String> OPERATIONS=Set.of("power","projector","led","weather","led.basic_pattern","led.music_pattern","led.sequence",
+    static final Set<String> OPERATIONS=Set.of("alarm","sensor","power","projector","led","weather","led.basic_pattern","led.music_pattern","led.sequence",
         "music.mode","music.start","music.stop","music.pause","music.resume","music.next","volume","sleep","detection","query","detection.count","detection.reset");
     static boolean supports(String op){return OPERATIONS.contains(op);}
     static void validate(String op,String value,int rail,String status,JsonNode data){
@@ -17,7 +17,7 @@ final class ControlCommands {
             || !data.path("operation").asText().equals(op) || !data.has("value")
             || !(value==null?data.get("value").isNull():data.get("value").isString() && value.equals(data.get("value").asText()))
             || !data.path("device_application_confirmed").isBoolean() || !data.path("steps").isArray())throw Accounts.bad("Control identity mismatch");
-        int service=switch(op){case "power"->7;case "projector"->8;case "led","weather","led.basic_pattern","led.music_pattern","led.sequence"->1;
+        int service=switch(op){case "alarm"->6;case "sensor"->9;case "power"->7;case "projector"->8;case "led","weather","led.basic_pattern","led.music_pattern","led.sequence"->1;
             case "sleep"->10;case "detection","detection.count","detection.reset"->9;case "query"->0;default->2;};
         List<Integer> expected;
         if(op.equals("power") && Set.of("ac","battery").contains(value))expected=List.of(0x22,0x20);
@@ -40,6 +40,7 @@ final class ControlCommands {
                 String detail=s.path("data").asText();
                 if(!detail.matches("01(?:00|01)[0-9a-f]{8}") || (op.equals("detection.reset")&&!detail.substring(4).equals("00000000")))throw Accounts.bad("Invalid detection count confirmation");
             }
+            if(Set.of("alarm","sensor").contains(op) && !s.path("data").asText().equals("on".equals(value)?"01":"00"))throw Accounts.bad("Wrong reception setting confirmation");
             if(op.equals("volume") && !s.path("data").asText().equals(String.format("%02x",Integer.parseInt(value))))throw Accounts.bad("Wrong volume confirmation");
             if(op.equals("music.stop") && !s.path("data").asText().equals("00"))throw Accounts.bad("Wrong stopped state");
         }

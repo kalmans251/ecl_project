@@ -24,6 +24,10 @@ int main(void){
  radar_cache_capture(&f);radar_cache_reply(&q,&r);assert(r.payload[7]==0 && r.length==15);
  now+=1600000;radar_cache_reply(&q,&r);assert(!r.payload[6]);
  f.payload[1]=1;radar_cache_capture(&f);radar_cache_reply(&q,&r);assert(r.payload[6] && r.payload[5]==1);
+ radar_cache_set_enabled(false);radar_cache_reply(&q,&r);assert(!r.payload[6] && !r.payload[7]);
+ radar_cache_capture(&f);radar_cache_reply(&q,&r);assert(!r.payload[6]);
+ now+=1000;radar_cache_set_enabled(true);radar_cache_reply(&q,&r);assert(!r.payload[6]);
+ now+=1000;radar_cache_capture(&f);radar_cache_reply(&q,&r);assert(r.payload[6]);
  f.src=NODE_WROOM;assert(!radar_cache_capture(&f));
  q.src=NODE_S3;assert(!radar_cache_reply(&q,&r));
  return 0;
