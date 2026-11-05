@@ -191,43 +191,91 @@ function syncPendingSettings(){
 
 function mark(operation,value){dirty.set(operation,value);syncPendingSettings();toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
-let ledTabState={key:null,chosen:false};
-function ledSelectionKey(){return String(site)+'/'+rails().map(r=>r.id).join(',');}
-function syncLedCategory(s){
- const key=ledSelectionKey();if(ledTabState.key!==key)ledTabState={key,chosen:false};
- if(!ledTabState.chosen&&['basic','weather','music'].includes(s.led)){
-  switchCategoryTabUI(s.led,{basic:0,weather:1,music:2}[s.led],false);ledTabState.chosen=true;
- }
+const ledTabDefaults=[9,3,0];
+const ledDraftKeys=['led','weather','led.basic_pattern','led.music_pattern','led.sequence','weather.auto'];
+const ledPreferences=new Map();
+let displayedLedKey=null;
+function ledSelectionKey(){return JSON.stringify([site,rails().map(r=>r.id).sort()]);}
+function ledPreference(){
+ const key=ledSelectionKey();
+ if(!ledPreferences.has(key))ledPreferences.set(key,{values:[...ledTabDefaults],seconds:10,initialized:false,tab:0,lastObserved:null});
+ return ledPreferences.get(key);
 }
-function switchCategoryTabUI(name,code,edit=true){if(edit)ledTabState={key:ledSelectionKey(),chosen:true};currentCategory=code;document.querySelectorAll('.category-tab-btn').forEach((b,i)=>{b.classList.toggle('active',i===code);b.setAttribute('aria-selected',String(i===code));});['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');}
+function observedLed(s,auto){
+ const group={basic:0,weather:1,music:2}[s.led];
+ const value=group===0?s.led_basic_pattern:group===2?s.led_music_pattern:group===1?(auto?3:({clear:0,cloudy:1,rain:1,snow:2})[s.weather]):undefined;
+ return {group,value,seconds:s.led_sequence_seconds};
+}
+function rememberObservedLed(s){
+ const pref=ledPreference(),items=rails(),actual=observedLed(s,items.length===1&&items[0].weather_auto===true);
+ const signature=JSON.stringify(actual);
+ if(!ledDraftKeys.some(k=>dirty.has(k))&&pref.lastObserved!==signature&&Number.isInteger(actual.value)){
+  pref.values[actual.group]=actual.value;
+  if(actual.group===0&&actual.value===9&&Number.isInteger(actual.seconds))pref.seconds=actual.seconds;
+  pref.lastObserved=signature;
+ }
+ return actual;
+}
+function syncLedCategory(s){
+ const pref=ledPreference(),actual=rememberObservedLed(s);
+ const key=ledSelectionKey();
+ if(!pref.initialized&&Number.isInteger(actual.group)){
+  pref.initialized=true;pref.tab=actual.group;
+  switchCategoryTabUI(s.led,pref.tab,false);
+ }else if(displayedLedKey!==key)switchCategoryTabUI(null,pref.tab,false);
+ displayedLedKey=key;
+}
+function switchCategoryTabUI(name,code,edit=true){
+ const pref=ledPreference();
+ if(edit)pref.initialized=true;
+ pref.tab=code;currentCategory=code;
+ document.querySelectorAll('.category-tab-btn').forEach((b,i)=>{b.classList.toggle('active',i===code);b.setAttribute('aria-selected',String(i===code));});
+ ['Basic','Weather','Music'].forEach((n,i)=>$('tabContent'+n).style.display=i===code?'flex':'none');
+ if(edit)stageLedPreference();
+}
+function stageLedPreference(){
+ const pref=ledPreference(),group=currentCategory,value=pref.values[group],items=rails();
+ for(const key of ledDraftKeys)dirty.delete(key);
+ const matches=r=>{
+  const s=displayedStatus(r,statusCheck(r)),actual=observedLed(s,r.weather_auto===true);
+  return actual.group===group&&actual.value===value&&
+   (group!==0||value!==9||actual.seconds===pref.seconds)&&
+   (group===1||r.weather_auto!==true);
+ };
+ if(items.length&&!items.every(matches)){
+  if(group===1&&value===3)dirty.set('weather.auto','on');
+  else if(group===1)dirty.set('weather',['clear','rain','snow'][value]);
+  else if(group===0&&value===9)dirty.set('led.sequence',String(pref.seconds));
+  else{
+   const mode=group===0?'basic':'music';
+   if(items.some(r=>displayedStatus(r,statusCheck(r)).led!==mode))dirty.set('led',mode);
+   dirty.set(group===0?'led.basic_pattern':'led.music_pattern',String(value));
+  }
+ }
+ syncPendingSettings();
+ const r=items.length===1?items[0]:null;
+ syncLedPatterns(displayedStatus(r,statusCheck(r)));
+}
 function setSubModeUI(value){
- for(const key of ['led','weather','led.basic_pattern','led.music_pattern','led.sequence','weather.auto'])dirty.delete(key);
- if(currentCategory===1&&value===3)mark('weather.auto','on');
- else if(currentCategory===1)mark('weather',['clear','rain','snow'][value]);
- else if(currentCategory===0&&value===9)mark('led.sequence',String(Math.max(1,Math.min(120,Number($('ledSequenceSeconds').value)||10))));
- else{mark('led',currentCategory===0?'basic':'music');mark(currentCategory===0?'led.basic_pattern':'led.music_pattern',String(value));}
- syncLedPatterns(rails().length===1?rails()[0].reported||{}:{});
+ const pref=ledPreference();
+ pref.values[currentCategory]=value;
+ if(currentCategory===0&&value===9)pref.seconds=Math.max(1,Math.min(120,Math.trunc(Number($('ledSequenceSeconds').value)||10)));
+ stageLedPreference();
 }
 function syncLedPatterns(s){
- if(!dirty.has('led.sequence')&&Number.isInteger(s.led_sequence_seconds)&&$('ledSequenceSeconds'))$('ledSequenceSeconds').value=s.led_sequence_seconds;
- const group={basic:0,weather:1,music:2}[s.led];
- const auto=rails().length===1&&rails()[0].weather_auto===true;
- const value=group===0?s.led_basic_pattern:group===2?s.led_music_pattern:auto?3:({clear:0,cloudy:1,rain:1,snow:2})[s.weather];
- const pendingGroup=dirty.has('weather.auto')||dirty.has('weather')?1:dirty.has('led.sequence')||dirty.get('led')==='basic'?0:dirty.get('led')==='music'?2:null;
- const pendingValue=dirty.has('weather.auto')?3:dirty.has('led.sequence')?9:pendingGroup===1?['clear','rain','snow'].indexOf(dirty.get('weather')):Number(dirty.get(pendingGroup===0?'led.basic_pattern':'led.music_pattern'));
+ const pref=ledPreference(),items=rails(),actual=observedLed(s,items.length===1&&items[0].weather_auto===true);
+ const sequence=$('ledSequenceSeconds');if(sequence&&document.activeElement!==sequence)sequence.value=pref.seconds;
+ const pending=ledDraftKeys.some(k=>dirty.has(k));
  const inputs=[...document.querySelectorAll('input[name="ledPattern"]')];
- // Set the entire radio group first; derive row styling only after exclusivity settles.
  inputs.forEach(i=>i.checked=false);
- const chosen=inputs.find(i=>Number(i.dataset.category)===pendingGroup&&Number(i.value)===pendingValue);
- const observed=inputs.find(i=>Number(i.dataset.category)===group&&Number(i.value)===value);
- if(chosen)chosen.checked=true;else if(pendingGroup===null&&observed)observed.checked=true;
+ const chosen=inputs.find(i=>Number(i.dataset.category)===currentCategory&&Number(i.value)===pref.values[currentCategory]);
+ if(chosen)chosen.checked=true;
  inputs.forEach(i=>{
-  const running=s.led_enabled===true&&s.power_on===true&&!s.sleep_active&&Number(i.dataset.category)===group&&Number(i.value)===value;
-  const row=i.closest('label');row.classList.toggle('is-running',running);
-  row.classList.toggle('is-pending',i===chosen);
-  row.title=running?(i===chosen?'실행 중인 패턴 · 적용 요청 대기':'장치 응답 기준 실행 중'):i===chosen?'변경 선택 · 전체 적용 대기':'';
+  const running=s.led_enabled===true&&s.power_on===true&&!s.sleep_active&&Number(i.dataset.category)===actual.group&&Number(i.value)===actual.value;
+  const staged=pending&&i===chosen;
+  const row=i.closest('label');row.classList.toggle('is-running',running);row.classList.toggle('is-pending',staged);
+  row.title=staged?'변경 선택 · 전체 적용 대기':running?'장치 응답 기준 실행 중':'';
  });
-
 }
 function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit){dirty.set('volume',String(value));syncPendingSettings();}}
 function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','age'][Number(value)]);}
@@ -298,7 +346,7 @@ function setSettingsBusy(busy){
 }
 async function applyAllUpdates(){if(settingsApplying)return;settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
 function sendAudioAction(action){guarded(()=>send(['music.stop','music.start','music.next'][action]));}
-function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led','basic'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
+function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
 let railRouteLayers=[];
 function railMapIcon(r,highlight=selected.has(r.id)){
