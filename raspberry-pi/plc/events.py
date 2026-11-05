@@ -20,9 +20,11 @@ POLL_REPLY_BUDGET_MS = 140
 
 
 class EventPoller:
-    def __init__(self, bus, railings, audio, ids, dispatch):
+    def __init__(self, bus, railings, audio, ids, dispatch, status_refresh=None):
         self.bus, self.railings, self.audio = bus, railings, audio
         self.ids, self.dispatch = tuple(ids), dispatch
+        self.status_refresh = status_refresh
+        self.output_states = {}
         self.stop_event = threading.Event()
         self.condition = threading.Condition()
         self.reply_timeout = (POLL_STARTUP_SECONDS + POLL_HOST_MARGIN_SECONDS
@@ -108,7 +110,7 @@ class EventPoller:
         if (frame.src != Node.P4 or frame.dst != Node.PI or frame.service != Service.SYSTEM
                 or frame.command != Command.EVENT_REPLY):
             return False
-        if len(frame.payload) not in (14, 22, 19, 24):
+        if len(frame.payload) not in (14, 16, 22, 19, 24):
             return True
         with self.condition:
             if self.pending != (frame.railing_id, frame.payload[:4]):
@@ -130,8 +132,18 @@ class EventPoller:
                     self.dispatch(Frame(rid, Node.P4, Node.PI, service, command, frame.payload[14:]))
                     # Acknowledge only after the normal event handler succeeded.
                     self.ack[rid] = event_id
-            elif len(frame.payload) != 14 or service != 0 or command != 0:
+            elif len(frame.payload) not in (14, 16) or service != 0 or command != 0:
                 return True
+            if not event_id and len(frame.payload) == 16:
+                outputs = tuple(frame.payload[14:16])
+                if any(value not in (0, 1) for value in outputs):
+                    return True
+                if self.output_states.get(rid) != outputs:
+                    # Only enqueue a refresh here: never do blocking PLC I/O in
+                    # the single RX thread. Full correlated status remains truth.
+                    if self.status_refresh:
+                        self.status_refresh(rid)
+                    self.output_states[rid] = outputs
             if dropped != self.overflow.get(rid, 0):
                 LOG.error('Emergency reports lost on P4 rail=%d total=%d; inspect field state', rid, dropped)
             self.overflow[rid] = dropped
