@@ -46,17 +46,8 @@ final class MusicCommands {
         if(!data.isObject() || !data.path("railing_id").isInt() || data.path("railing_id").intValue()!=rail
             || !uint(data.path("catalog_version"),0xffffffffL) || !choice.group().equals(data.path("group").asText())) throw Accounts.bad("Music result mismatch");
         if(operation.equals("music.list")) {
-            if(!status.equals("COMPLETED") || (data.size()!=6 && !(data.size()==7 && data.has("settings"))) || !data.path("offset").isInt() || data.path("offset").intValue()!=choice.index()
+            if(!status.equals("COMPLETED") || data.size()!=6 || !data.path("offset").isInt() || data.path("offset").intValue()!=choice.index()
                 || !uint(data.path("total"),32) || !data.path("tracks").isArray()) throw Accounts.bad("Invalid catalog page");
-            if(data.has("settings")){
-                var settings=data.path("settings");
-                boolean controls=settings.has("volume")||settings.has("mode");
-                if(!settings.isObject() || settings.size()!=(controls?3:1) || !settings.has("filename")
-                    || !(settings.path("filename").isNull()||filename(settings.path("filename")))
-                    || (controls && (!uint(settings.path("volume"),100)
-                        || !Set.of("sequential","shuffle","age").contains(settings.path("mode").asText()))))
-                    throw Accounts.bad("Invalid music settings");
-            }
             int count=Math.max(0,Math.min(8,data.path("total").intValue()-choice.index()));
             if(data.path("tracks").size()!=count) throw Accounts.bad("Incomplete catalog page");
             int index=choice.index();

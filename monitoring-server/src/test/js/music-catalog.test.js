@@ -95,28 +95,3 @@ test('incident recovery sends exact incident and retains uncertainty on failed c
  assert.equal(sent[0][0],'/api/portal/incidents/incident-a/recover');assert.equal(a.run('controlBusy'),false);
  a.context.confirm=()=>false;await a.run(`recoverEmergencyIncident('incident-b','난간')`);assert.equal(sent.length,1);
 });
-
-test('music tab reads the selected rail without overwriting staged controls',async()=>{
- const a=app(),requests=[];a.context.capture=x=>requests.push(x);
- a.run(`site='site-a';$('piMusicGroup').value='default';updateVolUI=()=>{};stageLedPreference=()=>{};
- ['Basic','Weather','Music'].forEach(n=>$('tabContent'+n).style={});document.querySelectorAll=()=>[];guarded=f=>{globalThis.refreshTask=f();};
- dirty=new Map([['volume','55'],['music.mode','shuffle']]);$('piVolume').value=55;$('piPlayMode').value=1;
- musicRequest=async(r,op,value)=>{capture([r.id,op,value]);return {catalog_version:5,group:'default',offset:0,total:1,
- tracks:[{index:0,filename:'a.mp3'}],settings:{filename:'a.mp3',volume:37,mode:'age'}};};
- switchCategoryTabUI('music',2);`);
- await a.run('refreshTask');
- assert.deepEqual(Array.from(requests[0]),['rail-a','music.list','default:0']);
- assert.equal(a.elements.piVolume.value,55);assert.equal(a.elements.piPlayMode.value,1);
- assert.equal(a.elements.piTrackSelect.children[0].text,'현재곡: a.mp3');
-});
-test('queried volume and mode are shown when no edits are pending',async()=>{
- const a=app();a.run(`site='site-a';$('piMusicGroup').value='default';updateVolUI=()=>{};
- musicRequest=async()=>({catalog_version:5,group:'default',offset:0,total:0,tracks:[],settings:{filename:null,volume:37,mode:'age'}});`);
- await a.run('loadMusicPage(0)');
- assert.equal(a.elements.piVolume.value,37);assert.equal(a.elements.piPlayMode.value,2);
-});
-test('late music reads cannot update another railing',async()=>{
- const a=app();a.run(`site='site-a';$('piMusicGroup').value='default';$('piVolume').value=55;updateVolUI=()=>{};
- musicRequest=async()=>{selected=new Set(['rail-b']);return {catalog_version:5,group:'default',offset:0,total:0,tracks:[],settings:{filename:null,volume:37,mode:'age'}};};`);
- await a.run('loadMusicPage(0)');assert.equal(a.run('musicPage'),null);assert.equal(a.elements.piVolume.value,55);
-});

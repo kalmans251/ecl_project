@@ -165,7 +165,7 @@ s_initialized =
 
 static music_play_mode_t
 s_mode =
-    MUSIC_PLAY_MODE_AGE;
+    MUSIC_PLAY_MODE_SEQUENTIAL;
 
 
 static music_group_t
@@ -918,7 +918,7 @@ bool playlist_manager_init(void)
      * 여기서만 초기화한다.
      */
     s_mode =
-        MUSIC_PLAY_MODE_AGE;
+        MUSIC_PLAY_MODE_SEQUENTIAL;
 
 
     s_age_group =

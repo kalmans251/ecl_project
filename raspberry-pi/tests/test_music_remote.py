@@ -87,12 +87,11 @@ class MusicRemoteTests(unittest.TestCase):
         def reply(controls, rail, op, payload=b'', **kwargs):
             if op == Command.MUSIC_CATALOG:
                 return version.to_bytes(4,'big') + (32).to_bytes(2,'big') + bytes(8)
-            if op == Command.MUSIC_INFO: return b'\x02'+bytes(4)+b'\x05a.mp3'+bytes([20,3])
             return payload + b'\x05a.mp3'
         with patch('music_info.request',side_effect=reply) as send:
             first=page(self.controls,1,'default',0)
             self.assertEqual(len(first['tracks']),8)
-            self.assertEqual(send.call_count,11)  # catalog + eight names + recheck + settings
+            self.assertEqual(send.call_count,10)  # catalog + eight names + catalog recheck
             page(self.controls,1,'default',8)
             self.assertEqual(len(self.controls.music_catalogs[1]['tracks']),16)
             version=6

@@ -30,11 +30,11 @@ static SemaphoreHandle_t
 /*
  * 재생 방식.
  *
- * 기본은 나이 기반 (미판별 시 default 그룹).
+ * 기본은 순차.
  */
 static music_play_mode_t
     s_mode =
-        MUSIC_PLAY_MODE_AGE;
+        MUSIC_PLAY_MODE_SEQUENTIAL;
 
 
 /*
@@ -253,7 +253,7 @@ void music_manager_init(void)
 
 
     s_mode =
-        MUSIC_PLAY_MODE_AGE;
+        MUSIC_PLAY_MODE_SEQUENTIAL;
 
     s_group =
         MUSIC_GROUP_DEFAULT;
@@ -267,7 +267,7 @@ void music_manager_init(void)
 
     ESP_LOGI(
         TAG,
-        "Music manager initialized / AGE"
+        "Music manager initialized / SEQUENTIAL"
     );
 }
 

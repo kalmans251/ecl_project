@@ -84,9 +84,8 @@ int main(void) {
  f.payload_len=7;f.payload[4]=CMD_SET;f.payload[5]=1;f.payload[6]=2;
  handle_music_apply(&f);assert(response[5]==0 && response[6]==2);
  f.payload_len=5;f.payload[4]=CMD_MUSIC_INFO;handle_music_apply(&f);
- assert(reply_len==19 && response[5]==0 && response[6]==MUSIC_PLAYER_PAUSED);
+ assert(reply_len==17 && response[5]==0 && response[6]==MUSIC_PLAYER_PAUSED);
  assert(response[9]==0x30 && response[10]==0x39 && response[11]==5);
- assert(response[17]==volume && response[18]==2);
  f.payload[4]=CMD_MUSIC_CATALOG;handle_music_apply(&f);
  assert(reply_len==20 && response[9]==5 && response[11]==1);
  f.payload_len=12;f.payload[4]=CMD_MUSIC_TRACK;

@@ -120,20 +120,6 @@ def play(controls, rail, group, index, *, expected_version=None, guard=None):
             'catalog_version': listing['catalog_version'], **track}
 
 
-def settings(controls, rail, *, guard=None):
-    data = request(controls, rail, Command.MUSIC_INFO, guard=guard)
-    if len(data)<6 or data[0]>2 or data[5]>95 or len(data) not in (6+data[5],8+data[5]):
-        raise ValueError('Malformed music settings')
-    n=data[5]
-    result=dict(filename=data[6:6+n].decode('utf-8',errors='replace') or None)
-    if len(data)==8+n:
-        volume,mode=data[6+n:8+n]
-        if volume>100 or mode not in (1,2,3):
-            raise ValueError('Invalid music controls')
-        result.update(volume=volume,mode=('sequential','shuffle','age')[mode-1])
-    return result
-
-
 def page(controls, rail, group, offset=0, *, guard=None):
     """Eight tracks at a time; release PLC between each correlated read."""
     if group not in GROUPS or offset not in (0, 8, 16, 24):
@@ -155,10 +141,9 @@ def page(controls, rail, group, offset=0, *, guard=None):
         tracks.append(dict(group=group, index=index, filename=item[8:].decode('utf-8', errors='replace')))
     if request(controls, rail, Command.MUSIC_CATALOG, guard=guard) != data:
         raise ValueError('Catalog changed; refresh list')
-    actual = settings(controls, rail, guard=guard)
     number = int.from_bytes(version, 'big')
     cached = previous['tracks'] if previous and previous['catalog_version'] == number else []
     cached = [t for t in cached if t['group'] != group or not offset <= t['index'] < offset+8]
     controls.music_catalogs[rail] = dict(catalog_version=number, tracks=cached+tracks)
     return dict(railing_id=rail, catalog_version=number, group=group, offset=offset,
-                total=counts[GROUPS[group]], tracks=tracks, settings=actual)
+                total=counts[GROUPS[group]], tracks=tracks)
