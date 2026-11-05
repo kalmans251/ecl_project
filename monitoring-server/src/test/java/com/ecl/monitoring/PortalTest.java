@@ -288,6 +288,23 @@ class PortalTest {
   telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",2,"observed_at",Instant.ofEpochMilli(now+12).toString(),"state",Map.of("projector",false))));
   state=json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id));assertFalse(state.has("battery_voltage"));assertFalse(state.has("battery_percent"));
  }
+ @Test void telemetryAcceptsReceptionFlagsAndRejectsInvalidTypes(){
+  String id=rail();long now=System.currentTimeMillis();
+  for(boolean enabled:List.of(true,false)){
+   telemetry.accept("gateway-01",json.valueToTree(Map.of("version",1,"type","telemetry",
+    "railing_id",1,"observed_at",Instant.ofEpochMilli(++now).toString(),
+    "state",Map.of("alarm_enabled",enabled,"sensor_enabled",!enabled,"power","battery","projector",true))));
+   var snapshot=json.readTree(db.queryForObject("SELECT snapshot FROM rails WHERE id=?",String.class,id));
+   assertEquals(enabled,snapshot.path("alarm_enabled").asBoolean());
+   assertEquals(!enabled,snapshot.path("sensor_enabled").asBoolean());
+  }
+  for(String key:List.of("alarm_enabled","sensor_enabled","unknown_flag")){
+   var bad=json.valueToTree(Map.of("version",1,"type","telemetry","railing_id",1,
+    "observed_at",Instant.ofEpochMilli(++now).toString(),"state",
+    Map.of(key,key.equals("unknown_flag")?(Object)true:(Object)1)));
+   assertThrows(RuntimeException.class,()->telemetry.accept("gateway-01",bad));
+  }
+ }
  @Test void telemetryPreservesAllReportedPowerModes(){
   String id=rail();long now=System.currentTimeMillis();
   for(String mode:List.of("auto","ac","battery")){
