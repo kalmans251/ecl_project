@@ -178,15 +178,7 @@ function syncPendingSettings(){
   const detail=document.createElement('small');detail.textContent=`${stateFetchFailed?'연결 확인 불가':r.online?'Pi 연결됨':'Pi 연결 끊김'}`;
   item.append(name,detail);root.append(item);
  }
- const labels={'power':'전원','sleep':'슬립 모드','led':'LED 모드','projector':'프로젝터','volume':'음량','music.mode':'음악 재생 모드','detection':'감지 방식','weather':'날씨 패턴','weather.auto':'현재 날씨 자동 연동','led.basic_pattern':'LED 기본 패턴','led.music_pattern':'음악 연동 패턴','led.sequence':'LED 순차 전환 간격'};
- const values={ac:'상전',battery:'배터리',on:'켜기',off:'끄기',basic:'기본',music:'음악 연동',weather:'날씨 연동',radar:'레이더',cctv:'CCTV',clear:'맑음',rain:'비/흐림',snow:'눈',sequential:'순차',shuffle:'무작위',age:'연령 연동'};
- const list=$('pendingChangesList');list.replaceChildren();
- for(const [op,value] of dirty){const li=document.createElement('li');let display=values[value]??String(value);
-  if(op==='volume')display=value+'%';
-  if(op==='led.sequence')display=value+'초';
-  if(op==='led.basic_pattern'||op==='led.music_pattern')display='모드 '+(Number(value)+1);
-  li.textContent=`${labels[op]??op}: ${display}`;list.append(li);
- }
+
 }
 
 function mark(operation,value){dirty.set(operation,value);syncPendingSettings();toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
