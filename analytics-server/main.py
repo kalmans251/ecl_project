@@ -137,7 +137,9 @@ def run(c):
     api = ApiWorker(c)
     reader = Reader(c, api)
     overlay = OverlayWorker(c, api)
-    entries = Entries(c['camera_id'])
+    age_options = c.get('age', {})
+    entries = Entries(c['camera_id'], age_window=float(age_options.get('window_seconds', 4)),
+                      min_samples=int(age_options.get('min_samples', 3)))
     ctx = mp.get_context('spawn')
     jobs, replies, stop_age = ctx.Queue(maxsize=1), ctx.Queue(maxsize=4), ctx.Event()
     age_proc = None

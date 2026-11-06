@@ -7,8 +7,10 @@ def timestamp():
     return datetime.now(timezone.utc).isoformat()
 
 class Entries:
-    def __init__(self, camera, clock=time.monotonic):
+    def __init__(self, camera, clock=time.monotonic, age_window=4.0, min_samples=3):
         self.camera, self.clock = camera, clock
+        self.age_window = age_window
+        self.min_samples = min_samples
         self.tracks = {}
 
     def update(self, ids):
@@ -40,10 +42,10 @@ class Entries:
             if not state['event'] or state['age_sent']:
                 continue
             age = self.clock() - state['entered']
-            if len(state['ages']) < 2 and age < 1.5:
+            if age < self.age_window and not (age >= 2 and len(state['ages']) >= 5):
                 continue
             group = 'keep'
-            if age < 2 and len(state['ages']) >= 2:
+            if len(state['ages']) >= self.min_samples:
                 value = int(statistics.median(state['ages']) // 10) * 10
                 if value in (10, 20, 30, 40):
                     group = str(value)

@@ -9,6 +9,13 @@
     "enabled": false,
     "repo": "MiVOLO",
     "checkpoint": "models/mivolo_imdb.pth.tar",
-    "device": "cpu"
+    "device": "cpu",
+    "face_model": null,
+    "face_conf": 0.85,
+    "min_face_width": 64,
+    "min_face_sharpness": 35,
+    "require_face": true,
+    "window_seconds": 4,
+    "min_samples": 3
   }
 }
