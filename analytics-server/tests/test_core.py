@@ -41,4 +41,15 @@ class EntriesTest(unittest.TestCase):
   now[0]=5
   self.assertEqual(e.age_events()[0]['age_group'],'keep')
 
+ def test_rejection_reason_is_track_scoped_and_success_clears_it(self):
+  now=[0.];e=Entries('a',lambda:now[0])
+  for _ in range(3):e.update([7]);now[0]+=.1
+  event=e.tracks[7]['event']
+  e.age_rejected(7,'wrong','face-not-found')
+  self.assertIsNone(e.tracks[7]['age_reason'])
+  e.age_rejected(7,event['event_id'],'face-blurry')
+  self.assertEqual(e.tracks[7]['age_reason'],'face-blurry')
+  e.age(7,event['event_id'],28)
+  self.assertIsNone(e.tracks[7]['age_reason'])
+
 if __name__=='__main__':unittest.main()

@@ -170,6 +170,8 @@ def run(c):
                 else:
                     busy = False
                     entries.age(result['id'], result['token'], result['age'])
+                    if result['age'] is None:
+                        entries.age_rejected(result['id'], result['token'], result.get('reason', 'analysis-error'))
             if age_proc and not age_proc.is_alive():
                 age_ready = busy = False
             snap = reader.latest

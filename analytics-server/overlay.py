@@ -18,7 +18,8 @@ def snapshot(rows, tracks, width, height, frame_id, age_state):
         values = [v for v in state.get('ages', []) if math.isfinite(v) and 0 <= v <= 100]
         age = round(statistics.median(values), 1) if len(values) >= 2 else None
         label = 'estimated' if age is not None else age_state if age_state != 'ready' else 'unknown' if state.get('age_sent') else 'pending'
-        people.append({'id': str(tid), 'box': [round(max(0, min(1, v)), 4) for v in (x1/width, y1/height, x2/width, y2/height)], 'age': age, 'state': label})
+        reason = state.get('age_reason') if age is None else None
+        people.append({'id': str(tid), 'box': [round(max(0, min(1, v)), 4) for v in (x1/width, y1/height, x2/width, y2/height)], 'age': age, 'state': label, 'reason': reason})
     return {'frame_id': str(frame_id), 'people': people}
 
 class OverlayWorker(threading.Thread):

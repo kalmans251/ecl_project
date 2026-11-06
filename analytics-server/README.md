@@ -39,8 +39,12 @@ ROI와 추적 이력은 카메라별로 격리됩니다. 테스트는 모델 다
 - `age.model_id`: `v2` Hugging Face 모델 ID 또는 사전에 다운로드한 로컬 모델 경로
 - `age.face_model`: [OpenCV Zoo YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet)의 로컬 ONNX 모델 파일 경로
 - `age.require_face=true`: 검출된 얼굴이 없거나 품질이 부족하면 전신만으로 나이를 확정하지 않음
-- `age.min_face_width=64`: 최소 얼굴 박스 폭·높이(px)
-- `age.min_face_sharpness=35`: Laplacian 분산 기준의 초기 흐림 임계값(현장 영상에서 재조정 필요)
+- `age.min_face_width=24`: 최소 얼굴 박스 폭·높이(px), 진단용 완화값
+- `age.min_face_sharpness=5`: Laplacian 분산 기준의 진단용 흐림 임계값(현장 영상에서 재조정 필요)
+- 높은 곳의 CCTV에서 검출률 진단을 위한 시작값은 `face_conf=0.65`, `min_face_width=24`, `min_face_sharpness=5`입니다.
+  좁고 흐린 얼굴까지 통과하므로 **나이 추정 정확도를 보장하지 않으며**, 현장 검증 뒤 조정해야 합니다.
+- 관제 오버레이의 `얼굴 미검출`, `얼굴 크기 부족`, `선명도 부족`, `유효 프레임 부족`, `나이 추론 실패`는
+  분석 실패 원인입니다. `미인식`이 반복되면 각 원인의 빈도를 먼저 확인하세요.
 - `age.window_seconds=4`, `age.min_samples=3`: 복수 샘플을 모을 시간과 최소 샘플 수
 
 `face_model=null`이면 기존 **body-only** 경로가 유지됩니다. 얼굴 검출 파일을 설정하면
