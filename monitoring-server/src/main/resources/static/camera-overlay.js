@@ -6,6 +6,8 @@
  }
  function label(p){
   if(p.state==='estimated'&&Number.isFinite(p.age))return '#'+p.id+' 추정 '+Math.round(p.age)+'세';
+  const reason=({ 'face-not-found':'얼굴 미검출', 'face-too-small':'얼굴 크기 부족', 'face-blurry':'선명도 부족', 'insufficient-samples':'유효 프레임 부족', 'analysis-error':'나이 추론 실패', 'invalid-age':'나이 추론 실패', 'stale-job':'분석 지연', 'too-small':'사람 영역 부족', 'eval-failed':'분석 실패'})[p.reason];
+  if(reason&&p.state!=='disabled'&&p.state!=='unavailable')return '#'+p.id+' '+reason;
   return '#'+p.id+' '+({pending:'나이 분석 중',unknown:'나이 미확정',disabled:'연령 분석 꺼짐',unavailable:'연령 분석 불가'})[p.state];
  }
  function attach(camera,video,canvas,status,toggle){

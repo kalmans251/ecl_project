@@ -56,9 +56,9 @@ Set-JsonProperty $config.age 'backend' 'v2'
 Set-JsonProperty $config.age 'model_id' 'iitolstykh/mivolo_v2'
 Set-JsonProperty $config.age 'device' $(if ($UseCpu) { 'cpu' } else { 'cuda:0' })
 Set-JsonProperty $config.age 'face_model' $modelPath
-Set-JsonProperty $config.age 'face_conf' 0.85
-Set-JsonProperty $config.age 'min_face_width' 40
-Set-JsonProperty $config.age 'min_face_sharpness' 35
+Set-JsonProperty $config.age 'face_conf' 0.65
+Set-JsonProperty $config.age 'min_face_width' 24
+Set-JsonProperty $config.age 'min_face_sharpness' 5
 Set-JsonProperty $config.age 'require_face' $true
 Set-JsonProperty $config.age 'window_seconds' 4
 Set-JsonProperty $config.age 'min_samples' 3

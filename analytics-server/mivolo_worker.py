@@ -59,6 +59,7 @@ def age_worker(jobs, replies, stop, settings):
             h, w = crop.shape[:2]
             boxes_data = [[0, 0, w, h, 1.0, 0]]
             face_valid = False
+            reject_reason = 'face-not-found'
             if detector is not None:
                 detector.setInputSize((w, h))
                 _, faces = detector.detect(crop)
@@ -67,20 +68,22 @@ def age_worker(jobs, replies, stop, settings):
                     min_width = int(settings.get('min_face_width', 64))
                     candidates = [f for f in faces if f[2] >= min_width and f[3] >= min_width
                                   and f[1] + f[3] / 2 < h * 0.65]
+                    reject_reason = 'face-too-small'
                     if candidates:
                         f = max(candidates, key=lambda item: float(item[2] * item[3] * item[-1]))
                         x, y, fw, fh = map(float, f[:4])
                         x1, y1, x2, y2 = max(0, int(x)), max(0, int(y)), min(w, int(x + fw)), min(h, int(y + fh))
                         face = crop[y1:y2, x1:x2]
                         blur = cv2.Laplacian(cv2.cvtColor(face, cv2.COLOR_BGR2GRAY), cv2.CV_64F).var() if face.size else 0
+                        reject_reason = 'face-blurry'
                         if blur >= float(settings.get('min_face_sharpness', 35)):
                             boxes_data.append([x1, y1, x2, y2, float(f[-1]), 1])
                             face_valid = True
             if detector is not None and not face_valid and settings.get('require_face', True):
-                return None, 'face-unavailable'
+                return None, reject_reason
             if backend == 'v2':
                 if not face_valid:
-                    return None, 'face-unavailable'
+                    return None, reject_reason
                 face_input = processor(images=[face])['pixel_values'].to(dtype=model.dtype, device=device)
                 body_input = processor(images=[crop])['pixel_values'].to(dtype=model.dtype, device=device)
                 with torch.inference_mode():

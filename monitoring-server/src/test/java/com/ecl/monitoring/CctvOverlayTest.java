@@ -17,4 +17,10 @@ class CctvOverlayTest {
   service.accept("a",json.readTree(frame.replace("\"age\":28","\"age\":null").replace("estimated","pending")));
   assertEquals(true,service.latest("a").get("fresh"));
  }
+ @Test void acceptsKnownFailureReasonButRejectsUnknownReason(){
+  var service=new CctvOverlay();
+  var pending=frame.replace("\"age\":28","\"age\":null").replace("estimated","pending");
+  service.accept("a",json.readTree(pending.replace("\"state\":\"pending\"","\"state\":\"pending\",\"reason\":\"face-not-found\"")));
+  assertThrows(Exception.class,()->service.accept("a",json.readTree(pending.replace("\"state\":\"pending\"","\"state\":\"pending\",\"reason\":\"bogus\""))));
+ }
 }

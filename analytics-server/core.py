@@ -18,7 +18,7 @@ class Entries:
         self.tracks = {k: v for k, v in self.tracks.items() if now - v['seen'] < 3}
         events = []
         for tid in set(ids):
-            state = self.tracks.setdefault(tid, {'seen': now, 'hits': 0, 'event': None, 'ages': [], 'age_sent': False, 'attempted': 0})
+            state = self.tracks.setdefault(tid, {'seen': now, 'hits': 0, 'event': None, 'ages': [], 'age_sent': False, 'attempted': 0, 'age_reason': None})
             if now - state['seen'] > .75:
                 state['hits'] = 0
             state['seen'], state['hits'] = now, state['hits'] + 1
@@ -34,6 +34,13 @@ class Entries:
             return
         if value is not None and 0 <= value <= 100:
             state['ages'].append(float(value))
+            state['age_reason'] = None
+
+    def age_rejected(self, tid, event_id, reason):
+        state = self.tracks.get(tid)
+        if (state and state['event'] and state['event']['event_id'] == event_id
+                and self.clock() - state['seen'] <= .75):
+            state['age_reason'] = reason
 
     def age_events(self):
         import statistics
@@ -49,6 +56,8 @@ class Entries:
                 value = int(statistics.median(state['ages']) // 10) * 10
                 if value in (10, 20, 30, 40):
                     group = str(value)
+            elif not state['age_reason']:
+                state['age_reason'] = 'insufficient-samples'
             state['age_sent'] = True
             events.append({**state['event'], 'type': 'age', 'age_group': group})
         return events
