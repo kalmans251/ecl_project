@@ -1,0 +1,5 @@
+-r requirements.txt
+transformers==4.51.0
+accelerate==1.8.1
+safetensors>=0.4,<1
+git+https://github.com/WildChlamydia/MiVOLO.git

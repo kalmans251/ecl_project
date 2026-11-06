@@ -4,12 +4,15 @@ import queue
 import time
 
 def age_worker(jobs, replies, stop, settings):
-    """MiVOLO v1 body-only inference; retain main-process ByteTrack identity."""
+    """MiVOLO v1 or Hugging Face v2 inference, preserving ByteTrack identity."""
     try:
         import sys
         from pathlib import Path
+        backend = settings.get('backend', 'v1')
+        if backend not in ('v1', 'v2'):
+            raise ValueError('age.backend must be v1 or v2')
         repo = settings.get('repo')
-        if repo:
+        if backend == 'v1' and repo:
             root = Path(repo).expanduser().resolve()
             if not (root / 'mivolo' / 'model' / 'mi_volo.py').is_file():
                 raise FileNotFoundError(f'Invalid MiVOLO repository: {root}')
@@ -17,19 +20,12 @@ def age_worker(jobs, replies, stop, settings):
         import numpy as np
         import cv2
         import torch
-        from ultralytics.engine.results import Results
-        from mivolo.model.mi_volo import MiVOLO
-        from mivolo.structures import PersonAndFaceResult
-
         torch.set_num_threads(2)
         device = settings['device']
         if device == 'auto':
             device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         elif str(device).isdigit():
             device = f'cuda:{device}'
-        checkpoint = Path(settings['checkpoint']).expanduser().resolve()
-        if not checkpoint.is_file():
-            raise FileNotFoundError(f'MiVOLO face+body v1 checkpoint missing: {checkpoint}')
         face_model_path = settings.get('face_model')
         detector = None
         if face_model_path:
@@ -38,10 +34,26 @@ def age_worker(jobs, replies, stop, settings):
                 raise FileNotFoundError(f'YuNet face model missing: {face_model_path}')
             detector = cv2.FaceDetectorYN.create(str(face_model_path), '', (320, 320),
                                                   score_threshold=float(settings.get('face_conf', 0.85)))
-        model = MiVOLO(str(checkpoint), device=device, half=False,
-                       disable_faces=detector is None, use_persons=True)
-        if not model.meta.use_person_crops:
-            raise ValueError('A face+body checkpoint is required, not a face-only checkpoint.')
+        if backend == 'v1':
+            from ultralytics.engine.results import Results
+            from mivolo.model.mi_volo import MiVOLO
+            from mivolo.structures import PersonAndFaceResult
+            checkpoint = Path(settings['checkpoint']).expanduser().resolve()
+            if not checkpoint.is_file():
+                raise FileNotFoundError(f'MiVOLO v1 checkpoint missing: {checkpoint}')
+            model = MiVOLO(str(checkpoint), device=device, half=False,
+                           disable_faces=detector is None, use_persons=True)
+            if not model.meta.use_person_crops:
+                raise ValueError('A face+body checkpoint is required.')
+        else:
+            if detector is None:
+                raise ValueError('MiVOLO v2 requires age.face_model (YuNet ONNX)')
+            from transformers import AutoModelForImageClassification, AutoImageProcessor
+            model_id = settings.get('model_id', 'iitolstykh/mivolo_v2')
+            precision = torch.float16 if device.startswith('cuda') else torch.float32
+            model = AutoModelForImageClassification.from_pretrained(
+                model_id, trust_remote_code=True, torch_dtype=precision).to(device).eval()
+            processor = AutoImageProcessor.from_pretrained(model_id, trust_remote_code=True)
 
         def predict_age(crop):
             h, w = crop.shape[:2]
@@ -66,17 +78,25 @@ def age_worker(jobs, replies, stop, settings):
                             face_valid = True
             if detector is not None and not face_valid and settings.get('require_face', True):
                 return None, 'face-unavailable'
+            if backend == 'v2':
+                if not face_valid:
+                    return None, 'face-unavailable'
+                face_input = processor(images=[face])['pixel_values'].to(dtype=model.dtype, device=device)
+                body_input = processor(images=[crop])['pixel_values'].to(dtype=model.dtype, device=device)
+                with torch.inference_mode():
+                    prediction = model(faces_input=face_input, body_input=body_input)
+                return float(prediction.age_output[0].item()), 'face-body-v2'
             boxes = torch.tensor(boxes_data, dtype=torch.float32)
             detection = Results(orig_img=crop, path='tracked-person',
                                 names={0: 'person', 1: 'face'}, boxes=boxes)
             prediction = PersonAndFaceResult(detection)
-            # Official predict handles missing face, normalization and age scaling.
             model.predict(crop, prediction)
             return prediction.ages[0], ('face-body' if face_valid else 'body-only')
 
-        # Exercise the actual body-only path before reporting ready.
-        predict_age(np.full((256, 128, 3), 127, dtype=np.uint8))
-        print(f'[Age/MiVOLO] Ready | face={detector is not None} | device={device}', flush=True)
+        if backend == 'v1':
+            # Exercise the original body-only path before reporting ready.
+            predict_age(np.full((256, 128, 3), 127, dtype=np.uint8))
+        print(f'[Age/MiVOLO] Ready | backend={backend} | face={detector is not None} | device={device}', flush=True)
         replies.put(dict(kind='ready'))
     except Exception as exc:
         print(f'[Age/MiVOLO Init Error] {type(exc).__name__}: {exc}', flush=True)
