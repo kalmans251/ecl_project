@@ -24,8 +24,16 @@ if (-not (Test-Path -LiteralPath $python)) {
 }
 
 if ($InstallDependencies) {
+    # The upstream MiVOLO setup.py imports pkg_resources at build time.
+    # Modern isolated builds can omit it; use a compatible local setuptools.
+    & $python -m pip install 'setuptools>=69,<81' wheel
+    if ($LASTEXITCODE -ne 0) { throw 'Build tooling installation failed; configuration was not changed.' }
     & $python -m pip install -r (Join-Path $root 'requirements-age-v2.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed; configuration was not changed.' }
+    # Do not let MiVOLO's old ultralytics==8.1.0 requirement downgrade the
+    # project's existing YOLO11 installation.
+    & $python -m pip install --no-build-isolation --no-deps 'git+https://github.com/WildChlamydia/MiVOLO.git'
+    if ($LASTEXITCODE -ne 0) { throw 'MiVOLO package installation failed; configuration was not changed.' }
 }
 
 # Config is an object on both Windows PowerShell 5.1 and PowerShell 7.

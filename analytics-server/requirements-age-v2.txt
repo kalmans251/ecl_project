@@ -2,4 +2,4 @@
 transformers==4.51.0
 accelerate==1.8.1
 safetensors>=0.4,<1
-git+https://github.com/WildChlamydia/MiVOLO.git
+timm==0.8.13.dev0
