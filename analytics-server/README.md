@@ -16,6 +16,9 @@ ROI와 추적 이력은 카메라별로 격리됩니다. 테스트는 모델 다
 1. 기존 설정 파일 `analytics-server/config.json`을 유지합니다 (토큰을 Git에 올리지 마세요).
 2. YuNet 파일을 `analytics-server/models/face_detection_yunet_2023mar.onnx`에 복사합니다.
 3. 기존 `.venv`가 있는 서버에서 `powershell -ExecutionPolicy Bypass -File .\setup-age.ps1 -InstallDependencies`를 실행합니다.
+   스크립트는 구형 MiVOLO의 `pkg_resources` 빌드 의존성을 위해 호환 가능한 setuptools를 설치하고,
+   MiVOLO 패키지는 `--no-deps --no-build-isolation`으로 설치합니다. 이렇게 해야 기존 YOLO11에 필요한
+   Ultralytics가 구형 `8.1.0`으로 내려가지 않습니다.
 4. 이 명령은 `config.json.backup.<timestamp>`를 만든 다음 **`age` 필드만 갱신**합니다. 카메라 ID, URL, 인증 토큰은 유지합니다.
 5. `\.venv\Scripts\python.exe main.py --config config.json`으로 실행하고 `backend=v2 | face=True` 로그를 확인합니다.
 
