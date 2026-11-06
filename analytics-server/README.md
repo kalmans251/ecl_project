@@ -7,12 +7,33 @@ ROI와 추적 이력은 카메라별로 격리됩니다. 테스트는 모델 다
 
 ## 얼굴+전신 나이 추정 (선택 기능)
 
-기본 설정은 기존 운영 방식과 호환되도록 `age.enabled=false`, `face_model=null`입니다.
-실제 나이 추정 기능을 활성화하려면 `config.json`에서 다음을 설정합니다.
+기본 설정은 기존 운영을 변경하지 않도록 `age.enabled=false`입니다.
+새 서버에서는 `config.example.json`의 `age.backend=v2`를 사용할 수 있고,
+기존 `config.json`에 `backend`가 없으면 예전 `v1` 방식이 그대로 유지됩니다.
+
+### Windows 설정 (YuNet 파일은 수동 제공)
+
+1. 기존 설정 파일 `analytics-server/config.json`을 유지합니다 (토큰을 Git에 올리지 마세요).
+2. YuNet 파일을 `analytics-server/models/face_detection_yunet_2023mar.onnx`에 복사합니다.
+3. 기존 `.venv`가 있는 서버에서 `powershell -ExecutionPolicy Bypass -File .\setup-age.ps1 -InstallDependencies`를 실행합니다.
+4. 이 명령은 `config.json.backup.<timestamp>`를 만든 다음 **`age` 필드만 갱신**합니다. 카메라 ID, URL, 인증 토큰은 유지합니다.
+5. `\.venv\Scripts\python.exe main.py --config config.json`으로 실행하고 `backend=v2 | face=True` 로그를 확인합니다.
+
+최초 실행 시 Hugging Face 모델 다운로드가 필요합니다. 서버가 인터넷에 연결되지 않았다면
+미리 내려받은 모델 디렉터리를 `age.model_id`로 지정해야 합니다.
+`age.backend=v2`는 Hugging Face `iitolstykh/mivolo_v2`를 `transformers`로 로드합니다.
+공식 모델 카드의 BGR 얼굴/전신 384px 전처리 및 추론 API를 사용합니다.
+
+**라이선스 주의:** 위 공개 MiVOLO v2 가중치는 `CC-BY-NC-4.0`으로 표시되어 있습니다.
+상업용 스마트 난간 운영에 사용하려면 권리자에게 별도 사용 허가를 확인해야 합니다.
+설치 스크립트는 이 사항을 경고하며 라이선스 승인을 대신하지 않습니다.
+
+실제 나이 추정 기능을 활성화하려면 다음을 확인합니다.
 
 - `age.enabled=true`: 별도 나이 추정 프로세스 실행
-- `age.repo`: 설치된 [MiVOLO](https://github.com/WildChlamydia/MiVOLO) 소스 경로
-- `age.checkpoint`: 해당 MiVOLO 코드와 호환되는 **face+body** 체크포인트 경로. v2로 변경 시 해당 버전의 가중치/의존성 조합을 별도 검증해야 합니다.
+- `age.backend`: `v1`(기존 체크포인트) 또는 `v2`(Hugging Face 모델)
+- `age.repo`, `age.checkpoint`: `v1` 모드에서만 사용하는 기존 경로
+- `age.model_id`: `v2` Hugging Face 모델 ID 또는 사전에 다운로드한 로컬 모델 경로
 - `age.face_model`: [OpenCV Zoo YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet)의 로컬 ONNX 모델 파일 경로
 - `age.require_face=true`: 검출된 얼굴이 없거나 품질이 부족하면 전신만으로 나이를 확정하지 않음
 - `age.min_face_width=64`: 최소 얼굴 박스 폭·높이(px)
