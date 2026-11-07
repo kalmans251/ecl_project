@@ -506,18 +506,18 @@ body #sosCardContainer .card-title{
 
 /* Keep the diagnostics action visible within the system settings card. */
 body .card-system-setting .system-check-compact{
- border:1px solid #b88344;background:linear-gradient(145deg,#332a21,#1b2029);
+ border:1px solid #4b8de0;background:linear-gradient(145deg,#182e50,#131f34);
  align-self:stretch;gap:8px;
- box-shadow:inset 4px 0 #ffb454,0 3px 12px #0003;text-align:left;align-items:stretch;
+ box-shadow:inset 4px 0 #69aaff,0 3px 12px #0003;text-align:left;align-items:stretch;
 }
-.system-check-heading{display:flex;align-items:center;gap:8px;min-width:0;color:#ffbd70}
+.system-check-heading{display:flex;align-items:center;gap:8px;min-width:0;color:#8cbfff}
 .system-check-heading svg{flex:none;width:28px;height:28px}
-body .card-system-setting .system-check-heading strong{font-size:17px;font-weight:800;color:#fff1dc;line-height:1.35}
+body .card-system-setting .system-check-heading strong{font-size:17px;font-weight:800;color:#edf5ff;line-height:1.35}
 body .card-system-setting .system-check-compact .system-diagnostic-button{
  display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
- min-height:42px;padding:8px 10px;font-size:15px;border:1px solid #ffd297;border-radius:6px;
- background:#ffb454;color:#241608!important;font-weight:800;cursor:pointer;text-shadow:none;
+ min-height:42px;padding:8px 10px;font-size:15px;border:1px solid #a3ccff;border-radius:6px;
+ background:#69aaff;color:#0b203e!important;font-weight:800;cursor:pointer;text-shadow:none;
 }
-body .card-system-setting .system-check-compact .system-diagnostic-button:hover{background:#ffd08c;border-color:#ffe3bb}
-body .card-system-setting .system-check-compact .system-diagnostic-button:focus-visible{outline:2px solid #fff1dc;outline-offset:3px}
-body .card-system-setting .system-check-compact small{color:#e2cdb6}
+body .card-system-setting .system-check-compact .system-diagnostic-button:hover{background:#91c4ff;border-color:#c0dfff}
+body .card-system-setting .system-check-compact .system-diagnostic-button:focus-visible{outline:2px solid #edf5ff;outline-offset:3px}
+body .card-system-setting .system-check-compact small{color:#c0d6f3}
