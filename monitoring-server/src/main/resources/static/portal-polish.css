@@ -512,7 +512,7 @@ body .card-system-setting .system-check-compact{
 }
 .system-check-heading{display:flex;align-items:center;gap:8px;min-width:0;color:#8cbfff}
 .system-check-heading svg{flex:none;width:28px;height:28px}
-body .card-system-setting .system-check-heading strong{font-size:17px;font-weight:800;color:#edf5ff;line-height:1.35}
+body .card-system-setting .system-check-heading strong{font-size:17px;font-weight:800;color:#ff7582;line-height:1.35}
 body .card-system-setting .system-check-compact .system-diagnostic-button{
  display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
  min-height:42px;padding:8px 10px;font-size:15px;border:1px solid #a3ccff;border-radius:6px;
@@ -521,3 +521,5 @@ body .card-system-setting .system-check-compact .system-diagnostic-button{
 body .card-system-setting .system-check-compact .system-diagnostic-button:hover{background:#91c4ff;border-color:#c0dfff}
 body .card-system-setting .system-check-compact .system-diagnostic-button:focus-visible{outline:2px solid #edf5ff;outline-offset:3px}
 body .card-system-setting .system-check-compact small{color:#c0d6f3}
+
+#systemDiagnosisTitle{color:#ff7582}
