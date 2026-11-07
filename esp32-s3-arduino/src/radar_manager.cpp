@@ -1033,6 +1033,22 @@ void radar_manager_init(void)
 // PROCESS
 // ============================================================
 
+static void send_presence_if_needed()
+{
+    static uint32_t last_sent;
+    uint32_t now=millis();
+    if(audio_session_is_active() || (uint32_t)(now-last_sent)<2000)return;
+    bool occupied=(s_radar1.stable_count>0 && s_radar1.target_count>0 && (uint32_t)(now-s_radar1.last_frame_ms)<1000) ||
+                  (s_radar2.stable_count>0 && s_radar2.target_count>0 && (uint32_t)(now-s_radar2.last_frame_ms)<1000);
+    if(!occupied)return;
+    protocol_frame_t frame={};
+    frame.railing_id=RAILING_ID;frame.src=NODE_S3;frame.dst=NODE_P4;
+    frame.service=SERVICE_DETECTION;frame.command=CMD_DATA;
+    frame.length=1;frame.payload[0]=5;
+    ble_send_frame(&frame);
+    last_sent=now;
+}
+
 void radar_manager_process(void)
 {
     process_uart(
@@ -1047,6 +1063,7 @@ void radar_manager_process(void)
         &s_parser2,
         2
     );
+    send_presence_if_needed();
 }
 
 

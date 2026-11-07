@@ -8,7 +8,8 @@ import tools.jackson.databind.JsonNode;
 @RestController
 public class CctvApi {
  private final CctvOverlay overlay;private final Cctv cctv;private final CameraSocket sockets;private final Events events;
- public CctvApi(Cctv cctv,CameraSocket sockets,Events events,CctvOverlay overlay){this.overlay=overlay;this.cctv=cctv;this.sockets=sockets;this.events=events;}
+ private final PresenceRelay presence;
+ public CctvApi(Cctv cctv,CameraSocket sockets,Events events,CctvOverlay overlay,PresenceRelay presence){this.presence=presence;this.overlay=overlay;this.cctv=cctv;this.sockets=sockets;this.events=events;}
  public record Provision(String control_token,String publish_token,String analysis_token){}
  @PutMapping("/api/portal/admin/cctv/{camera}") public void provision(Principal p,@PathVariable String camera,@RequestBody Provision v){cctv.provision(p.getName(),camera,v.control_token(),v.publish_token(),v.analysis_token());sockets.refresh();}
  public record Enabled(boolean enabled){}
@@ -21,7 +22,8 @@ public class CctvApi {
  @PostMapping("/api/cctv/analysis/{camera}/events") public Map<String,Object> event(@PathVariable String camera,@RequestBody Events.Input input){if(!camera.equals(input.camera_id())||!cctv.analysis(camera))throw Accounts.bad("Analysis disabled or camera mismatch");return events.submit(input);}
  @PostMapping("/api/cctv/analysis/{camera}/observation") public void observe(@PathVariable String camera,@RequestBody JsonNode n){
   if(n.size()!=3||!n.path("available").isBoolean()||!n.path("people").isInt()||n.path("people").asInt()<0||n.path("people").asInt()>1000||!Set.of("ready","disabled","unavailable","pending").contains(n.path("age").asText()))throw Accounts.bad("Invalid observation");
-  if(!cctv.analysis(camera))throw Accounts.bad("Analysis disabled");cctv.observe(camera,Map.of("available",n.path("available").asBoolean(),"people",n.path("people").asInt(),"age",n.path("age").asText()));
+  if(!cctv.analysis(camera))throw Accounts.bad("Analysis disabled");presence.observe(camera,n.path("available").asBoolean() && n.path("people").asInt()>0);
+  cctv.observe(camera,Map.of("available",n.path("available").asBoolean(),"people",n.path("people").asInt(),"age",n.path("age").asText()));
  }
  @PostMapping("/api/cctv/analysis/{camera}/overlay") public void overlay(@PathVariable String camera,@RequestBody JsonNode n){if(!cctv.analysis(camera))throw Accounts.bad("Analysis disabled");overlay.accept(camera,n);}
  @GetMapping("/api/portal/cctv/{camera}/overlay") public org.springframework.http.ResponseEntity<Map<String,Object>> overlay(Principal p,@PathVariable String camera){cctv.permit(p.getName(),camera,false);return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(cctv.analysis(camera)?overlay.latest(camera):Map.of("fresh",false,"people",List.of()));}

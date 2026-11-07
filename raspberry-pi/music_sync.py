@@ -146,6 +146,8 @@ class MusicPublisher:
 
     async def _connection(self, ws, alive):
         from call_remote import OPERATIONS as CALLS
+        from presence_sync import PresenceUpdates
+        presence=PresenceUpdates(self.remote.controls,self.remote.rails) if self.remote else None
         self.command_task = None
         incoming = asyncio.Queue(maxsize=2)
         async def execute(message, handler):
@@ -171,10 +173,18 @@ class MusicPublisher:
                 at,message = await incoming.get()
                 if self.calls and alive.is_set() and time.monotonic()-at<.4:
                     await asyncio.to_thread(self.calls.receive, message)
+        async def presence_worker():
+            while True:
+                await asyncio.sleep(.25)
+                if presence:
+                    await asyncio.to_thread(presence.step,lambda: alive.is_set() and not self.stop.is_set())
         async def receiver():
             while not self.stop.is_set():
                 raw = await ws.recv()
                 message = json.loads(raw)
+                if message.get('type')=='cctv.presence':
+                    if presence:presence.offer(message)
+                    continue
                 if message.get('type') == 'emergency_ack' and self.emergency_outbox:
                     await asyncio.to_thread(self.emergency_outbox.acknowledge,message)
                     continue
@@ -211,7 +221,7 @@ class MusicPublisher:
                         self.command_task = asyncio.create_task(execute(message,handler))
                 elif message.get('type') in ('command','cctv.enter','cctv.age'):
                     await ws.send(json.dumps(dict(version=1,type='ack',message_id=message['message_id'],status='FAILED')))
-        tasks = [asyncio.create_task(fn()) for fn in (sender,receiver,audio_worker)]
+        tasks = [asyncio.create_task(fn()) for fn in (sender,receiver,audio_worker,presence_worker)]
         try:
             done,_ = await asyncio.wait(tasks,return_when=asyncio.FIRST_COMPLETED)
             for task in done: task.result()

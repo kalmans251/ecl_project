@@ -158,3 +158,6 @@ void detection_manager_get_summary(
 
 /* Reset only the cumulative detection count; preserve dedup, age and activity. */
 void detection_manager_reset_count(detection_summary_t *summary);
+
+/* Presence renews activity without counting a new person or changing age. */
+bool detection_manager_touch_presence(detection_source_t source);
