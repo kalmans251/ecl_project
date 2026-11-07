@@ -77,7 +77,7 @@ async function startSystemDiagnosis(){
     }
    }
   }
-  text('systemDiagnosisSummary',`${systemDiagnosisStop?'진단 중단':'진단 완료'} · 정상 ${passed} / 실패 ${failed} / 생략 ${skipped}. 응답 실패만으로 전원·배선·CRC 중 원인을 확정할 수 없습니다.`);
+  text('systemDiagnosisSummary',`${systemDiagnosisStop?'진단 중단':'진단 완료'} · 정상 ${passed} / 실패 ${failed} / 생략 ${skipped}`);
  }catch(e){
   if(systemDiagnosisRunning)text('systemDiagnosisSummary',e.message);else toast(e.message);
  }finally{
