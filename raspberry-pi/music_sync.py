@@ -43,6 +43,7 @@ class MusicSync:
             message['state'] = dict(available=True, state=data['state'], filename=data['filename'],
                                     position_ms=data['position_ms'],duration_ms=data['duration_ms'],
                                     playback_id=data['playback_id'],seekable=data['seekable'])
+            if 'volume' in data: message['state']['volume']=data['volume']
         except (RuntimeError, ValueError, OSError):
             message['state'] = dict(available=False)
         # Timestamp after receiving confirmation, not before waiting for PLC.

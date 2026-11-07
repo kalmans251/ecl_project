@@ -48,14 +48,19 @@ def request(controls, rail, operation, payload=b'', *, background=False, timeout
 def status(controls, rail, *, background=False):
     data = request(controls, rail, Command.MUSIC_TIMELINE, background=background,
                    timeout=0.6 if background else None)
-    if len(data)<15 or data[0]>2 or data[13]>1 or data[14]>95 or len(data)!=15+data[14]:
+    if len(data)<15 or data[0]>2 or data[13]>1 or data[14]>95 or len(data) not in (15+data[14],16+data[14]):
         raise ValueError('Malformed music timeline')
     duration=int.from_bytes(data[5:9],'big')
-    return dict(railing_id=rail,state=('idle','playing','paused')[data[0]],
+    end=15+data[14]
+    result=dict(railing_id=rail,state=('idle','playing','paused')[data[0]],
                 position_ms=int.from_bytes(data[1:5],'big'),duration_ms=duration or None,
                 playback_id=int.from_bytes(data[9:13],'big'),seekable=bool(data[13]),
-                filename=data[15:].decode('utf-8',errors='replace') or None,
+                filename=data[15:end].decode('utf-8',errors='replace') or None,
                 position_basis='MP3 frames / PCM submitted to I2S')
+    if len(data)>end:
+        if data[end]>100: raise ValueError('Invalid music volume')
+        result['volume']=data[end]
+    return result
 
 
 def seek(controls, rail, playback_id, position_ms, *, guard=None):
