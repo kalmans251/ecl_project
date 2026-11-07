@@ -506,17 +506,18 @@ body #sosCardContainer .card-title{
 
 /* Keep the diagnostics action visible within the system settings card. */
 body .card-system-setting .system-check-compact{
- border-color:#3b8993;background:linear-gradient(145deg,#143944,#102430);
- box-shadow:inset 3px 0 #59dce7;text-align:left;align-items:stretch;
+ border:1px solid #b88344;background:linear-gradient(145deg,#332a21,#1b2029);
+ align-self:stretch;gap:8px;
+ box-shadow:inset 4px 0 #ffb454,0 3px 12px #0003;text-align:left;align-items:stretch;
 }
-.system-check-heading{display:flex;align-items:center;gap:8px;min-width:0;color:#80ecf2}
-.system-check-heading svg{flex:none}
-body .card-system-setting .system-check-heading strong{font-size:14px;color:#e2fbff;line-height:1.35}
+.system-check-heading{display:flex;align-items:center;gap:8px;min-width:0;color:#ffbd70}
+.system-check-heading svg{flex:none;width:28px;height:28px}
+body .card-system-setting .system-check-heading strong{font-size:17px;font-weight:800;color:#fff1dc;line-height:1.35}
 body .card-system-setting .system-check-compact .system-diagnostic-button{
  display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;
- min-height:36px;padding:7px 10px;border:1px solid #8beaf0;border-radius:6px;
- background:#72e4ec;color:#0b2531;font-weight:800;cursor:pointer;text-shadow:none;
+ min-height:42px;padding:8px 10px;font-size:15px;border:1px solid #ffd297;border-radius:6px;
+ background:#ffb454;color:#241608!important;font-weight:800;cursor:pointer;text-shadow:none;
 }
-body .card-system-setting .system-check-compact .system-diagnostic-button:hover{background:#a1f2f6;color:#0b2531}
-body .card-system-setting .system-check-compact .system-diagnostic-button:focus-visible{outline:2px solid #e4fcff;outline-offset:3px}
-body .card-system-setting .system-check-compact small{color:#b8d6df}
+body .card-system-setting .system-check-compact .system-diagnostic-button:hover{background:#ffd08c;border-color:#ffe3bb}
+body .card-system-setting .system-check-compact .system-diagnostic-button:focus-visible{outline:2px solid #fff1dc;outline-offset:3px}
+body .card-system-setting .system-check-compact small{color:#e2cdb6}
