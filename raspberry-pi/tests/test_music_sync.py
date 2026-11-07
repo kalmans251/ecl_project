@@ -10,14 +10,30 @@ from voice import VoiceRelay
 
 class MusicSyncTests(unittest.TestCase):
     def test_independent_rails_and_failed_sample(self):
-        sync = MusicSync(None, [1, 2])
+        published = []
+        sync = MusicSync(None, [1, 2], publish=published.append)
         with patch('music_sync.status', side_effect=[
                 dict(state='playing', filename='one.mp3', position_ms=100,duration_ms=1000,playback_id=9,seekable=True),
                 dict(state='paused', filename='two.mp3', position_ms=200,duration_ms=1000,playback_id=10,seekable=False), TimeoutError()]):
-            sync.sample(1); sync.sample(2); sync.sample(1)
-        self.assertFalse(sync.snapshot()['1']['state']['available'])
+            first = sync.sample(1); sync.sample(2); sync.sample(1)
+        self.assertEqual(sync.snapshot()['1'], first)
+        self.assertEqual(len(published), 2)
         self.assertEqual(sync.snapshot()['2']['state']['filename'], 'two.mp3')
         self.assertEqual(sync.snapshot()['2']['state']['position_ms'], 200)
+
+    def test_initial_failure_and_confirmed_idle(self):
+        published = []
+        sync = MusicSync(None, [1], publish=published.append)
+        with patch('music_sync.status', side_effect=[
+                TimeoutError(),
+                dict(state='playing', filename='one.mp3', position_ms=100,duration_ms=1000,playback_id=9,seekable=True),
+                TimeoutError(),
+                dict(state='idle', filename=None, position_ms=0,duration_ms=None,playback_id=0,seekable=False)]):
+            self.assertFalse(sync.sample(1)['state']['available'])
+            sync.sample(1)
+            self.assertEqual(sync.sample(1)['state']['filename'], 'one.mp3')
+            self.assertEqual(sync.sample(1)['state']['state'], 'idle')
+        self.assertEqual(len(published), 3)
 
     def test_background_yields_busy_bus_and_call_guard(self):
         bus = Bus(); lock = threading.Lock(); bus.transaction = lambda: lock

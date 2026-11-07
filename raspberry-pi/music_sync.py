@@ -45,6 +45,12 @@ class MusicSync:
                                     playback_id=data['playback_id'],seekable=data['seekable'])
             if 'volume' in data: message['state']['volume']=data['volume']
         except (RuntimeError, ValueError, OSError):
+            # Busy PLC or a missed response is not a playback change.
+            # Retain the last observation without extending its freshness.
+            with self.lock:
+                previous = self.states.get(rail)
+                if previous and previous['state']['available']:
+                    return previous
             message['state'] = dict(available=False)
         # Timestamp after receiving confirmation, not before waiting for PLC.
         message['observed_at'] = datetime.now(timezone.utc).isoformat()
