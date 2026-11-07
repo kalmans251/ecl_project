@@ -99,7 +99,7 @@ int main(void) {
  f.payload[8]=5;f.payload[11]=1;handle_music_apply(&f);assert(selections==1 && response[5]==1);
  f.payload[11]=0;queue_ok=false;handle_music_apply(&f);assert(response[5]==2);
  f.payload_len=5;f.payload[4]=CMD_MUSIC_TIMELINE;handle_music_apply(&f);
- assert(reply_len==26 && response[5]==0 && response[6]==MUSIC_PLAYER_PAUSED && response[19]==0 && response[20]==5);
+ assert(reply_len==27 && response[26]==volume && response[5]==0 && response[6]==MUSIC_PLAYER_PAUSED && response[19]==0 && response[20]==5);
  f.payload_len=13;f.payload[4]=CMD_MUSIC_SEEK;memset(f.payload+5,0,8);f.payload[8]=9;before=replies;
  handle_music_apply(&f);assert(replies==before);
  f.payload[8]=10;handle_music_apply(&f);assert(response[5]!=0);
