@@ -661,7 +661,8 @@ static void handle_general_apply(const protocol_frame_t *request)
             } else if(f.command==CMD_SET && f.length==1 && f.payload[0]<=1) {
                 handle_detection(&f);response[5]=detection_manager_get_source()==f.payload[0]?0:2;
             } else if(f.command==CMD_DATA &&
-                ((f.length==5 && f.payload[0]==DETECT_EVENT_CCTV_NEW_PERSON) ||
+                ((f.length==1 && f.payload[0]==4) ||
+                 (f.length==5 && f.payload[0]==DETECT_EVENT_CCTV_NEW_PERSON) ||
                  (f.length==6 && f.payload[0]==DETECT_EVENT_CCTV_AGE_RESULT &&
                   ((f.payload[5]>=1 && f.payload[5]<=4) || f.payload[5]==255)))) {
                 handle_detection(&f);response[5]=s_apply_accepted?0:1;
@@ -1297,6 +1298,16 @@ static void handle_detection(
 
     p4_system_state_t receive_state;system_state_get(&receive_state);
     if(!receive_state.sensor_enabled){s_apply_accepted=true;return;}
+
+    /* 4=CCTV presence from Pi, 5=presence from either S3 radar.
+     * Never route these through NEW_PERSON counting/age statistics. */
+    if(frame->length==1 && ((frame->payload[0]==4 && frame->src==NODE_PI) ||
+                           (frame->payload[0]==5 && frame->src==NODE_S3))){
+        detection_source_t source=frame->payload[0]==4?DETECTION_SOURCE_CCTV:DETECTION_SOURCE_RADAR;
+        s_apply_accepted=detection_manager_touch_presence(source);
+        if(s_apply_accepted)sleep_manager_on_new_detection(source,0,false);
+        return;
+    }
 
     uint8_t event =
         frame->payload[0];
