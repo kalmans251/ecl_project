@@ -21,7 +21,16 @@ public class SecurityConfiguration {
             .authorizeHttpRequests(a -> a.anyRequest().permitAll())
             .addFilterBefore(new Authentication(settings,registry),UsernamePasswordAuthenticationFilter.class).build();
     }
-    @Bean SecurityFilterChain browser(HttpSecurity http) throws Exception {
+    @Bean SecurityFilterChain browser(HttpSecurity http,
+            org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration authentication,
+            org.springframework.core.env.Environment env) throws Exception {
+        String testPassword=env.getProperty("MONITOR_LOCAL_TEST_PASSWORD","");
+        if(!testPassword.isEmpty()){
+            if(!"127.0.0.1".equals(env.getProperty("server.address")))
+                throw new IllegalStateException("Local test login requires server.address=127.0.0.1");
+            http.addFilterBefore(new LocalTestLogin(authentication.getAuthenticationManager(),testPassword),
+                UsernamePasswordAuthenticationFilter.class);
+        }
         return http.authorizeHttpRequests(a -> a.requestMatchers("/login.html","/login.js","/api/auth/csrf","/error").permitAll().anyRequest().authenticated())
             .requestCache(c -> c.disable())
             .exceptionHandling(e -> e.authenticationEntryPoint((q,r,x) -> {
