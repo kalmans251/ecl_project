@@ -573,8 +573,11 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     </div>
    </div>
    <aside class="system-check-compact" aria-label="시스템 자체진단">
-    <strong>시스템 자체진단</strong>
-    <button type="button" class="system-diagnostic-button" onclick="startSystemDiagnosis()">진단 시작</button>
+    <div class="system-check-heading">
+     <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M6 11h3l2-3 2 6 2-3h3M9 21h6"/></svg>
+     <strong>시스템 자체진단</strong>
+    </div>
+    <button type="button" class="system-diagnostic-button" onclick="startSystemDiagnosis()">진단 시작 <span aria-hidden="true">→</span></button>
     <small>장치 상태·기능 확인</small>
    </aside>
   </div>
@@ -905,7 +908,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 </style>
 <dialog id="systemDiagnosisDialog" aria-labelledby="systemDiagnosisTitle" oncancel="if(systemDiagnosisRunning){event.preventDefault();stopSystemDiagnosis();}">
  <header><h2 id="systemDiagnosisTitle">시스템 자체진단</h2><p id="systemDiagnosisTarget"></p></header>
- <p class="diagnosis-note">통신 조회만 수행합니다. 전원·LED·음악 설정은 변경하지 않습니다. Pi 연결 확인은 장치 응답 확인과 별개입니다.</p>
+ <p class="diagnosis-note">통신 조회만 수행합니다. 전원·LED·음악 설정은 변경하지 않습니다.</p>
  <ol id="systemDiagnosisResults" aria-label="단계별 진단 결과"></ol>
  <p id="systemDiagnosisSummary" role="status" aria-live="polite"></p>
  <footer><button type="button" id="systemDiagnosisStop" onclick="stopSystemDiagnosis()">진단 중단</button><button type="button" id="systemDiagnosisClose" onclick="document.getElementById('systemDiagnosisDialog').close()">닫기</button></footer>
