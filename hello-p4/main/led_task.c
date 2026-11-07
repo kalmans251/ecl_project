@@ -163,6 +163,7 @@ void led_task_init(void) {
     init_strip(LED_DATA_PIN_RIGHT,&s_strip_right);
     init_strip(LED_DATA_PIN_LEFT,&s_strip_left);
     if(!s_strip_right || !s_strip_left)abort();
+    s_sequence_started=(uint32_t)(esp_timer_get_time()/1000);
     ESP_LOGI(TAG,"LED design ready: 9 basic + sequence / 3 weather / 3 music patterns");
 }
 void led_task(void *arg) {

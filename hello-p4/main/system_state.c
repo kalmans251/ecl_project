@@ -75,6 +75,7 @@ void system_state_init(void)
 
     s_state.led_mode =
         LED_MODE_BASIC;
+    s_state.led_basic_pattern=9; /* Repeat modes 1 through 9 at boot. */
     s_state.led_sequence_seconds=10;
 
     s_state.weather_type =
