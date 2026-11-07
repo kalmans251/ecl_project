@@ -651,7 +651,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="7" onchange="setSubModeUI(7)"> 모드8 : 비/흐림 패턴</label>
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="8" onchange="setSubModeUI(8)"> 모드9 : 눈 패턴</label>
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="0" value="9" onchange="setSubModeUI(9)"> 순차 재생: 모드1 → 모드9 반복</label>
-            <label class="led-sequence-interval">전환 간격 <input id="ledSequenceSeconds" type="number" min="1" max="120" value="10" aria-label="LED 순차 재생 전환 간격(초)" onchange="if(document.querySelector('input[name=ledPattern][data-category=&quot;0&quot;][value=&quot;9&quot;]:checked'))setSubModeUI(9)"> 초 (1~120)</label>
+            <label class="led-sequence-interval">LED 전환 간격 <input id="ledSequenceSeconds" type="number" min="1" max="120" value="10" aria-label="LED 순차 재생 전환 간격(초)" onchange="if(document.querySelector('input[name=ledPattern][data-category=&quot;0&quot;][value=&quot;9&quot;]:checked'))setSubModeUI(9)"> 초 (1~120)</label>
 </div>
         <div id="tabContentWeather" class="led-select-group" style="display: none;">
             <label class="led-radio-label"><input type="radio" name="ledPattern" data-category="1" value="3" onchange="setSubModeUI(3)"> 🌐 현재 날씨 자동 연동</label>
