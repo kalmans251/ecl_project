@@ -1,0 +1,4 @@
+# Local testing only. Do not proxy this server to external clients.
+server:
+  address: 127.0.0.1
+MONITOR_LOCAL_TEST_PASSWORD: '123456789012345'
