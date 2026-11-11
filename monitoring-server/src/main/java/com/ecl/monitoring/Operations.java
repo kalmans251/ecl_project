@@ -62,5 +62,5 @@ public class Operations {
         db.update("UPDATE sms_requests SET status=? WHERE id=?",status,id);registry.audit(p.getName(),site,"sms."+status.toLowerCase(),id);
         return Map.of("status",status,"delivery_confirmed",false);
     }
-    private static void validLabel(String label){if(!Set.of("주민센터","소방서","경찰서").contains(label==null?"":label))throw Accounts.bad("Unknown contact label");}
+    private static void validLabel(String label){if(!Set.of("주민센터","소방서","경찰서","기타").contains(label==null?"":label))throw Accounts.bad("Unknown contact label");}
 }

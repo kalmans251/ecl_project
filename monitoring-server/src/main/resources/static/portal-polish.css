@@ -537,3 +537,15 @@ body .card-system-setting .system-check-compact small{color:#c0d6f3}
 /* Keep the bulk selector at the beginning of the railing list. */
 #idBadgeGrid{justify-content:flex-start}
 #idBadgeGrid .all-select-btn{flex:0 0 auto;border-color:#6b8fac;color:#d4eaff;background:#1c344a;font-weight:700}
+
+/* Keep the rail group centered independently of the left-hand all-select control. */
+#idBadgeGrid{display:grid;grid-template-columns:90px minmax(0,1fr) 90px;align-items:center;gap:8px;box-sizing:border-box}
+#idBadgeGrid .all-select-btn{grid-column:1;justify-self:start;margin:0}
+#idBadgeGrid .rail-badge-list{grid-column:2;display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}
+#idBadgeGrid .rail-badge-list button{margin:0}
+body .card-system-setting .energy-summary .energy-section-title{display:flex;align-items:center;justify-content:center;margin:0 0 10px;padding:0;background:transparent!important;border:0!important;font-size:20px!important;font-weight:800;color:#ffb454!important}
+@media(max-width:600px){
+ #idBadgeGrid{grid-template-columns:70px minmax(0,1fr) 70px;gap:4px;padding:8px}
+ #idBadgeGrid button{padding:7px 8px!important}
+ body .card-system-setting .energy-summary .energy-section-title{font-size:17px!important}
+}
