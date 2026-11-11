@@ -991,3 +991,12 @@ void detection_manager_get_summary(
 
     unlock_manager();
 }
+
+bool detection_manager_touch_presence(detection_source_t source)
+{
+    lock_manager();
+    if(s_summary.source!=source){unlock_manager();return false;}
+    s_summary.last_detection_ms=get_now_ms();
+    unlock_manager();
+    return true;
+}
