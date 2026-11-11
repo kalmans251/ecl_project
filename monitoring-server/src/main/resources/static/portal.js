@@ -459,6 +459,16 @@ function renderEnergy(s){
  text('solarCurrentLeft',Number.isFinite(s.left_current)?s.left_current.toFixed(2):'--');
  text('solarCurrentRight',Number.isFinite(s.right_current)?s.right_current.toFixed(2):'--');
 }
+function renderCctvDetectionCount(r){
+ const el=$('cctvDetectionCount');if(!el)return;
+ const valid=n=>Number.isInteger(n)&&n>=0;
+ const observed=r?.reported?.detection_count;
+ const queried=r?DetectionCounts.get(r.id):null;
+ const useQuery=valid(queried?.count)&&(!valid(observed)||Number(queried.at)>Number(r?.seen_at||0));
+ const count=useQuery?queried.count:observed;
+ el.textContent=r&&valid(count)?`누적 인원 ${count.toLocaleString('ko-KR')}명`:'누적 인원 미확인';
+ el.title=r?`${r.name} · 장치가 집계한 누적 감지 인원(현재 화면에 남아 있는 인원과 다름)${r.online?'':' · 연결 끊김, 마지막 확인값'}`:'난간 하나를 선택하세요';
+}
 function renderLive(){
  if(dirty.size||settingsApplying)syncPendingSettings();
  renderSelectedRailSummary();
@@ -466,7 +476,7 @@ function renderLive(){
  renderMusicStatus();
  const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=displayedStatus(r,check);
  renderEnergy(s);
- EnvironmentWeather.update(r);text('systemCommState',r?(r.online?`Pi 연결됨 · 난간 ${fresh?'응답 확인':check.waiting?(check.applying?'적용 후 상태 확인 중':'상태 확인 중'):'최신 응답 미확인'}`:'Pi 연결 끊김 · 난간 상태 미확인'):'난간 하나를 선택하세요');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
+ EnvironmentWeather.update(r);text('systemCommState',r?(r.online?`Pi 연결됨 · 난간 ${fresh?'응답 확인':check.waiting?(check.applying?'적용 후 상태 확인 중':'상태 확인 중'):'최신 응답 미확인'}`:'Pi 연결 끊김 · 난간 상태 미확인'):'난간 하나를 선택하세요');DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;renderCctvDetectionCount(countRail);text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
  const age=r?.seen_at?Math.max(0,Math.floor((Date.now()-r.seen_at)/1000)):null;
  const reported=r?.reported||{};
  const summary=`전원 ${reported.power??'미확인'} / ${reported.power_on===undefined?'미확인':reported.power_on?'ON':'OFF'} · LED ${reported.led??'미확인'} / ${reported.led_enabled===undefined?'미확인':reported.led_enabled?'ON':'OFF'} · 프로젝터 ${reported.projector===undefined?'미확인':reported.projector?'ON':'OFF'} · 슬립 ${reported.sleep===undefined?'미확인':reported.sleep?'사용':'해제'}${reported.sleep_active?' (잠든 상태)':''} · 감지 ${reported.detection??'미확인'} · 음악 모드 ${reported.music_mode??'미확인'} · 누적 ${reported.detection_count??'--'}`;
