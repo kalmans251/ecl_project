@@ -13,8 +13,14 @@
   const height=window.innerHeight;
   if(width<=0||height<=0)return;
   const scale=Math.max(MIN_SCALE,Math.min(width/WIDTH,height/HEIGHT));
-  stage.style.width=(WIDTH*scale)+'px';
-  stage.style.height=(HEIGHT*scale)+'px';
+  // Keep controls uniformly scaled, but let card tracks consume spare space.
+  // 16:10 grows the logical height; ultrawide grows the logical width.
+  const logicalWidth=Math.max(WIDTH,width/scale);
+  const logicalHeight=Math.max(HEIGHT,height/scale);
+  canvas.style.width=logicalWidth+'px';
+  canvas.style.height=logicalHeight+'px';
+  stage.style.width=(logicalWidth*scale)+'px';
+  stage.style.height=(logicalHeight*scale)+'px';
   canvas.style.transform='scale('+scale+')';
  }
  function schedule(){if(!frame)frame=requestAnimationFrame(fit);}
