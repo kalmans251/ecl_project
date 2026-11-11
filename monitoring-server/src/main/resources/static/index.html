@@ -601,7 +601,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
   </section>
   </div>
   <section class="energy-summary" aria-label="태양광 에너지 모니터링">
-   <div class="battery-board-title minor-section-title energy-section-title">태양광 에너지 모니터링</div>
+   <div class="card-title section-heading energy-section-title">태양광 에너지 모니터링</div>
    <div class="energy-overview-grid">
     <div class="sub-block energy-cell">
      <div class="sub-block-title">좌측 태양광</div>
@@ -731,7 +731,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             <section class="sos-emergency-queue" aria-label="비상 호출 목록">
  <div class="sos-queue-heading"><strong id="emergencyQueueTitle">비상 호출 목록</strong><button type="button" onclick="showEmergencyHistory()">처리 이력</button></div>
  <div id="emergencyQueue"></div>
- <div class="sos-audio-status"><button type="button" onclick="muteEmergencyAudio()">현재 호출 음소거</button></div>
+
 </section>
 <div class="sos-card-flex">
                 <div class="sos-display-box" onclick="triggerMp3Alarm()">
@@ -769,6 +769,13 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                     <div class="contact-input-wrap">
                         <input type="text" class="contact-input" id="telPolice" value="" placeholder="전화번호">
                         <button type="button" class="btn-call-direct" onclick="sendEmergencySms('경찰서', 'telPolice')">문자발송</button>
+                    </div>
+                </div>
+                <div class="contact-row">
+                    <span class="contact-label">☎ 기타</span>
+                    <div class="contact-input-wrap">
+                        <input type="text" class="contact-input" id="telOther" value="" placeholder="전화번호">
+                        <button type="button" class="btn-call-direct" onclick="sendEmergencySms('기타', 'telOther')">문자발송</button>
                     </div>
                 </div>
             </div>
