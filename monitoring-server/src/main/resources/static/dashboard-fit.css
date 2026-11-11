@@ -1,0 +1,9 @@
+/* Logical desktop canvas: the user's 1920x1080 view at 80% zoom. */
+html,body{width:100%!important;height:auto!important;min-height:100%;margin:0;padding:0!important;overflow:auto!important;touch-action:auto!important}
+body{display:block!important}
+#dashboardStage{position:relative;margin:0 auto;flex:none}
+#dashboardCanvas{position:absolute;top:0;left:0;width:2400px;height:1350px;box-sizing:border-box;padding:12px 10px 10px;display:flex;flex-direction:column;transform-origin:top left;container-name:dashboard;container-type:inline-size}
+#dashboardCanvas>.main-header{flex:0 0 auto;min-width:0}
+#dashboardCanvas>.grid-row-3{flex:1 1 0;height:auto;min-height:0;min-width:0}
+#dashboardCanvas .main-header h1{font-size:36px}
+#dashboardCanvas .bat-single-percent{font-size:30px}
