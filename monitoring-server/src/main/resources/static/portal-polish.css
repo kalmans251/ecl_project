@@ -533,3 +533,7 @@ body .card-system-setting .system-check-compact small{color:#c0d6f3}
  text-shadow:0 1px 2px #0008;box-shadow:0 2px 8px #0004;
 }
 @media(max-width:700px){.cctv-detection-count{top:8px;right:8px;font-size:16px;padding:6px 10px}}
+
+/* Keep the bulk selector at the beginning of the railing list. */
+#idBadgeGrid{justify-content:flex-start}
+#idBadgeGrid .all-select-btn{flex:0 0 auto;border-color:#6b8fac;color:#d4eaff;background:#1c344a;font-weight:700}
