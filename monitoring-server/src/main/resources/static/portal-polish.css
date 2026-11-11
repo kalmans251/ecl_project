@@ -523,3 +523,13 @@ body .card-system-setting .system-check-compact .system-diagnostic-button:focus-
 body .card-system-setting .system-check-compact small{color:#c0d6f3}
 
 #systemDiagnosisTitle{color:#ff7582}
+
+/* Match primary dashboard headings without reducing the video area. */
+.cctv-detection-count{
+ position:absolute;top:12px;right:12px;z-index:10;pointer-events:none;
+ max-width:calc(100% - 24px);box-sizing:border-box;padding:7px 12px;
+ border:1px solid #ffb45466;border-radius:8px;background:#0b1526e8;
+ color:#ffb454;font-size:20px;font-weight:800;line-height:1.35;
+ text-shadow:0 1px 2px #0008;box-shadow:0 2px 8px #0004;
+}
+@media(max-width:700px){.cctv-detection-count{top:8px;right:8px;font-size:16px;padding:6px 10px}}
