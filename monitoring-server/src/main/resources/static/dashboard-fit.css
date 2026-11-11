@@ -14,3 +14,27 @@ body{display:block!important}
 
 #dashboardCanvas .main-header h1{font-size:36px}
 #dashboardCanvas .bat-single-percent{font-size:30px}
+
+/* Let content share the available card height instead of accumulating blank space. */
+#dashboardCanvas .card-system-setting .system-settings-content{
+ justify-content:space-between;gap:14px;
+}
+#dashboardCanvas .card-system-setting .system-settings-top,
+#dashboardCanvas .card-system-setting .reservation-target-layout,
+#dashboardCanvas .card-system-setting .energy-summary{flex:0 0 auto}
+#dashboardCanvas #tabContentBasic{gap:6px}
+#dashboardCanvas #tabContentBasic>.led-radio-label{
+ flex:1 0 34px;display:flex;align-items:center;margin:0;min-height:34px;
+}
+#dashboardCanvas #tabContentBasic>.led-sequence-interval{flex:0 0 auto}
+body #dashboardCanvas #sosCardContainer .sos-card-flex{
+ flex:1 1 auto;min-height:110px;display:flex;flex-direction:column;gap:10px;
+}
+#dashboardCanvas #sosCardContainer .sos-display-box{
+ flex:1 1 auto;min-height:55px;display:flex;flex-direction:column;align-items:center;justify-content:center;margin:0;
+}
+#dashboardCanvas #sosCardContainer .ptt-control-wrap{flex:0 0 auto;margin:0}
+#dashboardCanvas .section-contacts .emergency-contact-group{
+ flex:1 1 0;height:auto;min-height:0;display:grid;grid-template-rows:repeat(4,minmax(44px,1fr));gap:10px;
+}
+#dashboardCanvas .section-contacts .contact-row{min-height:44px;align-self:center;padding:9px 10px}
