@@ -69,3 +69,28 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 @keyframes weatherFall{50%{translate:0 4px;opacity:.45}}
 @keyframes weatherFlash{50%{opacity:.3}}
 @media(prefers-reduced-motion:reduce){.weather-art *{animation:none!important}}
+
+/* A common icon / heading / value rhythm for all four environment tiles. */
+#dashboardCanvas .section-weather .env-grid{flex:1 1 0;height:auto;min-height:0;grid-template-rows:repeat(2,minmax(0,1fr));gap:10px}
+#dashboardCanvas .section-weather .env-item{
+ display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:44px auto;
+ align-content:center;align-items:center;gap:8px;padding:12px;min-width:0;min-height:0;
+ position:relative;background:linear-gradient(145deg,#152e3d,#10202f);overflow:auto;
+}
+#dashboardCanvas .section-weather .env-label{grid-column:2;grid-row:1;margin:0;font-size:14px;line-height:1.3;font-weight:750;color:#c2dce9}
+#dashboardCanvas .section-weather .env-value{grid-column:1/-1;grid-row:2;font-size:19px;font-weight:800;line-height:1.4;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;min-width:0}
+#dashboardCanvas .section-weather :is(.weather-art,.env-art){
+ position:static;transform:none;grid-column:1;grid-row:1;width:44px;height:44px;pointer-events:none;
+}
+.env-art{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.env-art-wind{color:#83d9ff;animation:envBreeze 3s ease-in-out infinite}
+.env-art-dust{color:#b8d0ac}
+.env-art-dust circle{fill:currentColor;stroke-width:0;opacity:.8}
+.env-art-dust circle:nth-child(2n){opacity:.4}
+.env-art-connection{color:#e4bd72}
+[data-state=connected] .env-art-connection{color:#4bdeb1}
+[data-state=connected] .connection-dot{fill:currentColor;animation:envLinkPulse 2s ease-in-out infinite}
+[data-state=disconnected] .env-art-connection{color:#ef8c95;opacity:.8}
+@keyframes envBreeze{50%{translate:3px 0;opacity:.65}}
+@keyframes envLinkPulse{50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){.env-art,.env-art *{animation:none!important}}
