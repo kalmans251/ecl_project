@@ -107,3 +107,5 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 .pm-face .pm-mouth{display:none;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 [data-grade=good] .pm-smile-wide,[data-grade=moderate] .pm-smile,[data-grade=bad] .pm-frown,[data-grade=very-bad] .pm-unhappy,[data-grade=unknown] .pm-neutral{display:block}
 #dashboardCanvas .section-weather #envPm10{font-size:17px;line-height:1.45}
+
+.env-art-humidity{color:#79cfff;fill:#213e58;stroke:#79cfff}
