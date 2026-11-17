@@ -9,8 +9,8 @@
   if(visual)visual.dataset.grade=grade;
   if(el){el.textContent=grade==='unknown'?'미확인':({'good':'좋음','moderate':'보통','bad':'나쁨','very-bad':'매우 나쁨'})[grade]+' · '+value.toLocaleString('ko-KR',{maximumFractionDigits:1})+' μg/m³';el.title='설치 좌표 기준 Open-Meteo PM10 농도에 등급 구간을 적용한 참고 표시 · 현장 실측·공식 예보·통합대기환경지수 아님';}
  }
- function show(weather,wind,pm,pmValue){showPm10(pmValue);const visual=document.getElementById('weatherVisual');if(visual){const name=weather.split(' · ')[0];visual.dataset.weather=({'맑음':'clear','구름/흐림':'cloudy','안개':'fog','눈':'snow','뇌우':'storm','비':'rain'})[name]||'unknown';}for(const [id,value]of [['envWeather',weather],['envWind',wind]]){const el=document.getElementById(id);if(el){el.textContent=value;el.title='설치 좌표 기준 Open-Meteo 기상·대기질 데이터 (현장 실측값 아님)';}}}
- function draw(entry){show(entry.weather,entry.wind,entry.pm,entry.pmValue);}
+ function show(weather,wind,pm,pmValue,humidity){showPm10(pmValue);const visual=document.getElementById('weatherVisual');if(visual){const name=weather.split(' · ')[0];visual.dataset.weather=({'맑음':'clear','구름/흐림':'cloudy','안개':'fog','눈':'snow','뇌우':'storm','비':'rain'})[name]||'unknown';}for(const [id,value]of [['envWeather',weather],['envWind',wind],['envHumidity',Number.isFinite(humidity)&&humidity>=0&&humidity<=100?humidity+' %':'미확인']]){const el=document.getElementById(id);if(el){el.textContent=value;el.title='설치 좌표 기준 Open-Meteo 기상·대기질 데이터 (현장 실측값 아님)';}}}
+ function draw(entry){show(entry.weather,entry.wind,entry.pm,entry.pmValue,entry.humidity);}
  async function read(url){const r=await fetch(url,{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('Weather HTTP '+r.status);return r.json();}
  function update(rail){
   lastRail=rail;
@@ -24,11 +24,12 @@
   if(cache.size>64)cache.delete(cache.keys().next().value);
   const q='latitude='+encodeURIComponent(lat)+'&longitude='+encodeURIComponent(lng);
   Promise.allSettled([
-   read('https://api.open-meteo.com/v1/forecast?'+q+'&current=temperature_2m,weather_code,wind_speed_10m&wind_speed_unit=ms'),
+   read('https://api.open-meteo.com/v1/forecast?'+q+'&current=temperature_2m,weather_code,wind_speed_10m,relative_humidity_2m&wind_speed_unit=ms'),
    read('https://air-quality-api.open-meteo.com/v1/air-quality?'+q+'&current=pm10')
   ]).then(([w,a])=>{
    const c=w.status==='fulfilled'?w.value.current:null,p=a.status==='fulfilled'?a.value.current?.pm10:null;
    entry.weather=c&&Number.isFinite(c.weather_code)?weatherName(c.weather_code)+(Number.isFinite(c.temperature_2m)?' · '+c.temperature_2m+'°C':''):'조회 실패';
+   entry.humidity=c?.relative_humidity_2m;
    entry.wind=c&&Number.isFinite(c.wind_speed_10m)?c.wind_speed_10m+' m/s':'조회 실패';
    entry.pmValue=Number.isFinite(p)&&p>=0?p:null;
    entry.pm=Number.isFinite(p)?p+' μg/m³':'조회 실패';
