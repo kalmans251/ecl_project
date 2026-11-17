@@ -38,3 +38,34 @@ body #dashboardCanvas #sosCardContainer .sos-card-flex{
  flex:1 1 0;height:auto;min-height:0;display:grid;grid-template-rows:repeat(4,minmax(44px,1fr));gap:10px;
 }
 #dashboardCanvas .section-contacts .contact-row{min-height:44px;align-self:center;padding:9px 10px}
+
+/* Five full-width contact rows, with a shrinkable phone field. */
+#dashboardCanvas .section-contacts .emergency-contact-group{grid-template-rows:repeat(5,minmax(36px,1fr));gap:6px;width:100%;overflow-y:auto}
+#dashboardCanvas .section-contacts .contact-row{display:grid;grid-template-columns:100px minmax(0,1fr);gap:6px;width:100%;min-width:0;min-height:36px;padding:6px 8px;margin:0}
+#dashboardCanvas .section-contacts .contact-label{font-size:13px;white-space:nowrap}
+#dashboardCanvas .section-contacts .contact-input-wrap{display:grid;grid-template-columns:minmax(0,1fr) 66px;gap:6px;width:100%;min-width:0}
+#dashboardCanvas .section-contacts .contact-input{width:100%;min-width:0;padding:5px 4px;box-sizing:border-box}
+#dashboardCanvas .section-contacts .btn-call-direct{width:100%;min-width:0;padding:5px 4px;white-space:nowrap}
+body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;padding:10px 16px;line-height:1.2}
+#dashboardCanvas .weather-current{position:relative;overflow:hidden;padding-right:74px}
+.weather-art{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:72px;height:72px;pointer-events:none}
+.weather-sun{fill:#ffcc57;stroke:#ffcc57;stroke-width:3;transform-origin:40px 32px}
+.weather-cloud{fill:#c3d8e8;stroke:#e8f4ff;stroke-width:2}
+.weather-rain{stroke:#67c8ff;stroke-width:4;stroke-linecap:round}
+.weather-snow{fill:#c9f4ff;font-size:20px}
+.weather-fog{stroke:#b0d6e0;stroke-width:4;stroke-linecap:round}
+.weather-bolt{fill:#ffe27b}
+.weather-unknown{fill:#8caabc;font-size:32px;font-weight:bold}
+.weather-art :is(.weather-sun,.weather-cloud,.weather-rain,.weather-snow,.weather-fog,.weather-bolt,.weather-unknown){display:none}
+[data-weather=clear] .weather-sun{display:block;animation:weatherSpin 18s linear infinite}
+:is([data-weather=cloudy],[data-weather=rain],[data-weather=snow],[data-weather=storm],[data-weather=fog]) .weather-cloud{display:block;animation:weatherDrift 4s ease-in-out infinite}
+[data-weather=rain] .weather-rain{display:block;animation:weatherFall 1s ease-in-out infinite}
+[data-weather=snow] .weather-snow{display:block;animation:weatherFall 2s ease-in-out infinite}
+[data-weather=fog] .weather-fog{display:block}
+[data-weather=storm] .weather-bolt{display:block;animation:weatherFlash 2s ease-in-out infinite}
+[data-weather=unknown] .weather-unknown{display:block}
+@keyframes weatherSpin{to{rotate:360deg}}
+@keyframes weatherDrift{50%{translate:3px 0}}
+@keyframes weatherFall{50%{translate:0 4px;opacity:.45}}
+@keyframes weatherFlash{50%{opacity:.3}}
+@media(prefers-reduced-motion:reduce){.weather-art *{animation:none!important}}

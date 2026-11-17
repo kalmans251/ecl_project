@@ -2,7 +2,7 @@
 (function(root){
  const cache=new Map();let activeKey=null,enabled=true,lastRail=null;
  function weatherName(code){if(code===0)return '맑음';if([1,2,3].includes(code))return '구름/흐림';if([45,48].includes(code))return '안개';if([71,73,75,77,85,86].includes(code))return '눈';if([95,96,99].includes(code))return '뇌우';if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code))return '비';return '정보 없음';}
- function show(weather,wind,pm){for(const [id,value]of [['envWeather',weather],['envWind',wind],['envPm10',pm]]){const el=document.getElementById(id);if(el){el.textContent=value;el.title='설치 좌표 기준 Open-Meteo 기상·대기질 데이터 (현장 실측값 아님)';}}}
+ function show(weather,wind,pm){const visual=document.getElementById('weatherVisual');if(visual){const name=weather.split(' · ')[0];visual.dataset.weather=({'맑음':'clear','구름/흐림':'cloudy','안개':'fog','눈':'snow','뇌우':'storm','비':'rain'})[name]||'unknown';}for(const [id,value]of [['envWeather',weather],['envWind',wind],['envPm10',pm]]){const el=document.getElementById(id);if(el){el.textContent=value;el.title='설치 좌표 기준 Open-Meteo 기상·대기질 데이터 (현장 실측값 아님)';}}}
  function draw(entry){show(entry.weather,entry.wind,entry.pm);}
  async function read(url){const r=await fetch(url,{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('Weather HTTP '+r.status);return r.json();}
  function update(rail){
