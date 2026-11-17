@@ -109,3 +109,6 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 #dashboardCanvas .section-weather #envPm10{font-size:17px;line-height:1.45}
 
 .env-art-humidity{color:#79cfff;fill:#213e58;stroke:#79cfff}
+
+/* Readable, consistent labels on all four weather tiles. */
+#dashboardCanvas .section-weather .env-label{font-size:20px;font-weight:800;line-height:1.35;letter-spacing:.15px;color:#e0edf5}
