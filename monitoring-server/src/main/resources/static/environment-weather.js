@@ -2,8 +2,15 @@
 (function(root){
  const cache=new Map();let activeKey=null,enabled=true,lastRail=null;
  function weatherName(code){if(code===0)return '맑음';if([1,2,3].includes(code))return '구름/흐림';if([45,48].includes(code))return '안개';if([71,73,75,77,85,86].includes(code))return '눈';if([95,96,99].includes(code))return '뇌우';if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code))return '비';return '정보 없음';}
- function show(weather,wind,pm){const visual=document.getElementById('weatherVisual');if(visual){const name=weather.split(' · ')[0];visual.dataset.weather=({'맑음':'clear','구름/흐림':'cloudy','안개':'fog','눈':'snow','뇌우':'storm','비':'rain'})[name]||'unknown';}for(const [id,value]of [['envWeather',weather],['envWind',wind],['envPm10',pm]]){const el=document.getElementById(id);if(el){el.textContent=value;el.title='설치 좌표 기준 Open-Meteo 기상·대기질 데이터 (현장 실측값 아님)';}}}
- function draw(entry){show(entry.weather,entry.wind,entry.pm);}
+ // Concentration bands for PM10, not the official 24-hour CAI.
+ function pm10Grade(value){if(typeof value!=='number'||!Number.isFinite(value)||value<0)return 'unknown';return value<=30?'good':value<=80?'moderate':value<=150?'bad':'very-bad';}
+ function showPm10(value){
+  const grade=pm10Grade(value),visual=document.getElementById('pm10Visual'),el=document.getElementById('envPm10');
+  if(visual)visual.dataset.grade=grade;
+  if(el){el.textContent=grade==='unknown'?'미확인':({'good':'좋음','moderate':'보통','bad':'나쁨','very-bad':'매우 나쁨'})[grade]+' · '+value.toLocaleString('ko-KR',{maximumFractionDigits:1})+' μg/m³';el.title='설치 좌표 기준 Open-Meteo PM10 농도에 등급 구간을 적용한 참고 표시 · 현장 실측·공식 예보·통합대기환경지수 아님';}
+ }
+ function show(weather,wind,pm,pmValue){showPm10(pmValue);const visual=document.getElementById('weatherVisual');if(visual){const name=weather.split(' · ')[0];visual.dataset.weather=({'맑음':'clear','구름/흐림':'cloudy','안개':'fog','눈':'snow','뇌우':'storm','비':'rain'})[name]||'unknown';}for(const [id,value]of [['envWeather',weather],['envWind',wind]]){const el=document.getElementById(id);if(el){el.textContent=value;el.title='설치 좌표 기준 Open-Meteo 기상·대기질 데이터 (현장 실측값 아님)';}}}
+ function draw(entry){show(entry.weather,entry.wind,entry.pm,entry.pmValue);}
  async function read(url){const r=await fetch(url,{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('Weather HTTP '+r.status);return r.json();}
  function update(rail){
   lastRail=rail;
@@ -23,11 +30,12 @@
    const c=w.status==='fulfilled'?w.value.current:null,p=a.status==='fulfilled'?a.value.current?.pm10:null;
    entry.weather=c&&Number.isFinite(c.weather_code)?weatherName(c.weather_code)+(Number.isFinite(c.temperature_2m)?' · '+c.temperature_2m+'°C':''):'조회 실패';
    entry.wind=c&&Number.isFinite(c.wind_speed_10m)?c.wind_speed_10m+' m/s':'조회 실패';
+   entry.pmValue=Number.isFinite(p)&&p>=0?p:null;
    entry.pm=Number.isFinite(p)?p+' μg/m³':'조회 실패';
    entry.pending=false;entry.expires=Date.now()+(w.status==='fulfilled'&&a.status==='fulfilled'?600000:60000);
    if(enabled&&activeKey===key)draw(entry);
   });
  }
  function setEnabled(value){enabled=!!value;update(lastRail);}
- root.EnvironmentWeather={update,weatherName,setEnabled};
+ root.EnvironmentWeather={update,weatherName,setEnabled,pm10Grade};
 })(globalThis);
