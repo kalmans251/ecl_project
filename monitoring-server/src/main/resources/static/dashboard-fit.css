@@ -130,3 +130,6 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 
 /* Keep the PM10 grade and concentration together on one line. */
 #dashboardCanvas .section-weather #envPm10{font-size:14px;line-height:1.4;letter-spacing:-.3px;white-space:nowrap;overflow-wrap:normal;max-width:100%;font-variant-numeric:tabular-nums}
+
+/* Give the shorter weather headings more breathing room as a centered pair. */
+#dashboardCanvas .section-weather :is(.weather-current,.env-humidity,.env-wind) .env-heading{gap:16px}
