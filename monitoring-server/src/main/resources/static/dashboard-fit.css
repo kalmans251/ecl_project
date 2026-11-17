@@ -94,3 +94,16 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 @keyframes envBreeze{50%{translate:3px 0;opacity:.65}}
 @keyframes envLinkPulse{50%{opacity:.3}}
 @media(prefers-reduced-motion:reduce){.env-art,.env-art *{animation:none!important}}
+
+/* PM10 concentration grade is conveyed by both face and text. */
+#dashboardCanvas .section-weather .env-dust{--pm-color:#9aabba;border-color:var(--pm-color);border-left:3px solid var(--pm-color)}
+#dashboardCanvas .section-weather .env-dust[data-grade=good]{--pm-color:#6bc9ff}
+#dashboardCanvas .section-weather .env-dust[data-grade=moderate]{--pm-color:#71d69b}
+#dashboardCanvas .section-weather .env-dust[data-grade=bad]{--pm-color:#ffb15f}
+#dashboardCanvas .section-weather .env-dust[data-grade=very-bad]{--pm-color:#ff7b83}
+#dashboardCanvas .section-weather .pm-face,#dashboardCanvas .section-weather #envPm10{color:var(--pm-color)}
+.pm-face .pm-face-outline{fill:none;stroke:currentColor;stroke-width:3}
+.pm-face .pm-eyes{stroke:currentColor;stroke-width:5;stroke-linecap:round}
+.pm-face .pm-mouth{display:none;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+[data-grade=good] .pm-smile-wide,[data-grade=moderate] .pm-smile,[data-grade=bad] .pm-frown,[data-grade=very-bad] .pm-unhappy,[data-grade=unknown] .pm-neutral{display:block}
+#dashboardCanvas .section-weather #envPm10{font-size:17px;line-height:1.45}
