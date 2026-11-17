@@ -6,6 +6,9 @@ import unittest
 from test_control_window import HEADERS
 
 MAIN=Path(__file__).resolve().parents[1]/'main'
+CONTROLLER=(MAIN/'p4_controller.c').read_text()
+PRESENCE_START=CONTROLLER.index('    if(frame->length==1 && ((frame->payload[0]==4')
+PRESENCE=CONTROLLER[PRESENCE_START:CONTROLLER.index('    uint8_t event =',PRESENCE_START)]
 HARNESS=r'''
 #include <assert.h>
 #include <string.h>
@@ -64,7 +67,36 @@ static void radar_wake(void) {
     assert(sleep_manager_get_state()==ACTIVITY_ACTIVE && projector);
     music_manager_on_wake();
 }
+static bool presence_accepted=true;
+bool detection_manager_touch_presence(detection_source_t source){(void)source;return presence_accepted;}
+static void presence_frame(const protocol_frame_t *frame){
+    bool s_apply_accepted=false;
+'''+PRESENCE+r'''
+    (void)s_apply_accepted;
+}
 int main(void) {
+    // Execute the actual controller presence branch after natural track end.
+    const uint8_t presence_events[]={4,5};
+    for(unsigned i=0;i<2;++i){
+        setup();music_policy_on_finished();enter_sleeping();
+        music_manager_on_track_finished(true);
+        protocol_frame_t frame={.src=i?NODE_S3:NODE_PI,.length=1};
+        frame.payload[0]=presence_events[i];
+        unsigned initial=commands;
+        presence_frame(&frame);
+        assert(sleep_manager_get_state()==ACTIVITY_ACTIVE && projector);
+        assert(commands==initial+1 && last_command==CMD_NEXT);
+        presence_frame(&frame);assert(commands==initial+1); // no duplicate on heartbeat
+    }
+    setup();music_policy_on_finished();enter_sleeping();music_manager_on_track_finished(true);
+    protocol_frame_t frame={.src=NODE_PI,.length=1,.payload={4}};
+    unsigned initial=commands;presence_accepted=false;presence_frame(&frame);
+    assert(sleep_manager_get_state()==ACTIVITY_SLEEPING && commands==initial);
+    presence_accepted=true;
+    setup();music_manager_stop();music_policy_on_stopped();enter_sleeping();
+    initial=commands;presence_frame(&frame);
+    assert(sleep_manager_get_state()==ACTIVITY_ACTIVE && commands==initial); // user STOP stays stopped
+
     setup();sleep_via_led(true);
     unsigned before=commands;radar_wake();
     assert(commands==before+1 && last_command==CMD_RESUME);
