@@ -120,3 +120,10 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 #dashboardCanvas .section-weather .env-label{grid-column:2;grid-row:1;align-self:center;text-align:left;font-size:20px;line-height:1.3}
 #dashboardCanvas .section-weather :is(.weather-art,.env-art){grid-column:1;grid-row:1;width:44px;height:44px;justify-self:center}
 #dashboardCanvas .section-weather .env-value{grid-column:1/-1;grid-row:2;text-align:center;align-self:center}
+
+/* Center each icon-label pair as a single, naturally sized heading. */
+#dashboardCanvas .section-weather .env-item{grid-template-columns:minmax(0,1fr);grid-template-rows:44px minmax(48px,auto)}
+#dashboardCanvas .section-weather .env-heading{grid-column:1;grid-row:1;display:flex;align-items:center;justify-content:center;gap:8px;justify-self:center;min-width:0;max-width:100%}
+#dashboardCanvas .section-weather .env-heading :is(.weather-art,.env-art){flex:0 0 44px;width:44px;height:44px}
+#dashboardCanvas .section-weather .env-heading .env-label{flex:0 1 auto;min-width:0;margin:0;text-align:left}
+#dashboardCanvas .section-weather .env-value{grid-column:1;grid-row:2}
