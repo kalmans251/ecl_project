@@ -1305,7 +1305,17 @@ static void handle_detection(
                            (frame->payload[0]==5 && frame->src==NODE_S3))){
         detection_source_t source=frame->payload[0]==4?DETECTION_SOURCE_CCTV:DETECTION_SOURCE_RADAR;
         s_apply_accepted=detection_manager_touch_presence(source);
-        if(s_apply_accepted)sleep_manager_on_new_detection(source,0,false);
+        if(s_apply_accepted){
+            activity_state_t before=sleep_manager_get_state();
+            sleep_manager_on_new_detection(source,0,false);
+            /* Presence can arrive before NEW_PERSON. Restore playback on the
+             * same real wake transition, or the later event sees ACTIVE and
+             * never starts the track reserved at sleep. */
+            if(before==ACTIVITY_SLEEPING &&
+               sleep_manager_get_state()==ACTIVITY_ACTIVE){
+                music_manager_on_wake();
+            }
+        }
         return;
     }
 
