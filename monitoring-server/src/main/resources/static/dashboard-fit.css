@@ -133,3 +133,6 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 
 /* Give the shorter weather headings more breathing room as a centered pair. */
 #dashboardCanvas .section-weather :is(.weather-current,.env-humidity,.env-wind) .env-heading{gap:16px}
+
+/* Reduce only the droplet drawing, preserving its heading slot and spacing. */
+#dashboardCanvas .section-weather .env-heading .env-art-humidity{scale:.82}
