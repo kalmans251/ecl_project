@@ -96,7 +96,7 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 @media(prefers-reduced-motion:reduce){.env-art,.env-art *{animation:none!important}}
 
 /* PM10 concentration grade is conveyed by both face and text. */
-#dashboardCanvas .section-weather .env-dust{--pm-color:#9aabba;border-color:var(--pm-color);border-left:3px solid var(--pm-color)}
+#dashboardCanvas .section-weather .env-dust{--pm-color:#9aabba;}
 #dashboardCanvas .section-weather .env-dust[data-grade=good]{--pm-color:#55e29a}
 #dashboardCanvas .section-weather .env-dust[data-grade=moderate]{--pm-color:#ffad55}
 #dashboardCanvas .section-weather .env-dust[data-grade=bad]{--pm-color:#ff6975}
@@ -113,7 +113,7 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 /* Readable, consistent labels on all four weather tiles. */
 #dashboardCanvas .section-weather .env-label{font-size:20px;font-weight:800;line-height:1.35;letter-spacing:.15px;color:#e0edf5}
 
-#dashboardCanvas .section-weather .env-dust{border-left-width:1px}
+
 
 /* Icon left and label right on a shared header row; reading below. */
 #dashboardCanvas .section-weather .env-item{grid-template-columns:44px minmax(0,1fr);grid-template-rows:44px minmax(48px,auto);column-gap:8px;row-gap:6px;padding:10px;justify-items:stretch;align-content:center}
