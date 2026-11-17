@@ -94,3 +94,6 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 @keyframes envBreeze{50%{translate:3px 0;opacity:.65}}
 @keyframes envLinkPulse{50%{opacity:.3}}
 @media(prefers-reduced-motion:reduce){.env-art,.env-art *{animation:none!important}}
+
+/* Short environment labels remain legible beside their icons. */
+#dashboardCanvas .section-weather .env-label{font-size:17px;font-weight:800;line-height:1.35}
