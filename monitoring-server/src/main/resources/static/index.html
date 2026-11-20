@@ -709,7 +709,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                 <div class="audio-row" style="justify-content: center; gap: 15px; margin-top:10px;">
                     <button class="play-btn-circle" disabled title="현재 장치 이전 곡 명령 미지원" onclick="sendAudioAction(3)">⏮</button>
                     <button class="play-btn-circle" onclick="sendAudioAction(0)">⏹</button>
-                    <button class="play-btn-circle" onclick="sendAudioAction(1)">▶</button>
+                    <button type="button" class="play-btn-circle" id="musicPlayPause" disabled aria-label="재생 상태 확인 중" title="재생 상태 확인 중" onclick="sendAudioAction(1)">▶</button>
                     <button class="play-btn-circle" onclick="sendAudioAction(2)">⏭</button>
                 </div>
             </div>
@@ -883,9 +883,9 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 <script src="/dashboard-fit.js?v=2"></script>
 <div id="portalToast" class="portal-toast" hidden role="status"></div>
 <dialog id="portalDialog" class="portal-dialog"><button class="close" onclick="document.getElementById('portalDialog').close()">닫기</button><h2 id="dialogTitle"></h2><div id="dialogBody"></div></dialog>
-<script src="/music-status.js"></script>
+<script src="/music-status.js?v=2"></script>
 <script src="/web-voice.js"></script>
-<script src="/detection-count.js"></script><script src="/radar-view.js"></script><script src="/emergency-queue.js"></script><script src="/emergency-audio.js"></script><script src="/environment-weather.js?v=4"></script><script src="/portal.js?v=5"></script>
+<script src="/detection-count.js"></script><script src="/radar-view.js"></script><script src="/emergency-queue.js"></script><script src="/emergency-audio.js"></script><script src="/environment-weather.js?v=4"></script><script src="/portal.js?v=6"></script>
 <script src="/system-diagnosis.js"></script>
 <aside id="pendingSettingsBar" aria-label="변경 설정 적용" hidden>
  <div class="pending-panel-heading"><span>설정 변경 확인</span><strong id="pendingSettingsMessage"></strong></div>
