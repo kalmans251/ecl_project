@@ -516,21 +516,19 @@ function renderEnergy(s){
 function renderCctvDetectionCount(r){
  const el=$('cctvDetectionCount');if(!el)return;
  const valid=n=>Number.isInteger(n)&&n>=0;
- const observed=r?.reported?.detection_count;
- const queried=r?DetectionCounts.get(r.id):null;
- const useQuery=valid(queried?.count)&&(!valid(observed)||Number(queried.at)>Number(r?.seen_at||0));
- const count=useQuery?queried.count:observed;
+ const count=DetectionCounts.latest(r)?.count;
  el.textContent=r&&valid(count)?`TODAY : ${count.toLocaleString('ko-KR')}명`:'TODAY : --';
  el.title=r?`${r.name} · 장치가 집계한 누적 감지 인원(현재 화면에 남아 있는 인원과 다름)${r.online?'':' · 연결 끊김, 마지막 확인값'}`:'난간 하나를 선택하세요';
 }
 function renderLive(){
  if(dirty.size||settingsApplying)syncPendingSettings();
+ detectionCountView.select(rails().length===1?rails()[0].id:null);
  renderSelectedRailSummary();
  if(typeof EmergencyAudio!=='undefined')alarmAudio().sync(view?.rails||[],view?.calls||[]);
  renderMusicStatus();
  const r=rails().length===1?rails()[0]:null,check=statusCheck(r),fresh=check.fresh,s=displayedStatus(r,check);
  renderEnergy(s);
- EnvironmentWeather.update(r);DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;renderCctvDetectionCount(countRail);text('radarDetectedCount',countRail?(DetectionCounts.get(countRail.id)?.count??'--'):'--');text('detectionCountSummary',countRail?'누적 감지: '+DetectionCounts.describe(countRail.id):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
+ EnvironmentWeather.update(r);DetectionCounts.ingest(view?.commands);const countRail=rails().length===1?rails()[0]:null;renderCctvDetectionCount(countRail);text('radarDetectedCount',countRail?(DetectionCounts.latest(countRail)?.count??'--'):'--');text('detectionCountSummary',countRail?(DetectionCounts.latest(countRail)?`누적 감지: ${DetectionCounts.latest(countRail).count.toLocaleString('ko-KR')}회 · P4 마지막 확인값`:'누적 감지: 미조회'):'카운트 조회는 난간 하나를 선택하세요.');for(const id of ['detectionCountRead','detectionCountReset'])$(id).disabled=!countRail||view?.role==='VIEWER'||!countRail.online||controlBusy;
  syncReportedControls(r?.reported||{});renderProjector(r?.reported||{},fresh);
  activeCall=view.calls.find(c=>rails().some(r=>r.id===c.RAIL_ID));const callText=activeCall?`${activeCall.STATUS} · ${activeCall.DIRECTION} · ${activeCall.OWNER_NAME}`:r?.reported?.emergency?'🚨 비상 호출':fresh?'🟢 수신대기':'상태 미수신';text('sosBigText',callText);text('sosSubDesc',activeCall?(activeCall.OWNED?'내 통화 · 적용 확인 후 송수신':'다른 운영자의 통화'):view.voice_available?'통화 시작 후 음성 연결':'통화 제어 가능 · Codec2 라이브러리 로드 실패');
  $('btnPttTalk').disabled=!activeCall?.OWNED||activeCall.STATUS!=='ACTIVE'||!view.voice_available;$('btnPttTalk').classList.toggle('active',activeCall?.DIRECTION==='CONTROL_TX');
@@ -572,6 +570,12 @@ function drawRadar(targets){
  for(let i=1;i<=6;i++){ctx.beginPath();ctx.arc(ox,oy,scale*i,0,Math.PI);ctx.stroke();ctx.fillText(i+'m',ox+5,oy+scale*i);}
  for(const t of targets){if(!Number.isFinite(t.x)||!Number.isFinite(t.y))continue;ctx.fillStyle='#00f2fe';ctx.beginPath();ctx.arc(ox+t.x*scale,oy+t.y*scale,6,0,Math.PI*2);ctx.fill();}
 }
+const detectionCountView=typeof DetectionCountView==='undefined'?{select(){}}:new DetectionCountView(sample=>{
+ const r=rails().length===1?rails()[0]:null;
+ if(!r||r.id!==sample.rail_id||!DetectionCounts.ingestLive(sample))return;
+ renderCctvDetectionCount(r);text('radarDetectedCount',DetectionCounts.latest(r)?.count??'--');
+ text('detectionCountSummary',`누적 감지: ${sample.count.toLocaleString('ko-KR')}회 · P4 확인값`);
+});
 const radarView=new RadarView(drawRadar,message=>text('radarLiveStatus',message));
 
 async function ensureAudio(){if(!audioContext)audioContext=new AudioContext();await audioContext.resume();}

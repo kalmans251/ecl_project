@@ -15,15 +15,17 @@ MAX_EVENT_REPLY_BYTES = 34
 POLL_STARTUP_SECONDS = 0.200
 POLL_HOST_MARGIN_SECONDS = 0.100
 # Separate from host wait: request + 40 ms bus margin + reply budget
-# must still fit the P4 grant (18 bytes at 9600 + 40 + 140 < 200 ms).
+# must still fit the P4 grant (19 bytes at 9600 + 40 + 140 < 200 ms).
 POLL_REPLY_BUDGET_MS = 140
 
 
 class EventPoller:
-    def __init__(self, bus, railings, audio, ids, dispatch, status_refresh=None):
+    def __init__(self, bus, railings, audio, ids, dispatch, status_refresh=None, count_update=None):
         self.bus, self.railings, self.audio = bus, railings, audio
         self.ids, self.dispatch = tuple(ids), dispatch
         self.status_refresh = status_refresh
+        self.count_update = count_update
+        self.count_protocol = {}
         self.output_states = {}
         self.stop_event = threading.Event()
         self.condition = threading.Condition()
@@ -58,6 +60,19 @@ class EventPoller:
                 index = (index + 1) % len(self.ids)
 
     def poll_once(self, rail):
+        extended = self.count_update is not None and self.count_protocol.get(rail, True)
+        ok = self._exchange(rail, extended)
+        if extended and ok:
+            if self.received:
+                self.count_protocol[rail] = True
+            else:
+                # Old firmware rejects the extra capability byte. Probe once,
+                # then retain the legacy emergency path until the Pi restarts.
+                self.count_protocol[rail] = False
+                return self._exchange(rail, False)
+        return ok
+
+    def _exchange(self, rail, extended):
         # The call controller's lock makes explicit PTT/hangup take priority.
         if self.audio._keepalive_due.is_set() or not self.audio._control_lock.acquire(False):
             return False
@@ -73,7 +88,7 @@ class EventPoller:
                 self.token = (self.token + 1) & 0xffffffff
                 token = self.token.to_bytes(4, 'big')
                 request = Frame(rail, Node.PI, Node.P4, Service.SYSTEM, Command.EVENT_POLL,
-                                token + self.ack.get(rail, 0).to_bytes(4, 'big'))
+                                token + self.ack.get(rail, 0).to_bytes(4, 'big') + (b'\x01' if extended else b''))
                 with self.condition:
                     self.pending = (rail, token)
                     self.received = False
@@ -110,7 +125,7 @@ class EventPoller:
         if (frame.src != Node.P4 or frame.dst != Node.PI or frame.service != Service.SYSTEM
                 or frame.command != Command.EVENT_REPLY):
             return False
-        if len(frame.payload) not in (14, 16, 22, 19, 24):
+        if len(frame.payload) not in (14, 16, 21, 22, 19, 24):
             return True
         with self.condition:
             if self.pending != (frame.railing_id, frame.payload[:4]):
@@ -132,12 +147,16 @@ class EventPoller:
                     self.dispatch(Frame(rid, Node.P4, Node.PI, service, command, frame.payload[14:]))
                     # Acknowledge only after the normal event handler succeeded.
                     self.ack[rid] = event_id
-            elif len(frame.payload) not in (14, 16) or service != 0 or command != 0:
+            elif len(frame.payload) not in (14, 16, 21) or service != 0 or command != 0:
                 return True
-            if not event_id and len(frame.payload) == 16:
+            if not event_id and len(frame.payload) in (16, 21):
                 outputs = tuple(frame.payload[14:16])
                 if any(value not in (0, 1) for value in outputs):
                     return True
+                if len(frame.payload) == 21 and frame.payload[16] not in (0, 1):
+                    return True
+                if len(frame.payload) == 21 and self.count_update:
+                    self.count_update(rid, frame.payload[16], int.from_bytes(frame.payload[17:21], 'big'))
                 if self.output_states.get(rid) != outputs:
                     # Only enqueue a refresh here: never do blocking PLC I/O in
                     # the single RX thread. Full correlated status remains truth.
