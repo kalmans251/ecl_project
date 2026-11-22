@@ -136,3 +136,23 @@ body #dashboardCanvas .cctv-detection-count{font-size:28px;font-weight:850;paddi
 
 /* Reduce only the droplet drawing, preserving its heading slot and spacing. */
 #dashboardCanvas .section-weather .env-heading .env-art-humidity{scale:.82}
+
+
+/* Fit music controls inside the LED card, including long track names. */
+#dashboardCanvas #tabContentMusic{gap:4px;overflow:visible;flex:1 0 auto}
+#dashboardCanvas #tabContentMusic>.audio-ctrl-box{flex:0 0 auto;margin-top:4px;padding-top:6px;gap:5px;min-width:0}
+#dashboardCanvas #tabContentMusic .led-radio-label{padding:4px 8px;min-height:26px;font-size:14px;line-height:1.3;margin-bottom:3px!important}
+#dashboardCanvas #tabContentMusic .audio-ctrl-title{padding:2px 0;font-size:12px;line-height:1.3}
+#dashboardCanvas #tabContentMusic .music-now-summary{min-width:0;margin:0;line-height:1.3;font-size:13px}
+#dashboardCanvas #tabContentMusic #musicNowTitle{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dashboardCanvas #tabContentMusic .audio-row{min-width:0;min-height:27px;gap:7px}
+#dashboardCanvas #tabContentMusic .audio-row .neon-select{padding:4px 6px;font-size:13px;height:29px;min-height:0}
+#dashboardCanvas #tabContentMusic .audio-row button:not(.play-btn-circle){padding:4px 6px;min-height:27px}
+#dashboardCanvas #tabContentMusic .music-transport-row{justify-content:center;gap:15px;margin-top:3px}
+#dashboardCanvas #tabContentMusic .play-btn-circle{width:30px;height:30px;flex:0 0 30px}
+#dashboardCanvas #tabContentMusic #musicPageInfo{font-size:12px;line-height:1.3}
+
+/* Both monitoring modes fill the card and share the same count overlay. */
+#dashboardCanvas #mediaDisplayCard{padding:0;gap:0}
+#dashboardCanvas #mediaDisplayCard>.media-display-container{flex:1;min-height:0;border:0}
+#dashboardCanvas #viewRadarContainer{border:0;border-radius:0}
