@@ -12,6 +12,7 @@
 #include "call_manager.h"
 #include "event_outbox.h"
 #include "system_state.h"
+#include "detection_manager.h"
 #include "projector_control.h"
 #include "esp_timer.h"
 #include "esp_log.h"
@@ -93,7 +94,8 @@ static void handle_plc_frame(
 
     if (frame->src == NODE_PI && frame->dst == NODE_P4 &&
         frame->service == SERVICE_SYSTEM && frame->command == CMD_EVENT_POLL) {
-        if(frame->length != 8 || s_poll_pending)return;
+        bool live_count=frame->length==9 && frame->payload[8]==1;
+        if((frame->length != 8 && !live_count) || s_poll_pending)return;
         event_outbox_reply(frame, &s_poll_reply);
         /* Coalesce output changes in the existing Pi-owned response slot.
          * Emergency/call reports keep their priority and original encoding. */
@@ -103,6 +105,17 @@ static void handle_plc_frame(
             s_poll_reply.payload[14] = state.sleep_active ? 1 : 0;
             s_poll_reply.payload[15] = projector_control_get() ? 1 : 0;
             s_poll_reply.length = 16;
+            if(live_count){
+                detection_summary_t detection;
+                detection_manager_get_summary(&detection);
+                uint32_t total=detection.total_detected_count;
+                s_poll_reply.payload[16]=(uint8_t)detection.source;
+                s_poll_reply.payload[17]=total>>24;
+                s_poll_reply.payload[18]=total>>16;
+                s_poll_reply.payload[19]=total>>8;
+                s_poll_reply.payload[20]=total;
+                s_poll_reply.length=21;
+            }
         }
         int64_t now=esp_timer_get_time();
         s_poll_reply_at=now+20000; s_poll_reply_deadline=now+80000;

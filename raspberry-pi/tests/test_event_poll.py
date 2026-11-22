@@ -156,7 +156,7 @@ class PollTests(unittest.TestCase):
 
     def test_grant_budget_still_fits_9600_and_timeout_scales_with_baud(self):
         from plc.events import POLL_REPLY_BUDGET_MS
-        self.assertLessEqual(18 * 10 * 1000 / 9600 + 40 + POLL_REPLY_BUDGET_MS, 200)
+        self.assertLessEqual(19 * 10 * 1000 / 9600 + 40 + POLL_REPLY_BUDGET_MS, 200)
         self.bus.baudrate = 4800
         slow = EventPoller(self.bus, self.states, self.audio, [1], self.events.append)
         self.assertGreater(slow.reply_timeout, self.poller.reply_timeout)

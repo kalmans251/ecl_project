@@ -38,6 +38,9 @@ HARNESS = r"""
 #include <stdio.h>
 #include "plc_task.c"
 
+void system_state_get(p4_system_state_t *out){memset(out,0,sizeof(*out));}
+bool projector_control_get(void){return true;}
+void detection_manager_get_summary(detection_summary_t *out){memset(out,0,sizeof(*out));out->source=DETECTION_SOURCE_CCTV;out->total_detected_count=0x01020304;}
 QueueHandle_t router_queue = (void *)1;
 QueueHandle_t plc_tx_queue = (void *)2;
 QueueHandle_t wroom_tx_queue;
@@ -170,6 +173,13 @@ int main(void) {
     process_plc_tx_queue();assert(sent_count==0);
     now=20000;process_plc_tx_queue();assert(sent_count==1 && sent[0].command==CMD_EVENT_REPLY);
     handle_plc_frame(&poll);now+=80001;process_plc_tx_queue();assert(sent_count==1);
+    assert(sent[0].length==16); // legacy poll remains unchanged
+    reset();poll.length=9;poll.payload[8]=1;
+    handle_plc_frame(&poll);assert(s_poll_pending && s_poll_reply.length==21);
+    assert(s_poll_reply.payload[16]==DETECTION_SOURCE_CCTV);
+    assert(s_poll_reply.payload[17]==1 && s_poll_reply.payload[18]==2 && s_poll_reply.payload[19]==3 && s_poll_reply.payload[20]==4);
+    now=20000;process_plc_tx_queue();assert(sent_count==1 && sent[0].length==21);
+    reset();poll.payload[8]=2;handle_plc_frame(&poll);assert(!s_poll_pending);
     puts("P4 UART drain, receive-window silence, idle grants and stale voice: PASS");
     return 0;
 }

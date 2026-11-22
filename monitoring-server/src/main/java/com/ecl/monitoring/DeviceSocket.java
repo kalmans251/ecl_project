@@ -10,9 +10,9 @@ public class DeviceSocket extends TextWebSocketHandler {
     private final Events events;
     private final Commands commands; private final Telemetry telemetry;private final Voice voice;
     private final MusicTelemetry music;
-    private final RadarSocket radar;
+    private final RadarSocket radar; private final DetectionSocket detection;
     private final JsonMapper json=JsonMapper.builder().build();
-    public DeviceSocket(Gateways gateways, Events events, Commands commands, Telemetry telemetry,Voice voice,MusicTelemetry music,RadarSocket radar) { this.gateways=gateways; this.events=events; this.commands=commands;this.telemetry=telemetry;this.voice=voice;this.music=music;this.radar=radar; }
+    public DeviceSocket(Gateways gateways, Events events, Commands commands, Telemetry telemetry,Voice voice,MusicTelemetry music,RadarSocket radar,DetectionSocket detection) { this.gateways=gateways; this.events=events; this.commands=commands;this.telemetry=telemetry;this.voice=voice;this.music=music;this.radar=radar;this.detection=detection; }
     private String id(WebSocketSession session) { return session.getUri().getPath().substring("/ws/gateways/".length()); }
     @Override public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         session.setTextMessageSizeLimit(4096);
@@ -40,6 +40,7 @@ public class DeviceSocket extends TextWebSocketHandler {
                 if(node.path("version").asInt()==2)gateways.send(id(session),json.writeValueAsString(Map.of(
                     "version",2,"type","emergency_ack","event_id",node.path("event_id").asText(),"railing_id",node.path("railing_id").asInt())));
                 return;}
+            if(node.path("type").asText().equals("detection_state")){detection.accept(id(session),session.getId(),node);return;}
             if(node.path("type").asText().equals("radar_state")){radar.accept(id(session),session.getId(),node);return;}
             if(node.path("type").asText().equals("call_ended")){
                 if(commands.callEnded(id(session),node))gateways.send(id(session),json.writeValueAsString(Map.of(

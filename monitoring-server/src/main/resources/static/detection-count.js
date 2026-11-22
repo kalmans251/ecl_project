@@ -1,6 +1,6 @@
 /* Last P4-confirmed snapshot, never a browser-inferred people total. */
 (function(root){
- const values=new Map();
+ const values=new Map(),live=new Map();
  function decode(command){
   const reset=command.operation==='detection.reset';
   if(!reset&&command.operation!=='detection.count')return null;
@@ -14,6 +14,18 @@
  function ingest(commands){for(const command of commands||[]){const value=decode(command);if(value&&(!values.has(command.rail_id)||values.get(command.rail_id).at<=value.at))values.set(command.rail_id,value);}}
  function get(id){return values.get(id);}
  function describe(id){const d=get(id);return d?`${d.count}회 · ${d.source} · 마지막 확인 요청 ${new Date(d.at).toLocaleString()}`:'미조회 · 카운트 조회를 누르세요';}
- root.DetectionCounts={decode,ingest,get,describe};
+ function ingestLive(s){
+  if(!s||s.type!=='detection_count'||typeof s.rail_id!=='string'||!Number.isInteger(s.count)||s.count<0||s.count>0xffffffff||![0,1].includes(s.source)||!Number.isFinite(s.observed_at))return false;
+  if(live.has(s.rail_id)&&live.get(s.rail_id).at>=s.observed_at)return false;
+  live.set(s.rail_id,{count:s.count,source:s.source===0?'레이더':'CCTV',at:s.observed_at});
+  if(live.size>256)live.delete(live.keys().next().value);return true;
+ }
+ function latest(rail){
+  if(!rail)return null;
+  const candidates=[get(rail.id),live.get(rail.id)];
+  if(Number.isInteger(rail.reported?.detection_count)&&rail.reported.detection_count>=0)candidates.push({count:rail.reported.detection_count,at:Number(rail.seen_at||0)});
+  return candidates.filter(Boolean).sort((a,b)=>new Date(b.at).getTime()-new Date(a.at).getTime())[0]||null;
+ }
+ root.DetectionCounts={decode,ingest,get,describe,ingestLive,latest};
  if(typeof module!=='undefined')module.exports=root.DetectionCounts;
 })(globalThis);

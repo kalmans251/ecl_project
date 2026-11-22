@@ -5,9 +5,10 @@ import org.springframework.web.socket.server.standard.ServletServerContainerFact
 @Configuration
 @EnableWebSocket
 public class WebConfiguration implements WebSocketConfigurer {
-    private final DeviceSocket socket;private final Voice voice;private final CameraSocket camera;private final RadarSocket radar;
-    public WebConfiguration(DeviceSocket socket,Voice voice,CameraSocket camera,RadarSocket radar) { this.socket=socket;this.voice=voice;this.camera=camera;this.radar=radar; }
+    private final DeviceSocket socket;private final Voice voice;private final CameraSocket camera;private final RadarSocket radar;private final DetectionSocket detection;
+    public WebConfiguration(DeviceSocket socket,Voice voice,CameraSocket camera,RadarSocket radar,DetectionSocket detection) { this.socket=socket;this.voice=voice;this.camera=camera;this.radar=radar;this.detection=detection; }
     @Override public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        registry.addHandler(detection,"/ws/operator/detection/*").addInterceptors(new org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor());
         registry.addHandler(radar,"/ws/operator/radar/*").addInterceptors(new org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor());
         registry.addHandler(camera,"/ws/cameras/*");
         registry.addHandler(socket,"/ws/gateways/*");

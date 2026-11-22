@@ -242,8 +242,23 @@ def main() -> int:
             frame.payload.hex(" "),
         )
 
+    count_last = {}
+    def publish_count(rail, source, count):
+        if not publisher or not publisher.connected.is_set():
+            count_last.pop(rail, None)
+            return
+        previous = count_last.get(rail)
+        now = time.monotonic()
+        if previous and previous[:2] == (source, count) and now - previous[2] < 5:
+            return
+        from datetime import datetime, timezone
+        publisher.publish(dict(version=1, type='detection_state', railing_id=rail,
+            observed_at=datetime.now(timezone.utc).isoformat(), source=source, count=count))
+        count_last[rail] = (source, count, now)
+
     event_poller = EventPoller(bus, railings, audio, args.event_railings, on_frame,
-                               status_refresh=lambda rail: status_sync.refresh(rail) if status_sync else None)
+                               status_refresh=lambda rail: status_sync.refresh(rail) if status_sync else None,
+                               count_update=publish_count if args.monitor_url else None)
 
     bus.set_frame_handler(
         on_frame
