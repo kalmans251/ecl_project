@@ -62,3 +62,14 @@ Pi는 `timedatectl`이 `NTPSynchronized=yes`를 보고할 때만 카메라 시�
 `time sync failed`이면 ONVIF 주소·포트·권한을 확인하세요.
 실패는 다음 검사에서 재시도하며 영상 송출을 중단하지 않습니다.
 현재 결과는 Pi 로그에서 확인하며 관제 웹 상태에 별도 전송하지 않습니다.
+
+
+## FFmpeg RTSP 옵션 호환성
+
+`Option rw_timeout not found`는 카메라 연결 이전에 FFmpeg가 입력 옵션을 거절한 오류입니다.
+에이전트 시작 시 로컬 `ffmpeg -h demuxer=rtsp`로 지원 옵션을 확인합니다.
+구형 빌드는 `-stimeout`, 최신 빌드는 마이크로초 단위의 `-timeout`을 사용합니다.
+어느 옵션도 확인할 수 없으면 해당 옵션을 생략하고 기존 15초 무진행 감시로 재시작합니다.
+옵션 탐지는 한 번만 실행되며 카메라 주소·암호를 전달하지 않습니다.
+`RTSP timeout option: -timeout` 또는 `-stimeout` / `watchdog only` 로그로 확인할 수 있습니다.
+설정을 새로 만들거나 카메라 시간을 되돌릴 필요는 없습니다. 코드 업데이트 후 에이전트를 재시작하세요.

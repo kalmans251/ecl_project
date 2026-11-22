@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import signal
+import subprocess
 import time
 from urllib.parse import urlsplit, urlencode
 from camera_time import validate_config, time_sync_loop
@@ -38,17 +39,36 @@ def load_config(path):
     validate_config(c)
     return c
 
-def ffmpeg_args(c):
+def rtsp_timeout_option():
+    """RTSP options differ between FFmpeg builds; rw_timeout is not portable."""
+    try:
+        result = subprocess.run(['ffmpeg', '-hide_banner', '-h', 'demuxer=rtsp'],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=3, check=True)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    # Older builds also have a 'timeout' in seconds for listening. Prefer
+    # stimeout there, and only accept modern timeout when units are explicit.
+    if re.search(r'(?m)^\s*-stimeout\s', result.stdout):
+        return '-stimeout'
+    if re.search(r'(?mi)^\s*-timeout\s[^\n]*microseconds', result.stdout):
+        return '-timeout'
+    # The existing no-progress watchdog still terminates stalled FFmpeg.
+    return None
+
+def ffmpeg_args(c, timeout_option='-timeout'):
+    if timeout_option not in (None, '-timeout', '-stimeout'):
+        raise ValueError('Unsupported RTSP timeout option')
     query = urlencode({'streamid': f"publish:{c['camera_id']}_raw:camera:{c['publish_token']}",
                        'pkt_size': 1316, 'passphrase': c['srt_passphrase'], 'pbkeylen': 32})
     return ['ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-progress', 'pipe:1',
-            '-rtsp_transport', 'tcp', '-rw_timeout', '10000000', '-i', c['camera_url'],
+            '-rtsp_transport', 'tcp', *([timeout_option, '10000000'] if timeout_option else []), '-i', c['camera_url'],
             '-map', '0:v:0', '-c:v', 'copy', '-an', '-f', 'mpegts',
             f"srt://{c['server_host']}:8890?{query}"]
 
 class Supervisor:
-    def __init__(self, config, clock=time.monotonic):
+    def __init__(self, config, clock=time.monotonic, timeout_option='-timeout'):
         self.config, self.clock = config, clock
+        self.timeout_option = timeout_option
         self.deadline = 0
         self.wanted = False
         self.revision = None
@@ -112,7 +132,7 @@ class Supervisor:
         if self.proc is None and now >= self.retry_at:
             try:
                 # Credentials are never passed through a shell or written to logs.
-                self.proc = await asyncio.create_subprocess_exec(*ffmpeg_args(self.config),
+                self.proc = await asyncio.create_subprocess_exec(*ffmpeg_args(self.config, self.timeout_option),
                     stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
                 self.started, self.last_progress, self.state = now, 0, 'starting'
                 self.progress_task = asyncio.create_task(self.progress(self.proc))
@@ -121,7 +141,9 @@ class Supervisor:
 
 async def run(config):
     from websockets.asyncio.client import connect
-    supervisor = Supervisor(config)
+    timeout_option = await asyncio.to_thread(rtsp_timeout_option)
+    LOG.info('RTSP timeout option: %s', timeout_option or 'watchdog only')
+    supervisor = Supervisor(config, timeout_option=timeout_option)
     async def watchdog():
         while True:
             await supervisor.tick()
