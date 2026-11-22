@@ -573,3 +573,8 @@ body .section-controls .feature-toggle-grid .ctrl-item{
  body .section-controls .feature-toggle-grid{padding:4px 0}
  body .section-controls .feature-toggle-grid .ctrl-item{min-height:42px}
 }
+
+.pending-panel-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;flex-shrink:0}
+#btnCancelSettings{background:#243d4c;color:#e7eef5;border:1px solid #7694a5}
+#btnCancelSettings:disabled{opacity:.5;cursor:wait}
+@media(max-width:700px){.pending-panel-footer{flex-wrap:wrap}.pending-panel-actions{margin-left:auto}}
