@@ -188,7 +188,11 @@ function renderProjector(s,fresh=true){
 }
 
 function syncPendingSettings(){
+ if(!dirty.has('projector'))projectorDraftBefore=null;
+ if(!ledDraftKeys.some(key=>dirty.has(key)))ledDraftBefore=null;
+ for(const key of pendingOriginals.keys())if(!dirty.has(key))pendingOriginals.delete(key);
  const bar=$('pendingSettingsBar');if(!bar)return;
+ const cancel=$('btnCancelSettings');if(cancel)cancel.disabled=settingsApplying;
  bar.hidden=!dirty.size&&!settingsApplying;
  text('pendingSettingsMessage',settingsApplying?'장치에 적용 중입니다':`변경한 설정 ${dirty.size}개 · 적용 대상을 확인하세요`);
  const targets=rails();
@@ -203,7 +207,32 @@ function syncPendingSettings(){
 
 }
 
-function mark(operation,value){dirty.set(operation,value);syncPendingSettings();toast('옵션 변경됨 · 전체 적용을 눌러 요청하세요.');}
+const pendingOriginals=new Map();
+let projectorDraftBefore=null,ledDraftBefore=null;
+function settingValue(r,operation){
+ const s=r.reported||{};
+ if(operation==='projector')return ((projectorDraftBefore||projectorChoices).get(r.id)??true)?'on':'off';
+ if(operation==='volume')return !stateFetchFailed&&r.music_status?.fresh?r.music_status.volume:undefined;
+ const key={power:'power',sleep:'sleep',detection:'detection','music.mode':'music_mode',alarm:'alarm_enabled',sensor:'sensor_enabled'}[operation];
+ const value=s[key];return typeof value==='boolean'?(value?'on':'off'):value;
+}
+function stageSetting(operation,value){
+ if(!pendingOriginals.has(operation))pendingOriginals.set(operation,rails().map(r=>settingValue(r,operation)));
+ const original=pendingOriginals.get(operation);
+ if(original.length&&original.every(v=>v!==undefined&&String(v)===String(value)))dirty.delete(operation);
+ else dirty.set(operation,value);
+}
+function mark(operation,value){stageSetting(operation,value);syncPendingSettings();toast(dirty.size?'옵션 변경됨 · 전체 적용을 눌러 요청하세요.':'원래 설정으로 돌아왔습니다.');}
+function rememberLedDraft(){if(!ledDraftBefore)ledDraftBefore={key:ledSelectionKey(),preference:structuredClone(ledPreference())};}
+function cancelPendingSettings(){
+ if(settingsApplying)return;
+ if(dirty.has('projector')&&projectorDraftBefore)for(const [id,value]of projectorDraftBefore)projectorChoices.set(id,value);
+ if(ledDraftKeys.some(key=>dirty.has(key))&&ledDraftBefore)ledPreferences.set(ledDraftBefore.key,ledDraftBefore.preference);
+ dirty.clear();syncPendingSettings();displayedLedKey=null;
+ if(view)renderLive();
+ text('pendingSettingsResult','적용 대상 난간을 확인한 뒤 전체 적용을 눌러주세요.');
+ toast('변경한 설정을 취소했습니다.');
+}
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}
 const ledTabDefaults=[9,3,0];
 const ledDraftKeys=['led','weather','led.basic_pattern','led.music_pattern','led.sequence','weather.auto'];
@@ -240,6 +269,7 @@ function syncLedCategory(s){
  displayedLedKey=key;
 }
 function switchCategoryTabUI(name,code,edit=true){
+ if(edit)rememberLedDraft();
  const pref=ledPreference();
  if(edit)pref.initialized=true;
  if(currentCategory!==code)autoMusicKey=null;
@@ -272,6 +302,7 @@ function stageLedPreference(){
  syncLedPatterns(displayedStatus(r,statusCheck(r)));
 }
 function setSubModeUI(value){
+ rememberLedDraft();
  const pref=ledPreference();
  pref.values[currentCategory]=value;
  if(currentCategory===0&&value===9)pref.seconds=Math.max(1,Math.min(120,Math.trunc(Number($('ledSequenceSeconds').value)||10)));
@@ -292,7 +323,7 @@ function syncLedPatterns(s){
   row.title=staged?'변경 선택 · 전체 적용 대기':running?'장치 응답 기준 실행 중':'';
  });
 }
-function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit){dirty.set('volume',String(value));syncPendingSettings();}}
+function updateVolUI(value,edit=true){text('volDisplay',value+'%');if(edit){stageSetting('volume',String(value));syncPendingSettings();}}
 function updateAudioPlayMode(value){mark('music.mode',['sequential','shuffle','age'][Number(value)]);}
 function resetMusicCatalog(){musicPage=null;fillMusicTracks();renderMusicCatalog();}
 function fillMusicTracks(){
@@ -355,6 +386,7 @@ function syncProjectorSwitch(){
 }
 function toggleDeviceState(type,value){
  if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');
+ if(!projectorDraftBefore)projectorDraftBefore=new Map(rails().map(r=>[r.id,projectorChoices.get(r.id)??true]));
  rememberProjectorSwitch(value);mark('projector',value?'on':'off');syncProjectorSwitch();
 }
 function switchDisplayView(mode,edit=true){$('mediaDisplayCard').classList.toggle('cctv-only',mode==='cctv');$('viewRadarContainer').style.display=mode==='radar'?'flex':'none';$('viewCctvContainer').style.display=mode==='cctv'?'flex':'none';$('btnSwitchRadar').classList.toggle('active',mode==='radar');$('btnSwitchCctv').classList.toggle('active',mode==='cctv');text('mediaDisplayTitle',mode==='radar'?'출입인원 CHECK (레이더)':'CCTV 모니터링');const r=rails()[0];const path=mode==='cctv'&&r?.stream_path?r.stream_path:'about:blank';if($('cctvMainIframe').getAttribute('src')!==path)$('cctvMainIframe').src=path;if(edit)mark('detection',mode);radarView.select(mode==='radar'&&rails().length===1?rails()[0].id:null);}
@@ -399,7 +431,7 @@ function sendAudioAction(action){
   finally{musicTransportBusy=false;renderMusicPlaybackToggle();}
  });
 }
-function resetAllConfigurations(){dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);rememberProjectorSwitch(false);syncProjectorSwitch();syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
+function resetAllConfigurations(){rememberLedDraft();if(!projectorDraftBefore)projectorDraftBefore=new Map(rails().map(r=>[r.id,projectorChoices.get(r.id)??true]));dirty=new Map([['power','ac'],['sleep','off'],['led.sequence','10'],['projector','off'],['volume','20'],['music.mode','sequential'],['detection','radar']]);rememberProjectorSwitch(false);syncProjectorSwitch();syncPendingSettings();toggleSleepStateUI(false,false);switchCategoryTabUI('basic',0,false);ledPreference().values[0]=9;ledPreference().seconds=10;syncLedPatterns({});$('piVolume').value=20;updateVolUI(20,false);$('piPlayMode').value=0;toast('기본 옵션 준비됨 · 전체 적용을 눌러 요청하세요. 예약·위치·연락망은 각 저장 버튼으로 관리합니다.');}
 async function saveTimeReservation(){await guarded(async()=>{for(const r of requireSelection())await api(`/api/portal/rails/${r.id}/schedule`,'PUT',{start_time:$('startTime').value,end_time:$('endTime').value,enabled:true});toast('예약 저장됨 · 한국 시간에 시작/종료 전원 명령을 요청합니다.');await poll();});}
 let railRouteLayers=[];
 function railMapIcon(r,highlight=selected.has(r.id)){
