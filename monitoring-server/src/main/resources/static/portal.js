@@ -593,7 +593,7 @@ function triggerMp3Alarm(){if(!audioContext)audioContext=new AudioContext();audi
 function drawRadar(targets){
  const c=$('ld2450RadarCanvas'),ctx=c.getContext('2d'),dpr=window.devicePixelRatio||1,w=c.clientWidth||400,h=c.clientHeight||250;
  c.width=w*dpr;c.height=h*dpr;ctx.scale(dpr,dpr);ctx.clearRect(0,0,w,h);
- const ox=w/2,oy=12,scale=Math.min((w-30)/12,(h-30)/6);
+ const scale=Math.max(0,Math.min((w-30)/12,(h-30)/6)),ox=w/2,oy=(h-6*scale)/2;
  ctx.strokeStyle='#284558';ctx.fillStyle='#73929e';ctx.font='11px system-ui';
  for(let i=1;i<=6;i++){ctx.beginPath();ctx.arc(ox,oy,scale*i,0,Math.PI);ctx.stroke();ctx.fillText(i+'m',ox+5,oy+scale*i);}
  for(const t of targets){if(!Number.isFinite(t.x)||!Number.isFinite(t.y))continue;ctx.fillStyle='#00f2fe';ctx.beginPath();ctx.arc(ox+t.x*scale,oy+t.y*scale,6,0,Math.PI*2);ctx.fill();}
