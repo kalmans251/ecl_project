@@ -5,5 +5,12 @@
   "camera_url": "rtsp://VIEW_ONLY_USER:URL_ENCODED_PASSWORD@192.168.1.2:554/1/2",
   "server_host": "omtest.duckdns.org",
   "publish_token": "REPLACE_WITH_PUBLISH_TOKEN",
-  "srt_passphrase": "REPLACE_WITH_RANDOM_SRT_PASSPHRASE"
+  "srt_passphrase": "REPLACE_WITH_RANDOM_SRT_PASSPHRASE",
+  "time_sync": {
+    "enabled": false,
+    "device_url": "http://192.168.1.2:80/onvif/device_service",
+    "username": "REPLACE_WITH_ONVIF_TIME_ADMIN_USER",
+    "password": "REPLACE_WITH_ONVIF_PASSWORD",
+    "timezone": "KST-9"
+  }
 }

@@ -10,6 +10,7 @@ import re
 import signal
 import time
 from urllib.parse import urlsplit, urlencode
+from camera_time import validate_config, time_sync_loop
 
 LOG = logging.getLogger('camera')
 
@@ -34,6 +35,7 @@ def load_config(path):
         raise ValueError('Invalid SRT host')
     if not re.fullmatch(r'[A-Za-z0-9_-]{32,79}', c['srt_passphrase']):
         raise ValueError('Use a random SRT passphrase (32..79 URL-safe characters)')
+    validate_config(c)
     return c
 
 def ffmpeg_args(c):
@@ -150,12 +152,18 @@ async def run(config):
 
 async def main_async(config):
     task = asyncio.create_task(run(config))
+    clock_task = asyncio.create_task(time_sync_loop(config))
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, task.cancel)
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
+    try:
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    finally:
+        clock_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await clock_task
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
