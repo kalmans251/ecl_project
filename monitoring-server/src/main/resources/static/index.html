@@ -517,7 +517,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 <style>
 .top-info-group{gap:8px; flex-wrap:wrap;justify-content:flex-end}.top-info-group button,.top-info-group select{background:#121929;border:1px solid #294956;color:#b0e8ed;border-radius:7px;padding:7px;cursor:pointer}.clock-display{font-size:12px!important}button:disabled,input:disabled,select:disabled{opacity:.38;cursor:not-allowed!important}.portal-toast{position:fixed;bottom:18px;right:18px;max-width:520px;z-index:10000;background:#122336;border:1px solid #4facfe;padding:14px;border-radius:10px;box-shadow:0 6px 30px #000;color:#fff;font-size:14px}.portal-dialog{color:#dce9f5;background:#0e1726;border:1px solid #28516c;border-radius:14px;width:min(900px,90vw);max-height:85vh;overflow:auto}.portal-dialog::backdrop{background:#000a}.portal-dialog table{width:100%;border-collapse:collapse;font-size:13px}.portal-dialog td,.portal-dialog th{border-bottom:1px solid #263646;padding:10px;text-align:left}.portal-dialog h2{font-size:20px}.portal-dialog button,.portal-dialog input,.portal-dialog select{padding:10px;background:#192d40;color:#fff;border:1px solid #3c6278;border-radius:6px}.portal-dialog label{display:grid;grid-template-columns:150px 1fr;gap:10px;margin:12px 0}.portal-dialog .close{float:right}#siteSelect{max-width:160px}#userName{font-size:12px}.id-badge-container button{background:#142338;color:#dce9f5;border:1px solid #385471;border-radius:8px;padding:9px;margin:3px;cursor:pointer}.id-badge-container button.selected{border-color:#00f2fe;box-shadow:0 0 8px #00f2fe66}.id-badge-container button.offline{opacity:.5}#mapViewport .map-empty{padding:24px;color:#829caf}.portal-readonly{color:#ffb300}.request-status{color:#ffb300}.main-header h1{white-space:nowrap}
 @container dashboard (max-width:1100px){body{overflow:auto!important;height:auto!important}.grid-row-3{min-width:1000px;min-height:850px}.main-header{min-width:1000px}.main-header h1{font-size:20px!important}}
-</style><link rel="stylesheet" href="/portal-polish.css"><link rel="stylesheet" href="/dashboard-fit.css?v=17">
+</style><link rel="stylesheet" href="/portal-polish.css"><link rel="stylesheet" href="/dashboard-fit.css?v=18">
 <style>#tabContentBasic{overflow-y:auto;min-height:0}.led-sequence-interval{display:flex;gap:8px;align-items:center;font-size:12px;color:#c5d7e4;padding:8px}.led-sequence-interval input{width:64px;background:#152c3b;color:#fff;border:1px solid #4b718a;border-radius:5px;padding:5px}</style></head>
 <body>
 
@@ -669,7 +669,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
             </div>
             <div class="audio-ctrl-box">
                 <div class="audio-ctrl-title">🎧 오디오 원격 제어</div>
-                <div aria-live="polite" style="overflow-wrap:anywhere; margin-bottom:10px;">
+                <div class="music-now-summary" aria-live="polite">
                     <div id="musicNowTitle">곡 정보 없음</div>
                     <small id="musicNowState">상태 확인 대기</small>
                     <div id="musicNowTime">--:-- / --:--</div>
@@ -706,7 +706,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
                     <span id="musicPageInfo">목록 미조회</span>
                     <button id="musicPageNext" disabled onclick="guarded(()=>loadMusicPage(musicPage.offset+8))">다음 목록</button>
                 </div>
-                <div class="audio-row" style="justify-content: center; gap: 15px; margin-top:10px;">
+                <div class="audio-row music-transport-row">
                     <button class="play-btn-circle" disabled title="현재 장치 이전 곡 명령 미지원" onclick="sendAudioAction(3)">⏮</button>
                     <button class="play-btn-circle" onclick="sendAudioAction(0)">⏹</button>
                     <button type="button" class="play-btn-circle" id="musicPlayPause" disabled aria-label="재생 상태 확인 중" title="재생 상태 확인 중" onclick="sendAudioAction(1)">▶</button>
@@ -811,20 +811,16 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
     
     <!-- 레이더/CCTV 통합 카드 -->
     <div id="mediaDisplayCard" class="card projector-merged-square-card2" style="grid-column: 4 / span 2; grid-row: 3 / span 3; ">
-        <p id="detectionCountSummary" style="font-size:12px;margin:4px 0;flex-shrink:0">누적 감지 카운트 미조회</p><div id="detectionCountActions" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0"><button id="detectionCountRead" onclick="detectionCountAction(false)">카운트 조회</button><button id="detectionCountReset" onclick="detectionCountAction(true)">카운트 초기화</button></div>
-        <div class="card-title" id="mediaDisplayTitle">출입인원 CHECK (레이더)</div>
         <div class="media-display-container">
             <!-- 레이더 화면 -->
             <div class="radar-container" id="viewRadarContainer">
-                <div class="radar-count-badge">
-                    <span class="radar-count-val" id="radarDetectedCount">--</span>
-                </div>
+                <div class="cctv-detection-count" title="선택한 난간에서 장치가 집계한 누적 감지 인원">TODAY : <span id="radarDetectedCount">--</span> 명</div>
                 <div class="radar-canvas-wrap"><canvas id="ld2450RadarCanvas"></canvas></div>
                 <div id="radarLiveStatus" role="status">좌표 대기</div>
             </div>
             <!-- CCTV WebRTC 화면 -->
             <div class="cctv-full-wrap" id="viewCctvContainer">
-                <div id="cctvDetectionCount" class="cctv-detection-count" title="선택한 난간에서 장치가 집계한 누적 감지 인원">TODAY : --</div>
+                <div id="cctvDetectionCount" class="cctv-detection-count" title="선택한 난간에서 장치가 집계한 누적 감지 인원">TODAY : -- 명</div>
                 <iframe class="cctv-full-frame" id="cctvMainIframe" src="about:blank" allow="autoplay; fullscreen" allowfullscreen></iframe>
             </div>
         </div>
@@ -885,7 +881,7 @@ body { background-color: var(--bg-color); background-image: radial-gradient(at 0
 <dialog id="portalDialog" class="portal-dialog"><button class="close" onclick="document.getElementById('portalDialog').close()">닫기</button><h2 id="dialogTitle"></h2><div id="dialogBody"></div></dialog>
 <script src="/music-status.js?v=2"></script>
 <script src="/web-voice.js"></script>
-<script src="/detection-count.js?v=2"></script><script src="/detection-live.js?v=1"></script><script src="/radar-view.js"></script><script src="/emergency-queue.js"></script><script src="/emergency-audio.js"></script><script src="/environment-weather.js?v=4"></script><script src="/portal.js?v=7"></script>
+<script src="/detection-count.js?v=2"></script><script src="/detection-live.js?v=1"></script><script src="/radar-view.js"></script><script src="/emergency-queue.js"></script><script src="/emergency-audio.js"></script><script src="/environment-weather.js?v=4"></script><script src="/portal.js?v=8"></script>
 <script src="/system-diagnosis.js"></script>
 <aside id="pendingSettingsBar" aria-label="변경 설정 적용" hidden>
  <div class="pending-panel-heading"><span>설정 변경 확인</span><strong id="pendingSettingsMessage"></strong></div>
