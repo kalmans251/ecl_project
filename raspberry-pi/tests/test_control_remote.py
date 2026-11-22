@@ -16,6 +16,17 @@ class RemoteControlsTests(unittest.TestCase):
  def message(self,op,value=None,rail=1):
   return dict(version=1,type='command',message_id=str(uuid4()),operation=op,value=value,railing_id=rail,
               expires_at=(datetime.now(timezone.utc)+timedelta(seconds=14)).isoformat())
+ def test_alarm_and_sensor_confirm_the_exact_requested_state(self):
+  for op in ('alarm','sensor'):
+   for value,detail in (('on','01'),('off','00')):
+    with self.subTest(operation=op,value=value):
+     result=self.remote.handle(self.message(op,value))
+     self.assertEqual(result['type'],'control_result')
+     self.assertEqual(result['status'],'APPLIED')
+     self.assertTrue(result['data']['device_application_confirmed'])
+     self.assertEqual(result['data']['steps'][0]['data'],detail)
+     self.assertEqual(result['data']['operation'],op)
+     self.assertEqual(result['data']['value'],value)
  def test_confirmed_power_two_steps_and_restart_dedup(self):
   m=self.message('power','ac');r=self.remote.handle(m)
   self.assertEqual(r['type'],'control_result');self.assertEqual(r['status'],'APPLIED');self.assertEqual(len(r['data']['steps']),2)

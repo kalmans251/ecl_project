@@ -19,14 +19,19 @@ void energy_monitor_encode(uint8_t out[ENERGY_WIRE_SIZE]){memset(out,0,ENERGY_WI
 static const protocol_frame_t *s_apply_request;
 static bool s_apply_accepted,active,emergency,queue_ok=true,manager_ok=true;
 static unsigned replies,led_calls,actions;
-static uint8_t result[6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE];
+static uint8_t result[128];
+static unsigned reception_wakes;static bool radar_enabled;
 static unsigned count=123, resets;
 static p4_system_state_t state;
 static bool call_manager_is_active(void){return active;}
 static bool emergency_manager_is_active(void){return emergency;}
 void system_state_get(p4_system_state_t *out){*out=state;}
+void system_state_set_emergency_enabled(bool enabled){state.emergency_enabled=enabled;}
+void system_state_set_sensor_enabled(bool enabled){state.sensor_enabled=enabled;}
+static void radar_cache_set_enabled(bool enabled){radar_enabled=enabled;}
+static void sleep_manager_reset_activity(void){reception_wakes++;}
 static void send_response(const protocol_frame_t *f,uint8_t service,uint8_t cmd,const uint8_t *p,uint8_t n){
- assert(f->service==service && cmd==CMD_APPLY_RESULT && (n==7 || n==12 || n==6+STATUS_SNAPSHOT_SIZE || n==6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE));memcpy(result,p,n);replies++;
+ assert(f->service==service && cmd==CMD_APPLY_RESULT && (n==7 || n==12 || n==6+STATUS_SNAPSHOT_SIZE || n>=6+STATUS_SNAPSHOT_SIZE+ENERGY_WIRE_SIZE));memcpy(result,p,n);replies++;
 }
 static void handle_led(const protocol_frame_t *f){(void)f;assert(s_apply_request);led_calls++;s_apply_accepted=queue_ok;}
 static void handle_power(const protocol_frame_t *f){actions++;if(f->command==CMD_SET)state.power_mode=f->payload[0];}
@@ -53,7 +58,14 @@ static protocol_frame_t req(uint8_t service,uint8_t op){
  f.command=CMD_APPLY;f.length=5;f.payload[0]=42;f.payload[4]=op;return f;
 }
 int main(void){
- protocol_frame_t f=req(SERVICE_PROJECTOR,CMD_START);handle_general_apply(&f);
+ protocol_frame_t f=req(SERVICE_EMERGENCY,CMD_STOP);handle_general_apply(&f);
+ assert(result[5]==0 && result[6]==0 && !state.emergency_enabled);
+ f=req(SERVICE_EMERGENCY,CMD_START);handle_general_apply(&f);assert(result[5]==0 && result[6]==1 && state.emergency_enabled);
+ f=req(SERVICE_DETECTION,CMD_STOP);handle_general_apply(&f);assert(result[5]==0 && result[6]==0 && !state.sensor_enabled && !radar_enabled && reception_wakes==0);
+ f=req(SERVICE_DETECTION,CMD_START);handle_general_apply(&f);assert(result[5]==0 && result[6]==1 && state.sensor_enabled && radar_enabled && reception_wakes==1);
+ active=true;f=req(SERVICE_EMERGENCY,CMD_STOP);handle_general_apply(&f);assert(result[5]==1 && state.emergency_enabled);active=false;
+ emergency=true;f=req(SERVICE_DETECTION,CMD_STOP);handle_general_apply(&f);assert(result[5]==1 && state.sensor_enabled);emergency=false;
+ f=req(SERVICE_PROJECTOR,CMD_START);handle_general_apply(&f);
  assert(result[0]==42 && result[4]==CMD_START && result[5]==0 && state.projector_enabled);
  active=true;unsigned n=actions;handle_general_apply(&f);assert(result[5]==1 && actions==n);active=false;
  f=req(SERVICE_SYSTEM,CMD_PING);handle_general_apply(&f);assert(result[5]==0 && result[6]==1);
@@ -83,7 +95,9 @@ int main(void){
  assert(result[14]==1 && result[15]==DETECTION_SOURCE_CCTV && result[16]==MUSIC_PLAY_MODE_SHUFFLE);
  assert(result[17]==0x12 && result[20]==0x78);
  f.payload[5]=2;handle_general_apply(&f);assert(result[5]==0 && result[6]==2 && result[22]==16 && result[23]==0x33 && result[24]==0x90);
- f.payload[5]=3;handle_general_apply(&f);assert(result[5]==1);
+ f.payload[5]=5;handle_general_apply(&f);assert(result[5]==0 && result[6]==5);
+ assert(result[40]==1 && result[41]==1); /* v5 reception flags */
+ f.payload[5]=6;handle_general_apply(&f);assert(result[5]==1);
  count=9;f.payload[0]++;active=true;handle_general_apply(&f);assert(count==9 && result[5]==1);
  return 0;
 }

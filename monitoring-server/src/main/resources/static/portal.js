@@ -151,16 +151,30 @@ function renderSelection(){
  {const r=rails().length===1?rails()[0]:null;const empty=rails().length>1?'여러 난간 선택됨':'난간을 선택하세요';text('installedLat',r?(r.latitude??'미등록'):empty);text('installedLng',r?(r.longitude??'미등록'):empty);text('installedAddress',r?(r.address||'미등록'):empty);}
  renderLive();renderMap();
 }
-// Keep unsent edits separate from confirmed device observations.
-function syncReportedControls(s){
+function receptionControlBlock(){
+ const items=rails();
+ if(!items.length)return '난간을 선택하세요.';
+ if(view?.role==='VIEWER')return '조회 계정은 제어할 수 없습니다.';
+ if(stateFetchFailed||items.some(r=>!r.online))return '선택한 난간의 연결 상태를 확인하세요.';
+ if(settingsApplying||controlBusy||emergencyAccepting||pttChanging)return '진행 중인 요청이 완료된 뒤 변경하세요.';
+ if(items.some(r=>r.reported?.emergency)||view?.calls?.some(c=>items.some(r=>r.id===c.RAIL_ID)))return '비상·통화가 종료된 뒤 변경하세요.';
+ return '';
+}
+function syncReceptionControls(){
+ const items=rails(),blocked=receptionControlBlock();
  for(const [type,op,key]of [['alarmBell','alarm','alarm_enabled'],['radar','sensor','sensor_enabled']]){
+  const first=items[0]?.reported?.[key];
+  const value=dirty.has(op)?dirty.get(op)==='on':typeof first==='boolean'&&items.every(r=>r.reported?.[key]===first)?first:undefined;
   document.querySelectorAll('[data-device-toggle="'+type+'"]').forEach(b=>{
-   const value=dirty.has(op)?dirty.get(op)==='on':s[key];
    const active=typeof value==='boolean'&&b.dataset.enabled===String(value);
-   b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
-   b.title=typeof value==='boolean'?'':'설정 상태 미확인 · Pi와 P4 업데이트가 필요합니다.';
+   b.disabled=!!blocked;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));
+   b.title=blocked||(dirty.has(op)?'변경 선택 · 전체 적용 대기':typeof value==='boolean'?'P4 수신값 · '+(value?'ON':'OFF'):'설정 상태 미확인 또는 난간별 값이 다릅니다. 적용 후 장치 응답을 확인합니다.');
   });
  }
+}
+// Keep unsent edits separate from confirmed device observations.
+function syncReportedControls(s){
+ syncReceptionControls();
 
  const selectedMusic=rails().length===1?rails()[0].music_status:null;
  const volume=!stateFetchFailed&&selectedMusic?.fresh?selectedMusic.volume:undefined;
@@ -385,7 +399,12 @@ function syncProjectorSwitch(){
  });
 }
 function toggleDeviceState(type,value){
- if(type!=='projector')return toast('현재 펌웨어에서 해당 ON/OFF 명령을 지원하지 않습니다.');
+ if(type==='alarmBell'||type==='radar'){
+  if(typeof value!=='boolean')return;
+  const blocked=receptionControlBlock();if(blocked)return toast(blocked);
+  mark(type==='alarmBell'?'alarm':'sensor',value?'on':'off');syncReceptionControls();return;
+ }
+ if(type!=='projector')return;
  if(!projectorDraftBefore)projectorDraftBefore=new Map(rails().map(r=>[r.id,projectorChoices.get(r.id)??true]));
  rememberProjectorSwitch(value);mark('projector',value?'on':'off');syncProjectorSwitch();
 }
@@ -408,7 +427,16 @@ function setSettingsBusy(busy){
  if(busy){text('settingsBusyMessage','설정 전송 및 장치 응답을 확인하고 있습니다.');if(!loading.open)loading.showModal();}
  else if(loading.open)loading.close();
 }
-async function applyAllUpdates(){if(settingsApplying)return;if(musicBusy)return toast('음악 요청이 완료된 뒤 적용하세요.');settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
+function verifyReceptionSetting(operation,value,targets){
+ const key={alarm:'alarm_enabled',sensor:'sensor_enabled'}[operation];if(!key)return;
+ const expected=value==='on';
+ for(const id of targets){
+  const r=view?.rails.find(r=>r.id===id);
+  if(typeof r?.reported?.[key]!=='boolean')throw Error((r?.name||id)+': 설정 상태를 확인하지 못했습니다. 난간 Pi와 P4 버전을 확인하세요.');
+  if(r.reported[key]!==expected)throw Error((r.name||id)+': 요청한 수신 설정과 P4 상태가 다릅니다. 처리 내역을 확인하세요.');
+ }
+}
+async function applyAllUpdates(){if(settingsApplying)return;if(musicBusy)return toast('음악 요청이 완료된 뒤 적용하세요.');settingsApplying=true;setSettingsBusy(true);syncPendingSettings();try{await guarded(async()=>{const targets=requireSelection().map(r=>r.id),targetSite=site;if(!dirty.size)return toast('변경한 옵션이 없습니다.');const entries=[...dirty];for(const [op,value]of entries){if(site!==targetSite||JSON.stringify(rails().map(r=>r.id))!==JSON.stringify(targets))throw Error('선택이 변경되어 후속 설정을 중단했습니다. 처리 내역을 확인하세요.');await send(op,value,targets);if(op==='led'&&value==='music')await send('music.start',null,targets);toast('적용 후 실제 장치 상태 확인 중…');await waitAppliedSnapshot(targets,targetSite);verifyReceptionSetting(op,value,targets);if(dirty.get(op)===value)dirty.delete(op);syncPendingSettings();renderLive();}toast('변경 요청 처리 완료 · 정책 확인과 실제 적용의 구분은 처리 내역을 확인하세요.');});}finally{settingsApplying=false;setSettingsBusy(false);syncPendingSettings();}}
 let musicTransportBusy=false;
 function renderMusicPlaybackToggle(){
  const button=$('musicPlayPause');if(!button)return;
