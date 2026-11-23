@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
 const newId=()=>crypto.randomUUID();
 let settingsApplying=false;
-function toast(message){if(settingsApplying){text('pendingSettingsResult',message);text('settingsBusyMessage',message);return;}text('portalToast',message);$('portalToast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('portalToast').hidden=true,8000);}
+function toast(message){if(settingsApplying)text('settingsBusyMessage',message);text('portalToast',message);$('portalToast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('portalToast').hidden=true,8000);}
 async function api(path,method='GET',data,signal){
  const headers={};if(method!=='GET'){headers[csrf.header]=csrf.token;if(data!==undefined)headers['Content-Type']='application/json';}
  const response=await fetch(path,{method,headers,signal,body:data===undefined?undefined:JSON.stringify(data)});
@@ -208,16 +208,7 @@ function syncPendingSettings(){
  const bar=$('pendingSettingsBar');if(!bar)return;
  const cancel=$('btnCancelSettings');if(cancel)cancel.disabled=settingsApplying;
  bar.hidden=!dirty.size&&!settingsApplying;
- text('pendingSettingsMessage',settingsApplying?'장치에 적용 중입니다':`변경한 설정 ${dirty.size}개 · 적용 대상을 확인하세요`);
- const targets=rails();
- text('pendingTargetTitle',`적용 대상 난간 · ${targets.length}개`);
- const root=$('pendingTargetRails');root.replaceChildren();
- if(!targets.length){const empty=document.createElement('span');empty.textContent='선택된 난간 없음';root.append(empty);}
- for(const r of targets){const item=document.createElement('div');item.className='pending-target-item';
-  const name=document.createElement('strong');name.textContent=r.name;
-  const detail=document.createElement('small');detail.textContent=`${stateFetchFailed?'연결 확인 불가':r.online?'연결 정상':'연결 끊김'}`;
-  item.append(name,detail);root.append(item);
- }
+ const apply=$('btnApplyCommand');if(apply)apply.disabled=settingsApplying||!dirty.size;
 
 }
 
@@ -244,7 +235,6 @@ function cancelPendingSettings(){
  if(ledDraftKeys.some(key=>dirty.has(key))&&ledDraftBefore)ledPreferences.set(ledDraftBefore.key,ledDraftBefore.preference);
  dirty.clear();syncPendingSettings();displayedLedKey=null;
  if(view)renderLive();
- text('pendingSettingsResult','적용 대상 난간을 확인한 뒤 전체 적용을 눌러주세요.');
  toast('변경한 설정을 취소했습니다.');
 }
 function toggleSleepStateUI(value,edit=true){isSleepMode=value;$('btnModeWakeup').className=value?'pwr-state-btn':'pwr-state-btn active-normal';$('btnModeSleep').className=value?'pwr-state-btn active-sleep':'pwr-state-btn';if(edit)mark('sleep',value?'on':'off');}

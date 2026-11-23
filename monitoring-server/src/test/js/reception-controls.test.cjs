@@ -33,5 +33,5 @@ test('apply sends both commands and clears only after confirmed state matches',a
  const a=app();a.run("toggleDeviceState('alarmBell',false);toggleDeviceState('radar',false)");await a.run('applyAllUpdates()');assert.equal(a.run('sent.map(s=>s.op).join()'),'alarm,sensor');assert.equal(a.run('dirty.size'),0);assert.equal(a.run('view.rails[0].reported.sensor_enabled'),false);
 });
 test('mismatched or missing P4 readback keeps the edit and never claims completion',async()=>{
- for(const unknown of [false,true]){const a=app();a.run("toggleDeviceState('alarmBell',false);confirmValues=false");if(unknown)a.run('delete view.rails[0].reported.alarm_enabled');await a.run('applyAllUpdates()');assert.equal(a.run("dirty.get('alarm')"),'off');assert.equal(a.run('settingsApplying'),false);assert.equal(a.run('sent.length'),1);assert.match(a.el('pendingSettingsResult').textContent,unknown?/확인하지 못/:/다릅니다/);}
+ for(const unknown of [false,true]){const a=app();a.run("toggleDeviceState('alarmBell',false);confirmValues=false");if(unknown)a.run('delete view.rails[0].reported.alarm_enabled');await a.run('applyAllUpdates()');assert.equal(a.run("dirty.get('alarm')"),'off');assert.equal(a.run('settingsApplying'),false);assert.equal(a.run('sent.length'),1);assert.match(a.el('settingsBusyMessage').textContent,unknown?/확인하지 못/:/다릅니다/);}
 });
