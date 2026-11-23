@@ -424,7 +424,7 @@ body #pendingSettingsBar{position:fixed;top:0;left:50%;transform:translateX(-50%
 body #pendingSettingsBar[hidden]{display:none}
 .pending-panel-heading{display:flex;align-items:center;min-width:0}
 .pending-panel-heading>span{font-size:18px;font-weight:800;color:#dcfbff}
-body #pendingSettingsBar button{font-size:15px;padding:11px 24px;min-height:42px;flex-shrink:0}
+body #pendingSettingsBar button{font-size:15px;padding:11px 24px;min-height:42px;flex-shrink:0;margin:0;white-space:nowrap}
 @keyframes pendingDrawerOpen{from{opacity:0;transform:translate(-50%,-100%)}to{opacity:1;transform:translate(-50%,0)}}
 @media(max-width:700px){
  body #pendingSettingsBar{width:min(530px,calc(100vw - 16px));max-width:calc(100vw - 16px);padding:12px;gap:12px}
