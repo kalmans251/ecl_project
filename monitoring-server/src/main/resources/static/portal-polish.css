@@ -420,14 +420,14 @@ body :is(.card-title,.dashboard-section .section-heading)::after{
 }
 
 /* Top-attached application drawer: overlay only, never resize the dashboard. */
-body #pendingSettingsBar{position:fixed;top:0;left:50%;transform:translateX(-50%);translate:none;z-index:2000;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:16px;width:min(530px,calc(100vw - 32px));min-width:0;min-height:0;max-width:calc(100vw - 32px);box-sizing:border-box;padding:14px 18px;background:linear-gradient(180deg,#173645,#102533);border:1px solid #50cad5;border-top:0;border-radius:0 0 16px 16px;box-shadow:0 16px 45px #0008,inset 0 3px 0 #63dce3;animation:pendingDrawerOpen .3s ease-out}
+body #pendingSettingsBar{position:fixed;top:0;left:50%;transform:translateX(-50%);translate:none;z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;width:min(530px,calc(100vw - 32px));min-width:0;min-height:150px;max-width:calc(100vw - 32px);box-sizing:border-box;padding:24px 18px;background:linear-gradient(180deg,#173645,#102533);border:1px solid #50cad5;border-top:0;border-radius:0 0 16px 16px;box-shadow:0 16px 45px #0008,inset 0 3px 0 #63dce3;animation:pendingDrawerOpen .3s ease-out}
 body #pendingSettingsBar[hidden]{display:none}
 .pending-panel-heading{display:flex;align-items:center;min-width:0}
 .pending-panel-heading>span{font-size:18px;font-weight:800;color:#dcfbff}
 body #pendingSettingsBar button{font-size:15px;padding:11px 24px;min-height:42px;flex-shrink:0;margin:0;white-space:nowrap}
 @keyframes pendingDrawerOpen{from{opacity:0;transform:translate(-50%,-100%)}to{opacity:1;transform:translate(-50%,0)}}
 @media(max-width:700px){
- body #pendingSettingsBar{width:min(530px,calc(100vw - 16px));max-width:calc(100vw - 16px);padding:12px;gap:12px}
+ body #pendingSettingsBar{width:min(530px,calc(100vw - 16px));max-width:calc(100vw - 16px);padding:20px 12px;gap:18px}
  body #pendingSettingsBar button{font-size:13px;padding:10px 15px}
 }
 @media(prefers-reduced-motion:reduce){body #pendingSettingsBar{animation:none}}
@@ -560,7 +560,7 @@ body .section-controls .feature-toggle-grid .ctrl-item{
  body .section-controls .feature-toggle-grid .ctrl-item{min-height:42px}
 }
 
-.pending-panel-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;flex-shrink:0}
+.pending-panel-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;flex-shrink:0}
 #btnCancelSettings{background:#243d4c;color:#e7eef5;border:1px solid #7694a5}
 #btnCancelSettings:disabled{opacity:.5;cursor:wait}
 @media(max-width:420px){body #pendingSettingsBar{flex-wrap:wrap;justify-content:center}.pending-panel-actions{justify-content:center;flex-shrink:1}}
